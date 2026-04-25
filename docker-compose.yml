@@ -1,0 +1,200 @@
+# docker-compose.yml — CollabSpace local development environment
+#
+# Nothing here runs by default. Each service block is commented out and will
+# be activated incrementally as the corresponding application service is built.
+#
+# Usage (once a block is uncommented):
+#   docker compose up -d <service-name>
+#   docker compose down            # stop and remove containers
+#   docker compose down -v         # also remove named volumes (destroys data)
+#
+# All services share a single bridge network (collabspace) so they can resolve
+# each other by service name (e.g. postgres:5432, redis:6379).
+
+# version is intentionally omitted — Compose V2 does not require it.
+
+# ---------------------------------------------------------------------------
+# Networks
+# ---------------------------------------------------------------------------
+# networks:
+#   collabspace:
+#     driver: bridge
+
+# ---------------------------------------------------------------------------
+# Volumes
+# ---------------------------------------------------------------------------
+# Declare named volumes here so data survives container restarts.
+# volumes:
+#   postgres_data:
+#   mongo_data:
+#   redis_data:
+#   localstack_data:
+
+# ---------------------------------------------------------------------------
+# Services
+# ---------------------------------------------------------------------------
+services:
+
+  # -------------------------------------------------------------------------
+  # PostgreSQL — used by: auth-workspace service, ai-assistant service
+  #
+  # Auth/Workspace: users, workspaces, memberships, refresh tokens
+  # AI Assistant: conversation history + pgvector embeddings (same instance,
+  #               separate database — reconsider if load warrants splitting)
+  #
+  # When activating:
+  #   - Set POSTGRES_PASSWORD via a .env file (never hardcode here)
+  #   - Mount an init script in docker-entrypoint-initdb.d/ to create the
+  #     two databases (collabspace_auth, collabspace_ai) on first start
+  #   - Add pgvector extension init SQL for the ai database
+  # -------------------------------------------------------------------------
+  # postgres:
+  #   image: pgvector/pgvector:pg16   # includes pgvector extension
+  #   restart: unless-stopped
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER:-collabspace}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+  #     POSTGRES_DB: collabspace_auth
+  #   ports:
+  #     - "5432:5432"
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #     - ./infrastructure/local/postgres/init:/docker-entrypoint-initdb.d:ro
+  #   networks:
+  #     - collabspace
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collabspace}"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # -------------------------------------------------------------------------
+  # MongoDB — used by: document-service
+  #
+  # Stores document content, metadata, and version history.
+  # Atlas is used in deployed environments (see ADR-004); this local instance
+  # mirrors Atlas behaviour closely enough for development.
+  #
+  # When activating:
+  #   - Set MONGO_INITDB_ROOT_PASSWORD via .env
+  #   - Use a replica set (--replSet rs0) if you need change streams locally
+  # -------------------------------------------------------------------------
+  # mongo:
+  #   image: mongo:7
+  #   restart: unless-stopped
+  #   environment:
+  #     MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USER:-collabspace}
+  #     MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD:?MONGO_ROOT_PASSWORD must be set}
+  #     MONGO_INITDB_DATABASE: documents
+  #   ports:
+  #     - "27017:27017"
+  #   volumes:
+  #     - mongo_data:/data/db
+  #   networks:
+  #     - collabspace
+  #   healthcheck:
+  #     test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # -------------------------------------------------------------------------
+  # Redis — used by: auth-workspace service (session/token cache),
+  #                  realtime-service (pub/sub coordination)
+  #
+  # Upstash Redis is used in deployed environments (serverless, free tier).
+  # This local instance stands in for both use-cases during development.
+  #
+  # When activating:
+  #   - No password required locally; add requirepass in redis.conf for
+  #     closer parity with Upstash if needed
+  # -------------------------------------------------------------------------
+  # redis:
+  #   image: redis:7-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - "6379:6379"
+  #   volumes:
+  #     - redis_data:/data
+  #   networks:
+  #     - collabspace
+  #   healthcheck:
+  #     test: ["CMD", "redis-cli", "ping"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+
+  # -------------------------------------------------------------------------
+  # Kafka (+ ZooKeeper) — used by: ai-assistant service (AI event pipeline)
+  #
+  # Self-managed Kafka on EC2 in deployed environments (see ADR-003).
+  # KRaft mode (no ZooKeeper) is preferred for local dev simplicity but
+  # Bitnami's image supports both — choose based on team familiarity.
+  #
+  # When activating:
+  #   - KAFKA_CFG_ADVERTISED_LISTENERS must resolve from the host machine
+  #   - Create topics via kafka-topics.sh or an init container
+  #   - Topic naming convention: collabspace.<service>.<event-type>
+  # -------------------------------------------------------------------------
+  # zookeeper:
+  #   image: bitnami/zookeeper:3.9
+  #   restart: unless-stopped
+  #   environment:
+  #     ALLOW_ANONYMOUS_LOGIN: "yes"
+  #   networks:
+  #     - collabspace
+
+  # kafka:
+  #   image: bitnami/kafka:3.7
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - zookeeper
+  #   environment:
+  #     KAFKA_CFG_ZOOKEEPER_CONNECT: zookeeper:2181
+  #     KAFKA_CFG_ADVERTISED_LISTENERS: PLAINTEXT://localhost:9092
+  #     KAFKA_CFG_LISTENERS: PLAINTEXT://:9092
+  #     ALLOW_PLAINTEXT_LISTENER: "yes"
+  #   ports:
+  #     - "9092:9092"
+  #   networks:
+  #     - collabspace
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "kafka-topics.sh --bootstrap-server localhost:9092 --list"]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 5
+
+  # -------------------------------------------------------------------------
+  # LocalStack — emulates AWS services locally
+  #
+  # Covers: SQS, SNS, SSM Parameter Store, S3, API Gateway, Lambda
+  # Used for: Notification Lambda local testing, SSM config injection,
+  #           event fan-out (SNS→SQS) without hitting real AWS.
+  #
+  # When activating:
+  #   - Set SERVICES to only what you need (keeps startup fast)
+  #   - Use the AWS CLI with --endpoint-url=http://localhost:4566
+  #   - Seed SSM parameters and SQS queues via an init script in
+  #     infrastructure/local/localstack/init/
+  #   - LocalStack free tier is sufficient; no Pro features needed
+  # -------------------------------------------------------------------------
+  # localstack:
+  #   image: localstack/localstack:3
+  #   restart: unless-stopped
+  #   environment:
+  #     SERVICES: sqs,sns,ssm,s3,lambda,apigateway
+  #     DEFAULT_REGION: ${AWS_DEFAULT_REGION:-us-east-1}
+  #     LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}  # optional, for Pro
+  #   ports:
+  #     - "4566:4566"     # unified endpoint for all services
+  #   volumes:
+  #     - localstack_data:/var/lib/localstack
+  #     - /var/run/docker.sock:/var/run/docker.sock   # needed for Lambda exec
+  #     - ./infrastructure/local/localstack/init:/etc/localstack/init/ready.d:ro
+  #   networks:
+  #     - collabspace
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "awslocal s3 ls > /dev/null 2>&1 || exit 1"]
+  #     interval: 15s
+  #     timeout: 10s
+  #     retries: 5
