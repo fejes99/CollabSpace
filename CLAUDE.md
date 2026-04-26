@@ -166,7 +166,7 @@ Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-010
+Recent ADRs: adr-001 to adr-012
 
 Completed:
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
@@ -177,8 +177,12 @@ Completed:
   - Security groups: ALB, ECS tasks, RDS (no Redis SG — Upstash is external SaaS)
   - IAM: shared ECS task execution role + per-service task roles for 4 ECS services
   - CloudWatch log groups for all 5 services with 7-day retention
+- modules/ecs-cluster/ — ECS cluster with Container Insights toggle (disabled in dev; see ADR-011)
+- modules/alb/ — internet-facing ALB + HTTP listener with fixed-response default; services plug in via listener rules
+- modules/ecs-service/ — generic reusable module: target group, listener rule, task definition, ECS service; CI/CD manages task definition after initial creation (see ADR-012)
+- environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired; image placeholder :skeleton pending first ECR push
 
-Next milestone: ECS cluster module + ALB module + auth-workspace walking skeleton (Spring Boot returning 200 OK on /health) + GitHub Actions deploy workflow.
+Next milestone: Build auth-workspace Spring Boot container (returning 200 OK on /actuator/health), push :skeleton tag to ECR, write GitHub Actions deploy workflow. Service becomes reachable at the ALB DNS name.
 
 ## LAYER 3: POINTERS
 
@@ -193,6 +197,9 @@ Next milestone: ECS cluster module + ALB module + auth-workspace walking skeleto
 - Security groups module: infrastructure/modules/security-groups/ (ALB, ECS tasks, RDS; no Redis SG — Upstash is external)
 - IAM ECS module: infrastructure/modules/iam-ecs/ (shared execution role + per-service task roles)
 - CloudWatch module: infrastructure/modules/cloudwatch/ (per-service log groups, 7-day retention in dev)
+- ECS cluster module: infrastructure/modules/ecs-cluster/ (Container Insights toggle — see ADR-011)
+- ALB module: infrastructure/modules/alb/ (internet-facing ALB + HTTP listener; services own their target groups)
+- ECS service module: infrastructure/modules/ecs-service/ (generic per-service module; ignore_changes on task_definition — see ADR-012)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

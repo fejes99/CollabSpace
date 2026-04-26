@@ -12,9 +12,11 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `security_groups` | ALB SG, ECS tasks SG, RDS SG + rules | No Redis SG — Upstash is external SaaS |
 | `iam_ecs` | Shared task execution role, 4 per-service task roles, SSM read policy | Notification uses Lambda execution role, not ECS |
 | `cloudwatch` | 5 log groups (`/collabspace/dev/{service}`), 7-day retention | Includes notification Lambda |
+| `ecs_cluster` | ECS cluster | Container Insights disabled in dev — see ADR-011 |
+| `alb` | Internet-facing ALB, HTTP listener (default: 404) | Services attach their own listener rules |
+| `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Image placeholder `:skeleton` — push to ECR to activate |
 
 **Not created here:**
-- ECS cluster and services (next step in Stage 1)
 - RDS instances (added when auth-workspace service is built)
 - Upstash Redis (provisioned outside Terraform — external SaaS)
 - MongoDB Atlas (provisioned outside Terraform — external SaaS)
@@ -80,6 +82,12 @@ Designed to stay within the AWS free tier for active development:
 | Security groups | Free |
 | IAM roles and policies | Free |
 | CloudWatch log groups (7-day retention, low volume) | Free tier |
+| ECS cluster | Free |
+| ALB | ~$0.022/hour (~$16/month) + $0.008/LCU — main non-free cost in dev |
+| ECS Fargate task (256 CPU / 512 MB, 1 task) | ~$0.011/hour (~$8/month) |
+| Container Insights | Disabled — $0 (see ADR-011) |
+
+**Estimated total: ~$1–2/day when running.** Destroy the environment between sessions to stay within budget.
 
 No NAT Gateway (that alone would be ~$32/month). See [ADR-009](../../../docs/06-decisions/adr-009-ecs-public-subnet-strategy.md).
 
@@ -102,7 +110,6 @@ Safe to run between sessions for cost control. Only resources in this module are
 
 ## What comes next (Stage 1 continued)
 
-- ECS cluster
-- ALB with target group and listener
-- ECS service for `auth-workspace` with a working container
-- GitHub Actions workflow that builds and deploys on push
+- Build `auth-workspace` Spring Boot container returning 200 OK on `/actuator/health`
+- Push image to ECR with the `:skeleton` tag (unlocks the ECS service)
+- GitHub Actions workflow that builds and deploys on push to main

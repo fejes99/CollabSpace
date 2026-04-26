@@ -67,3 +67,29 @@ output "log_group_names" {
   description = "Map of service name → CloudWatch log group name. Referenced in ECS task definitions."
   value       = module.cloudwatch.log_group_names
 }
+
+# ── ECS cluster ───────────────────────────────────────────────────────────────
+
+output "ecs_cluster_name" {
+  description = "ECS cluster name. Used in CI/CD workflows (aws ecs update-service --cluster <name>)."
+  value       = module.ecs_cluster.cluster_name
+}
+
+# ── ALB ───────────────────────────────────────────────────────────────────────
+
+output "alb_dns_name" {
+  description = "Public DNS name of the ALB. Use this URL to test the walking skeleton: http://<alb_dns_name>/actuator/health"
+  value       = module.alb.alb_dns_name
+}
+
+output "alb_listener_arn" {
+  description = "HTTP listener ARN. Referenced by additional services that add their own listener rules."
+  value       = module.alb.listener_arn
+}
+
+# ── ECS services ──────────────────────────────────────────────────────────────
+
+output "auth_workspace_service_name" {
+  description = "ECS service name for auth-workspace. Used in CI/CD: aws ecs update-service --service <name>."
+  value       = module.auth_workspace.service_name
+}

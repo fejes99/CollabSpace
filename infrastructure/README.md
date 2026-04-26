@@ -74,3 +74,6 @@ Reusable modules live in `modules/`. Each module encapsulates one concept and is
 | [`modules/security-groups/`](modules/security-groups/README.md) | ALB, ECS tasks, and RDS security groups with minimal rules |
 | [`modules/iam-ecs/`](modules/iam-ecs/README.md) | Shared ECS task execution role, per-service task roles |
 | [`modules/cloudwatch/`](modules/cloudwatch/README.md) | Per-service log groups with retention policy |
+| [`modules/ecs-cluster/`](modules/ecs-cluster/) | ECS cluster with Container Insights toggle |
+| [`modules/alb/`](modules/alb/) | Internet-facing ALB, HTTP listener with fixed-response default |
+| [`modules/ecs-service/`](modules/ecs-service/) | Target group, listener rule, task definition, ECS service (generic, one call per service) |
