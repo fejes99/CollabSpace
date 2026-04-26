@@ -1,0 +1,5 @@
+aws_region          = "eu-central-1"
+project_name        = "collabspace"
+github_org          = "YOUR_GITHUB_USERNAME_OR_ORG"
+github_repo         = "YOUR_REPO_NAME"
+ecr_max_image_count = 10

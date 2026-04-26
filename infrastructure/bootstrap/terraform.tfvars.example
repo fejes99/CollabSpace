@@ -3,4 +3,4 @@
 
 aws_region   = "us-east-1"
 project_name = "collabspace"
-alert_email  = "david.fejes@gmail.com"
+alert_email  = "alert_email@example.com"

@@ -105,6 +105,7 @@ override.tf.json
 .terraformrc
 terraform.rc
 terraform.tfvars
+!infrastructure/shared/terraform.tfvars
 *.auto.tfvars
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
@@ -117,3 +118,6 @@ volume/
 # ─── Logs ────────────────────────────────────────────────────────────────────
 *.log
 logs/
+
+# ─── Notes ───────────────────────────────────────────────────────────────────
+notes/

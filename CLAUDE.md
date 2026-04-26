@@ -35,7 +35,7 @@ See /docs for full architecture once those files exist.
 - GitHub Actions with OIDC auth, no long-lived credentials
 - LocalStack for local AWS emulation
 - Compute mix: ECS Fargate (Auth, Document, AI) + EC2 (Realtime, Kafka)
-  + Lambda (Notification)
+  - Lambda (Notification)
 
 ### Repository structure (monorepo)
 
@@ -83,6 +83,7 @@ See /docs for full architecture once those files exist.
 ### Code style
 
 Java (Spring Boot):
+
 - Constructor injection only (no @Autowired on fields)
 - Records for DTOs
 - Optional<T> over null returns
@@ -90,6 +91,7 @@ Java (Spring Boot):
 - Bean Validation (jakarta.validation) at controller boundary
 
 TypeScript (Express):
+
 - strict: true in tsconfig
 - Named exports only (no default exports)
 - zod for runtime validation, infer types from schemas
@@ -98,6 +100,7 @@ TypeScript (Express):
 - No `any` without comment justifying
 
 Python (FastAPI):
+
 - Type hints on every public function
 - Pydantic models for request/response
 - async def for I/O-bound code
@@ -105,6 +108,7 @@ Python (FastAPI):
 - ruff for lint, black for format
 
 Terraform:
+
 - snake_case for resource names
 - All resources tagged (Environment, Service, ManagedBy=terraform)
 - for_each over count
@@ -165,8 +169,8 @@ Blocked on: nothing
 Recent ADRs: adr-001 to adr-006
 
 Completed:
+
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
-  - Pending: ADR-006 status still "Proposed" → change to "Accepted" before next commit
 
 Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton); ready for Walking Skeleton session.
 
