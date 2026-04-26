@@ -161,16 +161,16 @@ Terraform:
 
 Current stage: Stage 0 — Planning & Foundation
 Current service: none (foundation work)
-Current goal: infrastructure/shared — ECR repositories and GitHub Actions OIDC provider
+Current goal: infrastructure/environments/dev — dev environment skeleton
 
 Out of scope this session: GitHub Actions workflow content (workflow file contents). Those are separate sessions.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-006
+Recent ADRs: adr-001 to adr-007
 
 Completed:
-
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
+- infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live
 
 Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton); ready for Walking Skeleton session.
 
@@ -181,6 +181,7 @@ Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton
 - Cost strategy: docs/04-infrastructure/cost-strategy.md
 - All ADRs: docs/06-decisions/
 - Bootstrap Terraform: infrastructure/bootstrap/ (applied; local state only — see ADR-006)
+- Shared Terraform: infrastructure/shared/ (applied; S3 remote state — see ADR-007 for OIDC)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 
