@@ -106,6 +106,7 @@ override.tf.json
 terraform.rc
 terraform.tfvars
 !infrastructure/shared/terraform.tfvars
+!infrastructure/environments/dev/terraform.tfvars
 *.auto.tfvars
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
