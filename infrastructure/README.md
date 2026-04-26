@@ -8,9 +8,9 @@ Terraform configuration for CollabSpace, organised into three independent layers
 |---|---|---|---|
 | Bootstrap | `bootstrap/` | Local (`terraform.tfstate`) | Once — creates the state backend |
 | Shared | `shared/` | S3 remote | Once — creates account-wide resources |
-| Dev environment | `environments/dev/` | S3 remote | Repeatedly — torn down and recreated each session |
+| Dev environment | `environments/dev/` | S3 remote | Repeatedly — torn down and recreated between sessions |
 
-Each layer is a self-contained Terraform root module with its own `init`, `plan`, and `apply` cycle. They are not linked by Terraform itself — outputs from one layer are consumed by the next by reading them manually or via `terraform_remote_state`.
+Each layer is a self-contained Terraform root module with its own `init`, `plan`, and `apply` cycle. They are not linked by Terraform itself — outputs from one layer are consumed by the next via `terraform_remote_state` data sources, which read the upstream state file directly from S3. See [ADR-008](../docs/06-decisions/adr-008-cross-root-module-state-sharing.md) for the rationale and alternatives considered.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ terraform plan
 terraform apply
 ```
 
-Creates application infrastructure (VPC, ECS cluster, RDS, etc). This layer is designed to be destroyed at the end of a session and recreated at the start of the next. See `environments/dev/README.md` for details.
+Creates application infrastructure for the dev environment. Currently a skeleton that proves remote state is reachable; VPC, ECS cluster, RDS, and other resources are added in Stage 1. This layer is designed to be destroyed between sessions for cost control. See [`environments/dev/README.md`](environments/dev/README.md) for details.
 
 ## Destroying for cost control
 

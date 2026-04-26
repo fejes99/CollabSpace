@@ -159,20 +159,21 @@ Terraform:
 
 ## LAYER 2: CURRENT FOCUS
 
-Current stage: Stage 0 — Planning & Foundation
-Current service: none (foundation work)
-Current goal: infrastructure/environments/dev — dev environment skeleton
+Current stage: Stage 1 — Walking Skeleton
+Current service: none yet (Stage 1 planning)
+Current goal: First service end-to-end on AWS — VPC + auth-workspace scaffold + CI/CD pipeline deployed to dev
 
-Out of scope this session: GitHub Actions workflow content (workflow file contents). Those are separate sessions.
+Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-007
+Recent ADRs: adr-001 to adr-008
 
 Completed:
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
 - infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live
+- infrastructure/environments/dev/ — applied to real AWS; remote state proven; Stage 0 complete
 
-Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton); ready for Walking Skeleton session.
+Next milestone: Walking Skeleton — VPC + subnets + ECS cluster in environments/dev; auth-workspace container reachable via HTTP; GitHub Actions CI deploys on push to main.
 
 ## LAYER 3: POINTERS
 
@@ -182,6 +183,7 @@ Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton
 - All ADRs: docs/06-decisions/
 - Bootstrap Terraform: infrastructure/bootstrap/ (applied; local state only — see ADR-006)
 - Shared Terraform: infrastructure/shared/ (applied; S3 remote state — see ADR-007 for OIDC)
+- Dev environment Terraform: infrastructure/environments/dev/ (applied; S3 remote state — see ADR-008 for cross-module state sharing)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

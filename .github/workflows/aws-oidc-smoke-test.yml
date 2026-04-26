@@ -1,0 +1,68 @@
+name: AWS OIDC Smoke Test
+
+# Validates the full OIDC trust chain and scoped ECR permissions.
+# Run manually after any change to infrastructure/shared/ (OIDC provider,
+# IAM role, ECR repos) or to verify the setup in a fresh environment.
+# Not part of the service CI pipeline — this is infrastructure validation only.
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - infrastructure/shared/**
+
+permissions:
+  id-token: write   # required to request the OIDC JWT from GitHub
+  contents: read    # minimum required by the checkout action if added later
+
+env:
+  AWS_REGION: eu-central-1
+
+jobs:
+  smoke-test:
+    name: Verify OIDC trust chain and ECR access
+    runs-on: ubuntu-latest
+
+    steps:
+      # ── Step 1: Assume the OIDC-federated IAM role ───────────────────────────
+      # If this step fails with AccessDenied, the most likely causes are:
+      #   - AWS_ROLE_ARN secret not set in the repository settings
+      #   - OIDC provider not registered in the AWS account (infrastructure/shared not applied)
+      #   - Trust policy sub condition does not match this repo/branch
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Step 2: Verify STS identity ──────────────────────────────────────────
+      # Proves AssumeRoleWithWebIdentity succeeded and we are acting as the
+      # collabspace-github-actions-ci role, not the caller's own identity.
+      - name: Verify assumed identity (STS)
+        run: aws sts get-caller-identity
+
+      # ── Step 3: Authenticate to ECR ──────────────────────────────────────────
+      # Tests ecr:GetAuthorizationToken (account-scoped action).
+      # A successful docker login proves the ECR auth step of the push pipeline works.
+      - name: Authenticate to Amazon ECR
+        run: |
+          ACCOUNT_ID=$(aws sts get-caller-identity --query Account --output text)
+          aws ecr get-login-password --region ${{ env.AWS_REGION }} \
+            | docker login \
+                --username AWS \
+                --password-stdin \
+                "${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com"
+
+      # ── Step 4: Verify scoped ECR repository access ──────────────────────────
+      # Tests ecr:DescribeImages on a specific repository ARN (not account-wide).
+      # Repositories are empty at this stage — an empty result is a pass.
+      # An AccessDenied here means the IAM policy resource scope is wrong.
+      - name: Verify ECR repository access (auth-workspace)
+        run: |
+          aws ecr describe-images \
+            --repository-name collabspace-auth-workspace \
+            --region ${{ env.AWS_REGION }} \
+            --query 'imageDetails[*].imageTags' \
+            --output table
+          echo "ECR repository reachable — empty result expected (no images pushed yet)"

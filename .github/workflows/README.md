@@ -8,6 +8,14 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 ---
 
+## Active workflows
+
+| File | Status | Purpose |
+|---|---|---|
+| `aws-oidc-smoke-test.yml` | Live | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`. |
+
+---
+
 ## Planned workflows
 
 ### Service CI (per-service builds, tests, and deploys)

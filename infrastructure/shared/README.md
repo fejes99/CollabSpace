@@ -48,8 +48,8 @@ terraform output
 
 | Output | Used in |
 |---|---|
-| `ecr_repository_urls` | CI/CD workflow — image tag and push destination |
-| `github_actions_role_arn` | CI/CD workflow — `role-to-assume` in `configure-aws-credentials` |
+| `ecr_repository_urls` | CI/CD workflow (image push destination); `environments/dev` via `terraform_remote_state` (ECS task definitions in Stage 1) |
+| `github_actions_role_arn` | CI/CD workflow — `role-to-assume` in `configure-aws-credentials`; `environments/dev` via `terraform_remote_state` |
 | `oidc_provider_arn` | Reference only — registered once per AWS account |
 
 ## Adding a new service
