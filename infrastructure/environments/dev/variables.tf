@@ -20,3 +20,9 @@ variable "environment" {
     error_message = "environment must be one of: dev, staging, prod."
   }
 }
+
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days. 7 is sufficient for dev; increase for prod."
+  type        = number
+  default     = 7
+}

@@ -160,20 +160,25 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: none yet (Stage 1 planning)
-Current goal: First service end-to-end on AWS — VPC + auth-workspace scaffold + CI/CD pipeline deployed to dev
+Current service: auth-workspace (next to scaffold)
+Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in dev, deployed by GitHub Actions CI
 
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-008
+Recent ADRs: adr-001 to adr-010
 
 Completed:
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
 - infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live
-- infrastructure/environments/dev/ — applied to real AWS; remote state proven; Stage 0 complete
+- infrastructure/environments/dev/ — applied to real AWS; shared network foundation live:
+  - VPC (10.0.0.0/16), 2 public subnets + 2 private subnets across eu-central-1a/b
+  - Internet Gateway + public route table + S3 gateway endpoint (free ECR layer routing)
+  - Security groups: ALB, ECS tasks, RDS (no Redis SG — Upstash is external SaaS)
+  - IAM: shared ECS task execution role + per-service task roles for 4 ECS services
+  - CloudWatch log groups for all 5 services with 7-day retention
 
-Next milestone: Walking Skeleton — VPC + subnets + ECS cluster in environments/dev; auth-workspace container reachable via HTTP; GitHub Actions CI deploys on push to main.
+Next milestone: ECS cluster module + ALB module + auth-workspace walking skeleton (Spring Boot returning 200 OK on /health) + GitHub Actions deploy workflow.
 
 ## LAYER 3: POINTERS
 
@@ -184,6 +189,10 @@ Next milestone: Walking Skeleton — VPC + subnets + ECS cluster in environments
 - Bootstrap Terraform: infrastructure/bootstrap/ (applied; local state only — see ADR-006)
 - Shared Terraform: infrastructure/shared/ (applied; S3 remote state — see ADR-007 for OIDC)
 - Dev environment Terraform: infrastructure/environments/dev/ (applied; S3 remote state — see ADR-008 for cross-module state sharing)
+- VPC module: infrastructure/modules/vpc/ (public subnets for ECS — see ADR-009; 2 AZs — see ADR-010)
+- Security groups module: infrastructure/modules/security-groups/ (ALB, ECS tasks, RDS; no Redis SG — Upstash is external)
+- IAM ECS module: infrastructure/modules/iam-ecs/ (shared execution role + per-service task roles)
+- CloudWatch module: infrastructure/modules/cloudwatch/ (per-service log groups, 7-day retention in dev)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

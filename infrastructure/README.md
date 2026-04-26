@@ -66,4 +66,11 @@ Do not destroy `shared/` or `bootstrap/`. The shared layer holds ECR images that
 
 ## Module structure
 
-Reusable modules live in `modules/`. Each module encapsulates one concept (e.g. an ECS service, a security group pattern) and is composed by the environment configs. Modules are not applied directly.
+Reusable modules live in `modules/`. Each module encapsulates one concept and is composed by the environment root modules. Modules are never applied directly.
+
+| Module | What it creates |
+|---|---|
+| [`modules/vpc/`](modules/vpc/README.md) | VPC, subnets, IGW, route tables, S3 gateway endpoint |
+| [`modules/security-groups/`](modules/security-groups/README.md) | ALB, ECS tasks, and RDS security groups with minimal rules |
+| [`modules/iam-ecs/`](modules/iam-ecs/README.md) | Shared ECS task execution role, per-service task roles |
+| [`modules/cloudwatch/`](modules/cloudwatch/README.md) | Per-service log groups with retention policy |

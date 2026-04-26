@@ -2,11 +2,22 @@
 
 Terraform root module for the CollabSpace **dev environment**.
 
-This is the top of the infrastructure stack for dev. It owns its own state file in S3 and composes reusable modules from `infrastructure/modules/` (added in Stage 1). It reads shared infrastructure outputs (ECR repository URLs, GitHub Actions IAM role) from the `shared/` layer via `terraform_remote_state` — see [ADR-008](../../../docs/06-decisions/adr-008-cross-root-module-state-sharing.md).
+Composes reusable modules from `infrastructure/modules/` and reads account-wide outputs (ECR URLs, GitHub Actions IAM role) from the `shared/` layer via `terraform_remote_state`. See [ADR-008](../../../docs/06-decisions/adr-008-cross-root-module-state-sharing.md).
 
-## Current state
+## What it creates
 
-**Stage 0 skeleton.** No AWS resources are created yet. The sole purpose of this skeleton is to prove the remote state backend is reachable and that the `shared/` layer's outputs can be consumed correctly. Stage 1 adds VPC, subnets, security groups, ECS cluster, and RDS.
+| Module | Resources | Notes |
+|---|---|---|
+| `vpc` | VPC, IGW, 2 public subnets, 2 private subnets, route table, S3 gateway endpoint | ECS tasks in public subnets — see ADR-009 |
+| `security_groups` | ALB SG, ECS tasks SG, RDS SG + rules | No Redis SG — Upstash is external SaaS |
+| `iam_ecs` | Shared task execution role, 4 per-service task roles, SSM read policy | Notification uses Lambda execution role, not ECS |
+| `cloudwatch` | 5 log groups (`/collabspace/dev/{service}`), 7-day retention | Includes notification Lambda |
+
+**Not created here:**
+- ECS cluster and services (next step in Stage 1)
+- RDS instances (added when auth-workspace service is built)
+- Upstash Redis (provisioned outside Terraform — external SaaS)
+- MongoDB Atlas (provisioned outside Terraform — external SaaS)
 
 ## Prerequisites
 
@@ -16,49 +27,61 @@ This is the top of the infrastructure stack for dev. It owns its own state file 
 
 ## Usage
 
+All commands run from this directory:
+
 ```bash
 cd infrastructure/environments/dev
+```
 
-# First time only — downloads provider, connects to S3 backend
+**First time only** — downloads provider, resolves module sources, connects to S3 backend:
+
+```bash
 terraform init
+```
 
-# Review what would change (currently no-op: no resources declared)
+**Review changes before applying:**
+
+```bash
 terraform plan
+```
 
-# Apply (currently no-op)
+**Apply to AWS:**
+
+```bash
 terraform apply
+```
 
-# Verify remote state is wired correctly — should print ECR URLs and role ARN
+**Inspect what was created:**
+
+```bash
 terraform output
 ```
 
-### Expected output after init + apply
+## Network layout
 
 ```
-aws_account_id          = "440808375671"
-ecr_repository_urls     = {
-  "ai-assistant"      = "440808375671.dkr.ecr.eu-central-1.amazonaws.com/collabspace-ai-assistant"
-  "auth-workspace"    = "440808375671.dkr.ecr.eu-central-1.amazonaws.com/collabspace-auth-workspace"
-  "document-service"  = "440808375671.dkr.ecr.eu-central-1.amazonaws.com/collabspace-document-service"
-  "realtime-service"  = "440808375671.dkr.ecr.eu-central-1.amazonaws.com/collabspace-realtime-service"
-}
-environment             = "dev"
-github_actions_role_arn = "arn:aws:iam::440808375671:role/collabspace-github-actions-ci"
+VPC 10.0.0.0/16
+├── Public subnet eu-central-1a  10.0.1.0/24   ← ALB, ECS tasks
+├── Public subnet eu-central-1b  10.0.2.0/24   ← ALB, ECS tasks
+├── Private subnet eu-central-1a 10.0.11.0/24  ← RDS (when provisioned)
+└── Private subnet eu-central-1b 10.0.12.0/24  ← RDS (when provisioned)
 ```
 
-If `ecr_repository_urls` or `github_actions_role_arn` are empty or missing, the remote state data source failed to resolve — check that `shared/` has been applied and that the S3 key `shared/terraform.tfstate` exists.
+Two AZs in dev. See [ADR-010](../../../docs/06-decisions/adr-010-two-az-dev-environment.md).
 
 ## Cost
 
-Zero. No AWS resources are created by this skeleton. Resources added in Stage 1 are designed to stay within free-tier limits during active sessions and are destroyed between sessions.
+Designed to stay within the AWS free tier for active development:
 
-## Destroy
+| Resource | Cost |
+|---|---|
+| VPC, subnets, IGW, route tables | Free |
+| S3 gateway endpoint | Free |
+| Security groups | Free |
+| IAM roles and policies | Free |
+| CloudWatch log groups (7-day retention, low volume) | Free tier |
 
-```bash
-terraform destroy
-```
-
-Safe to run at any time. Only resources declared in this module are destroyed. The `shared/` layer (ECR repos, OIDC provider) and `bootstrap/` layer (S3 bucket, DynamoDB table) are not affected.
+No NAT Gateway (that alone would be ~$32/month). See [ADR-009](../../../docs/06-decisions/adr-009-ecs-public-subnet-strategy.md).
 
 ## State
 
@@ -69,10 +92,17 @@ Safe to run at any time. Only resources declared in this module are destroyed. T
 | Key | `environments/dev/terraform.tfstate` |
 | Lock table | `collabspace-terraform-locks` |
 
-## What comes next (Stage 1)
+## Destroy
 
-- VPC with public/private subnets across two AZs
-- Security groups per service
-- ECS cluster (Fargate)
-- RDS PostgreSQL instance (auth-workspace)
-- Upstash Redis (provisioned outside Terraform — see architecture docs)
+```bash
+terraform destroy
+```
+
+Safe to run between sessions for cost control. Only resources in this module are destroyed. The `shared/` and `bootstrap/` layers are not affected.
+
+## What comes next (Stage 1 continued)
+
+- ECS cluster
+- ALB with target group and listener
+- ECS service for `auth-workspace` with a working container
+- GitHub Actions workflow that builds and deploys on push

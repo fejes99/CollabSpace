@@ -9,8 +9,6 @@ output "aws_account_id" {
 }
 
 # ── Passed through from shared state ─────────────────────────────────────────
-# These outputs prove that terraform_remote_state resolved correctly.
-# Run `terraform output` after init to verify the backend round-trip.
 
 output "ecr_repository_urls" {
   description = "ECR repository URLs from shared state. Used in ECS task definitions in Stage 1."
@@ -20,4 +18,52 @@ output "ecr_repository_urls" {
 output "github_actions_role_arn" {
   description = "IAM role ARN from shared state that GitHub Actions assumes via OIDC."
   value       = data.terraform_remote_state.shared.outputs.github_actions_role_arn
+}
+
+# ── VPC ───────────────────────────────────────────────────────────────────────
+
+output "vpc_id" {
+  description = "VPC ID. Referenced by ECS services and any future module that needs the VPC boundary."
+  value       = module.vpc.vpc_id
+}
+
+output "public_subnet_ids" {
+  description = "Public subnet IDs (one per AZ). Used by the ALB and ECS services."
+  value       = module.vpc.public_subnet_ids
+}
+
+output "private_subnet_ids" {
+  description = "Private subnet IDs (one per AZ). Used by RDS and ElastiCache."
+  value       = module.vpc.private_subnet_ids
+}
+
+# ── Security groups ───────────────────────────────────────────────────────────
+
+output "alb_sg_id" {
+  description = "Security group ID for the ALB."
+  value       = module.security_groups.alb_sg_id
+}
+
+output "ecs_tasks_sg_id" {
+  description = "Security group ID applied to all ECS Fargate tasks."
+  value       = module.security_groups.ecs_tasks_sg_id
+}
+
+# ── IAM ───────────────────────────────────────────────────────────────────────
+
+output "task_execution_role_arn" {
+  description = "Shared ECS task execution role ARN. Every ECS task definition references this."
+  value       = module.iam_ecs.task_execution_role_arn
+}
+
+output "task_role_arns" {
+  description = "Map of service name → ECS task role ARN."
+  value       = module.iam_ecs.task_role_arns
+}
+
+# ── CloudWatch ────────────────────────────────────────────────────────────────
+
+output "log_group_names" {
+  description = "Map of service name → CloudWatch log group name. Referenced in ECS task definitions."
+  value       = module.cloudwatch.log_group_names
 }
