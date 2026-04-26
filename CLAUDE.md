@@ -157,37 +157,26 @@ Terraform:
 
 Current stage: Stage 0 — Planning & Foundation
 Current service: none (foundation work)
-Current goal: Build the repo skeleton and documentation foundation. Specifically:
-  - Folder structure per the "Repository structure" section above
-  - Root README.md, root CLAUDE.md (this file)
-  - /docs/01-overview/: vision.md, use-cases.md, glossary.md
-  - /docs/02-architecture/: system-overview.md, technology-choices.md,
-    service-communication.md
-  - /docs/04-infrastructure/: cost-strategy.md, aws-architecture.md
-  - /docs/06-decisions/: first 5 ADRs (monorepo, auth+workspace combined,
-    broker strategy, MongoDB Atlas, compute heterogeneity)
-  - .gitignore, .editorconfig, docker-compose.yml skeleton with comments
-  - .github/workflows/ folder (empty for now, structure documented)
+Current goal: infrastructure/shared — ECR repositories and GitHub Actions OIDC provider
 
-Out of scope this session: Terraform bootstrap, any service code,
-GitHub Actions workflow content (folder only). Those are separate sessions.
+Out of scope this session: GitHub Actions workflow content (workflow file contents). Those are separate sessions.
 
 Blocked on: nothing
-Recent ADRs: none yet — will write first batch this session
-Next milestone: Phase 0 deliverables complete; ready for Terraform
-  bootstrap session.
+Recent ADRs: adr-001 to adr-006
+
+Completed:
+- infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
+  - Pending: ADR-006 status still "Proposed" → change to "Accepted" before next commit
+
+Next milestone: Phase 0 complete (bootstrap + shared + environments/dev skeleton); ready for Walking Skeleton session.
 
 ## LAYER 3: POINTERS
 
-These files will be created during Stage 0. Until they exist, this CLAUDE.md
-is the source of truth.
-
-- Architecture overview (TODO): docs/02-architecture/system-overview.md
-- Tech choices and rationale (TODO): docs/02-architecture/technology-choices.md
-- Cost strategy (TODO): docs/04-infrastructure/cost-strategy.md
-- All ADRs (TODO): docs/06-decisions/
-
-Once each file is created, drop the `(TODO)` marker.
+- Architecture overview: docs/02-architecture/system-overview.md
+- Tech choices and rationale: docs/02-architecture/technology-choices.md
+- Cost strategy: docs/04-infrastructure/cost-strategy.md
+- All ADRs: docs/06-decisions/
+- Bootstrap Terraform: infrastructure/bootstrap/ (applied; local state only — see ADR-006)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 
