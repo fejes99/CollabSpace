@@ -107,14 +107,7 @@ Authorization: <service-to-service token>
 
 **Trade-off: soft dependency on Document Service availability.** If the Document Service is unavailable when the AI consumer processes a Kafka event, the fetch fails and indexing cannot complete for that document. Kafka's consumer semantics mitigate this: the offset is not committed on failure, so the event replays when the Document Service recovers. The AI index is eventually consistent — acceptable for a background concern.
 
-**Open question: service-to-service authentication.** Options under consideration:
-
-- **Shared secret / API key** — simple, but no caller identity and requires rotation management
-- **JWT with service identity claim** — AI Assistant presents a signed JWT; Document Service validates signature and `sub` claim
-- **mTLS** — mutual TLS at the network layer; strongest but most operationally complex at this scale
-- **VPC-only, no app-layer auth** — rely on network isolation; simplest, but no audit trail
-
-→ *Placeholder ADR: service-to-service authentication strategy — to be written before AI Assistant implementation.*
+**Service-to-service authentication.** The AI Assistant authenticates using a short-lived signed JWT (5-minute TTL) with `{ iss: "ai-assistant", aud: "document-service", exp }`. The Document Service validates the token's signature locally using the AI Assistant's public key from SSM. No third-party call is required for validation. → [ADR-014](../06-decisions/adr-014-service-to-service-auth.md)
 
 ---
 

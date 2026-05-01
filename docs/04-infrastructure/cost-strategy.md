@@ -10,17 +10,17 @@
 
 AWS free tier has two flavours: **12-month** (resets to paid after the first year) and **always free** (permanent). The table below notes which applies per resource. Managed services outside AWS (Atlas, Upstash) have their own permanent free tiers.
 
-| Service | Compute | Key Data Store | Free Tier | Always Free? |
-|---|---|---|---|---|
-| Auth & Workspace | ECS Fargate | RDS PostgreSQL (`auth_db`) | 50 vCPU-hr + 100 GB RAM-hr / month | No (12-month) |
-| Document Service | ECS Fargate | MongoDB Atlas M0 | 512 MB cluster, no expiry | Yes (Atlas) |
-| Realtime Service | EC2 t3.micro | Redis via Upstash | 750 instance-hr / month (shared pool) | No (12-month) |
-| AI Assistant | ECS Fargate | RDS PostgreSQL (`vector_db`) | Co-located on Auth RDS instance | No (12-month) |
-| Notification | Lambda (Node 22) | — | 1M invocations + 400K GB-sec / month | Yes |
-| Kafka broker | EC2 t3.micro | — (disk only) | 750 instance-hr / month (shared pool) | No (12-month) |
-| Messaging | SNS + SQS | — | 1M publishes + 1M requests / month | Yes |
-| API entry | API Gateway (HTTP API) | — | 1M calls / month | No (12-month) |
-| Database host | RDS db.t3.micro | — | 750 instance-hr / month, 20 GB storage | No (12-month) |
+| Service          | Compute                | Key Data Store               | Free Tier                              | Always Free?  |
+| ---------------- | ---------------------- | ---------------------------- | -------------------------------------- | ------------- |
+| Auth & Workspace | ECS Fargate            | RDS PostgreSQL (`auth_db`)   | 50 vCPU-hr + 100 GB RAM-hr / month     | No (12-month) |
+| Document Service | ECS Fargate            | MongoDB Atlas M0             | 512 MB cluster, no expiry              | Yes (Atlas)   |
+| Realtime Service | EC2 t3.micro           | Redis via Upstash            | 750 instance-hr / month (shared pool)  | No (12-month) |
+| AI Assistant     | ECS Fargate            | RDS PostgreSQL (`vector_db`) | Co-located on Auth RDS instance        | No (12-month) |
+| Notification     | Lambda (Node 22)       | —                            | 1M invocations + 400K GB-sec / month   | Yes           |
+| Kafka broker     | EC2 t3.micro           | — (disk only)                | 750 instance-hr / month (shared pool)  | No (12-month) |
+| Messaging        | SNS + SQS              | —                            | 1M publishes + 1M requests / month     | Yes           |
+| API entry        | API Gateway (HTTP API) | —                            | 1M calls / month                       | No (12-month) |
+| Database host    | RDS db.t3.micro        | —                            | 750 instance-hr / month, 20 GB storage | No (12-month) |
 
 **Notes:**
 
@@ -40,11 +40,11 @@ AWS free tier has two flavours: **12-month** (resets to paid after the first yea
 
 A small number of things are worth spending real money on if they unblock the learning goal:
 
-| Item | Cost | Why |
-|---|---|---|
-| Route 53 hosted zone | $0.50/month | A real domain makes HTTPS, OIDC, and CORS configuration realistic rather than localhost-only |
-| AWS Budgets alert | Free (first 2 budgets) | Peace of mind; no surprise bill |
-| RDS snapshot before a risky migration | ~$0.02 / GB | Cheap insurance during schema changes |
+| Item                                  | Cost                   | Why                                                                                          |
+| ------------------------------------- | ---------------------- | -------------------------------------------------------------------------------------------- |
+| Route 53 hosted zone                  | $0.50/month            | A real domain makes HTTPS, OIDC, and CORS configuration realistic rather than localhost-only |
+| AWS Budgets alert                     | Free (first 2 budgets) | Peace of mind; no surprise bill                                                              |
+| RDS snapshot before a risky migration | ~$0.02 / GB            | Cheap insurance during schema changes                                                        |
 
 Everything else — larger instance types, multi-AZ, ElastiCache, Secrets Manager — is out of scope for v1 and would blow the budget immediately.
 

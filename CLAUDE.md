@@ -17,7 +17,7 @@ See /docs for full architecture once those files exist.
 
 ### Architecture summary
 
-- Auth & Workspace: Java 21 + Spring Boot 3, PostgreSQL (RDS), Redis (Upstash)
+- Auth & Workspace: Java 25 + Spring Boot 4, PostgreSQL (RDS), Redis (Upstash)
 - Document Service: Node.js 22 + TypeScript + Express, MongoDB Atlas
 - Realtime Service: Node.js 22 + TypeScript + ws, Redis pub/sub coordination
 - AI Assistant: Python 3.13 + FastAPI, Postgres + pgvector
@@ -166,9 +166,10 @@ Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-012
+Recent ADRs: adr-001 to adr-016
 
 Completed:
+
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
 - infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live
 - infrastructure/environments/dev/ — applied to real AWS; shared network foundation live:
@@ -201,6 +202,12 @@ Next milestone: Build auth-workspace Spring Boot container (returning 200 OK on 
 - ALB module: infrastructure/modules/alb/ (internet-facing ALB + HTTP listener; services own their target groups)
 - ECS service module: infrastructure/modules/ecs-service/ (generic per-service module; ignore_changes on task_definition — see ADR-012)
 - Pre-commit checklist: docs/07-development/commit-checklist.md (run through before every commit)
+- Project roadmap and scope contract: docs/roadmap.md (MVP / v1.5 / out-of-scope; everything downstream references this)
+- Authentication architecture: docs/02-architecture/authentication.md (bcrypt, RS256, access+refresh tokens, flows)
+- Authorization architecture: docs/02-architecture/authorization.md (workspace RBAC, @PreAuthorize, invariants)
+- API conventions: docs/02-architecture/api-conventions.md (versioning, error format, pagination, CORS, correlation IDs)
+- Frontend service: docs/03-services/frontend.md (React stack, project structure, auth state, WebSocket, Vercel)
+- Local development setup: docs/07-development/local-setup.md (make up/down, native services, LocalStack, migrations)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

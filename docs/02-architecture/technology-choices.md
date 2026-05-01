@@ -6,13 +6,13 @@ This document records every technology decision for CollabSpace v1 and the ratio
 
 ## Per-Service Stack
 
-| Service | Language | Framework | Database | Sync API | Async |
-|---|---|---|---|---|---|
-| Auth & Workspace | Java 21 | Spring Boot 3 | PostgreSQL (RDS) + Redis (Upstash) | REST → API Gateway (HTTP API) | SNS publisher |
-| Document Service | TypeScript · Node 22 | Express | MongoDB Atlas | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
-| Realtime Service | TypeScript · Node 22 | ws | Redis (Upstash) — coordination only | WebSocket → ALB | SQS consumer |
-| AI Assistant | Python 3.13 | FastAPI | PostgreSQL + pgvector | REST → API Gateway (HTTP API) | Kafka consumer |
-| Notification | TypeScript · Node 22 | — (Lambda runtime) | — | — | SQS trigger (Lambda) |
+| Service          | Language             | Framework          | Database                            | Sync API                      | Async                        |
+| ---------------- | -------------------- | ------------------ | ----------------------------------- | ----------------------------- | ---------------------------- |
+| Auth & Workspace | Java 25              | Spring Boot 4      | PostgreSQL (RDS) + Redis (Upstash)  | REST → API Gateway (HTTP API) | SNS publisher                |
+| Document Service | TypeScript · Node 22 | Express            | MongoDB Atlas                       | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
+| Realtime Service | TypeScript · Node 22 | ws                 | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
+| AI Assistant     | Python 3.13          | FastAPI            | PostgreSQL + pgvector               | REST → API Gateway (HTTP API) | Kafka consumer               |
+| Notification     | TypeScript · Node 22 | — (Lambda runtime) | —                                   | —                             | SQS trigger (Lambda)         |
 
 ---
 
@@ -20,7 +20,7 @@ This document records every technology decision for CollabSpace v1 and the ratio
 
 ### Auth & Workspace
 
-Java 21 with Spring Boot 3 is the most battle-tested stack for auth and identity. Spring Security's JWT support, Spring Data JPA, and Bean Validation reduce the surface area for auth bugs — the area where a learning project is most likely to make costly mistakes. The two concerns (authentication and workspace membership) are combined into one service because they are tightly coupled at the data level: workspace roles are enforced by the same token-validation path that handles login. → **ADR-002**
+Java 25 with Spring Boot 4 is the most battle-tested stack for auth and identity. Spring Security's JWT support, Spring Data JPA, and Bean Validation reduce the surface area for auth bugs — the area where a learning project is most likely to make costly mistakes. The two concerns (authentication and workspace membership) are combined into one service because they are tightly coupled at the data level: workspace roles are enforced by the same token-validation path that handles login. → **ADR-002**
 
 PostgreSQL is the natural fit for relational, transactional data: users, workspaces, memberships, roles. Redis (Upstash) serves two purposes here: JWT blocklist for logout (US-03) and session caching. Upstash is used over a self-managed Redis instance to stay within the free-tier cost target. → **ADR-005**
 
@@ -42,7 +42,7 @@ The Realtime Service runs on EC2 rather than ECS Fargate. EC2 gives predictable 
 
 ### AI Assistant
 
-Python 3.13 with FastAPI is the natural choice for an ML-adjacent service: the embedding libraries (sentence-transformers, or the Anthropic SDK for embeddings), pgvector drivers, and async I/O support are all first-class in the Python ecosystem. FastAPI's async-native design matches the I/O-heavy pattern of making LLM API calls. → *See [ADR index](#adr-index) — Claude API ADR planned for AI Assistant implementation stage.*
+Python 3.13 with FastAPI is the natural choice for an ML-adjacent service: the embedding libraries (sentence-transformers, or the Anthropic SDK for embeddings), pgvector drivers, and async I/O support are all first-class in the Python ecosystem. FastAPI's async-native design matches the I/O-heavy pattern of making LLM API calls. → _See [ADR index](#adr-index) — Claude API ADR planned for AI Assistant implementation stage._
 
 PostgreSQL with the pgvector extension stores document embeddings alongside metadata. This avoids introducing a dedicated vector database (Pinecone, Weaviate) at a stage where the data volume does not justify the operational cost. pgvector is sufficient for a workspace of 5–15 people generating hundreds to low thousands of document chunks. The AI Assistant uses a separate database (`vector_db`) on the same RDS instance as Auth & Workspace (`auth_db`), with separate RDS users and least-privilege grants between them. This is a cost optimisation for v1 — co-location avoids a second RDS instance. Revisit criteria and split conditions are documented in ADR-005. → **ADR-005**
 
@@ -74,14 +74,14 @@ SNS + SQS handles the general fan-out pattern (Document Service → Notification
 
 ### Compute mix
 
-| Service | Compute | Reason |
-|---|---|---|
-| Auth & Workspace | ECS Fargate | Stateless, containerised, scales to zero |
-| Document Service | ECS Fargate | Stateless, containerised, scales to zero |
-| AI Assistant | ECS Fargate | Stateless, containerised, scales to zero |
-| Realtime Service | EC2 | Predictable host lifecycle, lower idle cost, debugging access |
-| Kafka broker | EC2 | Stateful; broker state must survive compute replacement |
-| Notification | Lambda | Stateless, event-driven, no idle cost |
+| Service          | Compute     | Reason                                                        |
+| ---------------- | ----------- | ------------------------------------------------------------- |
+| Auth & Workspace | ECS Fargate | Stateless, containerised, scales to zero                      |
+| Document Service | ECS Fargate | Stateless, containerised, scales to zero                      |
+| AI Assistant     | ECS Fargate | Stateless, containerised, scales to zero                      |
+| Realtime Service | EC2         | Predictable host lifecycle, lower idle cost, debugging access |
+| Kafka broker     | EC2         | Stateful; broker state must survive compute replacement       |
+| Notification     | Lambda      | Stateless, event-driven, no idle cost                         |
 
 → **ADR-005**
 
@@ -89,11 +89,15 @@ SNS + SQS handles the general fan-out pattern (Document Service → Notification
 
 ## ADR Index
 
-| Decision | ADR |
-|---|---|
-| Monorepo vs. polyrepo | ADR-001 |
-| Auth & Workspace as a combined service | ADR-002 |
-| Broker strategy: SNS/SQS + Kafka | ADR-003 |
-| MongoDB Atlas for the Document Service | ADR-004 |
-| Compute heterogeneity (Fargate + EC2 + Lambda) | ADR-005 |
-| Claude API as AI backend | *(planned — AI Assistant implementation stage)* |
+| Decision                                       | ADR                                             |
+| ---------------------------------------------- | ----------------------------------------------- |
+| Monorepo vs. polyrepo                          | ADR-001                                         |
+| Auth & Workspace as a combined service         | ADR-002                                         |
+| Broker strategy: SNS/SQS + Kafka               | ADR-003                                         |
+| MongoDB Atlas for the Document Service         | ADR-004                                         |
+| Compute heterogeneity (Fargate + EC2 + Lambda) | ADR-005                                         |
+| ECS over Kubernetes                            | ADR-013                                         |
+| Service-to-service authentication              | ADR-014                                         |
+| JWT signing algorithm (RS256 over HS256)       | ADR-015                                         |
+| Frontend stack                                 | ADR-016                                         |
+| Claude API as AI backend                       | _(planned — AI Assistant implementation stage)_ |
