@@ -51,7 +51,7 @@ terraform plan
 terraform apply
 ```
 
-Creates application infrastructure for the dev environment. Currently a skeleton that proves remote state is reachable; VPC, ECS cluster, RDS, and other resources are added in Stage 1. This layer is designed to be destroyed between sessions for cost control. See [`environments/dev/README.md`](environments/dev/README.md) for details.
+Creates application infrastructure for the dev environment. Currently live: VPC, security groups, IAM roles, CloudWatch log groups, ECS cluster, ALB, and the auth-workspace ECS service (image placeholder). This layer is designed to be destroyed between sessions for cost control. See [`environments/dev/README.md`](environments/dev/README.md) for details.
 
 ## Destroying for cost control
 
@@ -74,6 +74,6 @@ Reusable modules live in `modules/`. Each module encapsulates one concept and is
 | [`modules/security-groups/`](modules/security-groups/README.md) | ALB, ECS tasks, and RDS security groups with minimal rules |
 | [`modules/iam-ecs/`](modules/iam-ecs/README.md) | Shared ECS task execution role, per-service task roles |
 | [`modules/cloudwatch/`](modules/cloudwatch/README.md) | Per-service log groups with retention policy |
-| [`modules/ecs-cluster/`](modules/ecs-cluster/) | ECS cluster with Container Insights toggle |
-| [`modules/alb/`](modules/alb/) | Internet-facing ALB, HTTP listener with fixed-response default |
-| [`modules/ecs-service/`](modules/ecs-service/) | Target group, listener rule, task definition, ECS service (generic, one call per service) |
+| [`modules/ecs-cluster/`](modules/ecs-cluster/README.md) | ECS cluster with Container Insights toggle |
+| [`modules/alb/`](modules/alb/README.md) | Internet-facing ALB, HTTP listener with fixed-response default |
+| [`modules/ecs-service/`](modules/ecs-service/README.md) | Target group, listener rule, task definition, ECS service (generic, one call per service) |

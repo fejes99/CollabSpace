@@ -30,6 +30,10 @@ desktop.ini
 *.key
 *.p12
 *.jks
+*.crt
+*.cer
+*.p8
+*.pfx
 
 # ─── Java / Maven ────────────────────────────────────────────────────────────
 target/
@@ -42,6 +46,9 @@ target/
 hs_err_pid*
 replay_pid*
 .mvn/wrapper/maven-wrapper.jar
+# Spring Boot local profile config (may contain real credentials/URLs)
+**/application-local*.yml
+**/application-local*.properties
 
 # ─── Node.js / TypeScript ────────────────────────────────────────────────────
 node_modules/
@@ -49,6 +56,7 @@ dist/
 build/
 *.tsbuildinfo
 .npm
+.npmrc
 .eslintcache
 .stylelintcache
 .cache/
@@ -108,9 +116,16 @@ terraform.tfvars
 !infrastructure/shared/terraform.tfvars
 !infrastructure/environments/dev/terraform.tfvars
 *.auto.tfvars
+*.tfvars.json
+*.auto.tfvars.json
+# Plan output embeds state snapshot — treat as sensitive as tfstate
+*.tfplan
 
 # ─── Docker ──────────────────────────────────────────────────────────────────
 .docker/
+# Local developer overrides — convention is to use this file for env-specific
+# credentials and port bindings that must not be committed
+docker-compose.override.yml
 
 # ─── LocalStack ──────────────────────────────────────────────────────────────
 .localstack/

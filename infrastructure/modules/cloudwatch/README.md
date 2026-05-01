@@ -27,7 +27,7 @@ Pre-creating the groups in Terraform ensures the retention policy exists from th
 This structure allows Log Insights to query all services in one environment:
 
 ```
-filter @logStream like /collabspace\/dev\//
+filter @logGroup like /collabspace\/dev\//
 ```
 
 And isolate a single service:

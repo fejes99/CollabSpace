@@ -4,11 +4,11 @@ Creates all security groups and their rules for an environment. Centralising the
 
 ## What it creates
 
-| Security group | Inbound | Outbound |
+| Security group | Allows inbound from | Allows outbound to |
 |---|---|---|
-| `alb` | 0.0.0.0/0 → 80, 443 | All ports → `ecs_tasks` SG |
-| `ecs_tasks` | All ports ← `alb` SG | 443 → anywhere; 5432 → `rds` SG |
-| `rds` | 5432 ← `ecs_tasks` SG | (none declared) |
+| `alb` | `0.0.0.0/0` on 80, 443 | `ecs_tasks` SG on all ports |
+| `ecs_tasks` | `alb` SG on all ports | anywhere on 443; `rds` SG on 5432 |
+| `rds` | `ecs_tasks` SG on 5432 | (none declared) |
 
 ### Why no Redis security group?
 

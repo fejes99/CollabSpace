@@ -200,6 +200,7 @@ Next milestone: Build auth-workspace Spring Boot container (returning 200 OK on 
 - ECS cluster module: infrastructure/modules/ecs-cluster/ (Container Insights toggle — see ADR-011)
 - ALB module: infrastructure/modules/alb/ (internet-facing ALB + HTTP listener; services own their target groups)
 - ECS service module: infrastructure/modules/ecs-service/ (generic per-service module; ignore_changes on task_definition — see ADR-012)
+- Pre-commit checklist: docs/07-development/commit-checklist.md (run through before every commit)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

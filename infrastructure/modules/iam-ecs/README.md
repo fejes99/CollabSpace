@@ -64,9 +64,10 @@ module "iam_ecs" {
 
 ## Adding permissions to a task role
 
-When a service needs to call an AWS service, add an inline policy to its task role in the environment's Terraform (not in this module — keep the module generic):
+When a service needs to call an AWS service, add an inline policy to its task role **in the environment root module** (`infrastructure/environments/dev/main.tf`), not inside this module. Keeping the module generic means it never needs to change when services grow.
 
 ```hcl
+# infrastructure/environments/dev/main.tf
 resource "aws_iam_role_policy" "auth_workspace_ses" {
   name   = "ses-send"
   role   = module.iam_ecs.task_role_arns["auth-workspace"]

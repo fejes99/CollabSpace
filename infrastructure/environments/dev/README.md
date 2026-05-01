@@ -14,7 +14,7 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `cloudwatch` | 5 log groups (`/collabspace/dev/{service}`), 7-day retention | Includes notification Lambda |
 | `ecs_cluster` | ECS cluster | Container Insights disabled in dev — see ADR-011 |
 | `alb` | Internet-facing ALB, HTTP listener (default: 404) | Services attach their own listener rules |
-| `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Image placeholder `:skeleton` — push to ECR to activate |
+| `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Running with `:skeleton` placeholder image — service stabilises once a real image is pushed |
 
 **Not created here:**
 - RDS instances (added when auth-workspace service is built)
@@ -111,5 +111,6 @@ Safe to run between sessions for cost control. Only resources in this module are
 ## What comes next (Stage 1 continued)
 
 - Build `auth-workspace` Spring Boot container returning 200 OK on `/actuator/health`
-- Push image to ECR with the `:skeleton` tag (unlocks the ECS service)
-- GitHub Actions workflow that builds and deploys on push to main
+- Push image to ECR with the `:skeleton` tag — ECS service will stabilise and become healthy
+- GitHub Actions workflow that builds, tests, and deploys on push to main
+- Verify the service is reachable at the ALB DNS name (`terraform output alb_dns_name`)

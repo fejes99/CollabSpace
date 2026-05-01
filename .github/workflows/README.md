@@ -20,27 +20,33 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 ### Service CI (per-service builds, tests, and deploys)
 
-| File | Purpose |
-|------|---------|
-| `ci-service-template.yml` | Reusable workflow (called by the per-service workflows below). Handles lint, test, Docker build, ECR push, and ECS deploy. |
-| `service-auth.yml` | CI/CD for `services/auth-workspace` (Java + Spring Boot). |
-| `service-document.yml` | CI/CD for `services/document-service` (TypeScript + Express). |
-| `service-realtime.yml` | CI/CD for `services/realtime-service` (TypeScript + ws). |
-| `service-ai.yml` | CI/CD for `services/ai-assistant` (Python + FastAPI). |
+| File | Status | Purpose |
+|------|--------|---------|
+| `service-auth.yml` | Next up | CI/CD for `services/auth-workspace` (Java + Spring Boot). Lint, test, Docker build, ECR push, ECS deploy. |
+| `ci-service-template.yml` | Planned | Reusable workflow called by per-service workflows above. Extracts shared steps once two or more service workflows exist. |
+| `service-document.yml` | Planned | CI/CD for `services/document-service` (TypeScript + Express). |
+| `service-realtime.yml` | Planned | CI/CD for `services/realtime-service` (TypeScript + ws). |
+| `service-ai.yml` | Planned | CI/CD for `services/ai-assistant` (Python + FastAPI). |
 
 ### Lambda
 
-| File | Purpose |
-|------|---------|
-| `lambda-notification.yml` | Package and deploy `services/notification` to AWS Lambda. Triggered on push to `main` when `services/notification/**` changes. |
+| File | Status | Purpose |
+|------|--------|---------|
+| `lambda-notification.yml` | Planned | Package and deploy `services/notification` to AWS Lambda. Triggered on push to `main` when `services/notification/**` changes. |
 
 ### Infrastructure
 
-| File | Purpose |
-|------|---------|
-| `infra-plan.yml` | Run `terraform plan` on PRs that touch `infrastructure/**`. Posts the plan as a PR comment. |
-| `infra-apply.yml` | Run `terraform apply` on merge to `main` for `infrastructure/**` changes. Requires explicit approval via GitHub Environment protection rule. |
-| `infra-destroy.yml` | Manually triggered (`workflow_dispatch` only). Tears down the dev environment. Requires approval. |
+| File | Status | Purpose |
+|------|--------|---------|
+| `infra-plan.yml` | Planned | Run `terraform plan` on PRs that touch `infrastructure/**`. Posts the plan as a PR comment. |
+| `infra-apply.yml` | Planned | Run `terraform apply` on merge to `main` for `infrastructure/**` changes. Requires explicit approval via GitHub Environment protection rule. |
+| `infra-destroy.yml` | Planned | Manually triggered (`workflow_dispatch` only). Tears down the dev environment. Requires approval. |
+
+### Future enhancements (not yet scoped)
+
+| Idea | Status | Notes |
+|---|---|---|
+| Claude AI PR reviewer | Idea | GitHub Actions workflow that calls the Claude API on every PR open/update, posts inline review comments. Requires `ANTHROPIC_API_KEY` repo secret and a custom workflow. Would run automatically without needing to invoke `/review` manually. Evaluate when first feature PRs are opened in Stage 1. |
 
 ---
 

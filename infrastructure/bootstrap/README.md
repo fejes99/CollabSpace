@@ -5,7 +5,7 @@ Creates the shared Terraform state backend used by all other infrastructure laye
 ## What it creates
 
 | Resource | Name | Region | Purpose |
-| --- | --- | --- | --- |
+|---|---|---|---|
 | S3 bucket | `collabspace-terraform-state-{account_id}` | `eu-central-1` | Stores Terraform state for all layers |
 | DynamoDB table | `collabspace-terraform-locks` | `eu-central-1` | Prevents concurrent state writes |
 | SNS topic + subscription | `collabspace-billing-alarm` | `us-east-1` | Delivers billing alert emails |

@@ -4,7 +4,9 @@ A learning project: a five-service real-time collaboration platform built on AWS
 
 ## Status
 
-**Stage 0 — Foundation, in progress**
+**Stage 1 — Walking Skeleton, in progress**
+
+Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security groups, IAM roles, CloudWatch log groups. Next: push `auth-workspace` Spring Boot container to ECR and verify it's reachable via the ALB DNS name.
 
 ## Tech Stack
 
@@ -38,4 +40,11 @@ Start with [docs/01-overview/vision.md](docs/01-overview/vision.md), then [docs/
 
 ## Running the Project
 
-Local development setup is not yet documented. See [docs/07-development/](docs/07-development/) once those files exist.
+The dev environment runs on AWS, not locally. To bring it up:
+
+```bash
+cd infrastructure/environments/dev
+terraform init && terraform plan && terraform apply
+```
+
+See [infrastructure/README.md](infrastructure/README.md) for the full layer-by-layer bring-up sequence (bootstrap → shared → dev). Local service development setup will be documented in [docs/07-development/](docs/07-development/) once services are scaffolded.
