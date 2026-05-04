@@ -18,10 +18,10 @@ See /docs for full architecture once those files exist.
 ### Architecture summary
 
 - Auth & Workspace: Java 25 + Spring Boot 4, PostgreSQL (RDS), Redis (Upstash)
-- Document Service: Node.js 22 + TypeScript + Express, MongoDB Atlas
-- Realtime Service: Node.js 22 + TypeScript + ws, Redis pub/sub coordination
+- Document Service: Node.js 24 + TypeScript + Fastify, MongoDB Atlas
+- Realtime Service: Node.js 24 + TypeScript + Fastify + ws, Redis pub/sub coordination
 - AI Assistant: Python 3.13 + FastAPI, Postgres + pgvector
-- Notification: AWS Lambda (Node.js 22)
+- Notification: AWS Lambda (Node.js 24)
 
 ### Communication
 
@@ -90,14 +90,15 @@ Java (Spring Boot):
 - @Transactional on service methods that span multiple repository calls
 - Bean Validation (jakarta.validation) at controller boundary
 
-TypeScript (Express):
+TypeScript (Fastify):
 
 - strict: true in tsconfig
 - Named exports only (no default exports)
-- zod for runtime validation, infer types from schemas
+- JSON Schema on Fastify routes for HTTP boundary validation; zod for business logic, infer types from schemas
 - pino for logging, never console.log
 - async/await, never raw promises
 - No `any` without comment justifying
+- Package manager: pnpm (see ADR-018); never use npm install in Node.js services
 
 Python (FastAPI):
 
@@ -166,7 +167,7 @@ Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-016
+Recent ADRs: adr-001 to adr-021
 
 Completed:
 
@@ -208,6 +209,10 @@ Next milestone: Build auth-workspace Spring Boot container (returning 200 OK on 
 - API conventions: docs/02-architecture/api-conventions.md (versioning, error format, pagination, CORS, correlation IDs)
 - Frontend service: docs/03-services/frontend.md (React stack, project structure, auth state, WebSocket, Vercel)
 - Local development setup: docs/07-development/local-setup.md (make up/down, native services, LocalStack, migrations)
+- API Gateway trust model: docs/02-architecture/api-gateway-trust.md (JWT authorizer, X-Internal-Token, key rotation, why services don't re-validate JWTs)
+- Kafka retry policy and DLT: docs/02-architecture/kafka-retry-policy.md (exponential backoff, dead-letter topic, replay runbook)
+- Node.js framework: Fastify v5 (see ADR-017); pnpm (see ADR-018); Node.js 24 LTS (newer LTS line, longer support window)
+- Service-to-service auth: docs/06-decisions/adr-021-service-to-service-auth.md (internal service JWTs, RS256, 1-hour lifetime)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 

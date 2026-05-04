@@ -200,16 +200,66 @@ The JWKS endpoint must be publicly accessible — API Gateway calls it from with
 
 The following events are emitted as structured log lines and should always be present in the service's log output:
 
-| Event | Log fields |
-|---|---|
-| Registration | `userId`, `email` (hashed), `ip`, `correlationId` |
-| Login success | `userId`, `ip`, `userAgent`, `correlationId` |
-| Login failure | `email` (hashed), `reason` (not_found \| bad_password), `ip`, `correlationId` |
-| Token refresh | `userId`, `ip`, `correlationId` |
-| Logout | `userId`, `jti`, `correlationId` |
-| Blocklist check failure | `jti`, `userId`, `ip`, `correlationId` |
+| Event                   | Log fields                                                                    |
+| ----------------------- | ----------------------------------------------------------------------------- |
+| Registration            | `userId`, `email` (hashed), `ip`, `correlationId`                             |
+| Login success           | `userId`, `ip`, `userAgent`, `correlationId`                                  |
+| Login failure           | `email` (hashed), `reason` (not_found \| bad_password), `ip`, `correlationId` |
+| Token refresh           | `userId`, `ip`, `correlationId`                                               |
+| Logout                  | `userId`, `jti`, `correlationId`                                              |
+| Blocklist check failure | `jti`, `userId`, `ip`, `correlationId`                                        |
 
 Email addresses are hashed in logs (SHA-256, non-reversible) to prevent plaintext PII in CloudWatch. A compliance-grade audit trail — stored durably, tamper-evidently, queryable by user and time range — is deferred to v1.5. → [roadmap.md](../roadmap.md)
+
+---
+
+## WebSocket authentication
+
+WebSocket connections require a distinct authentication flow because:
+
+1. The browser's native `WebSocket` API does not support custom headers — the `Authorization` header cannot be set on the upgrade request from a browser.
+2. Passing a JWT in the URL query string would expose it in ALB access logs and CloudWatch. A token in a log is a leaked credential.
+
+The solution is a **single-use WebSocket ticket**: a short-lived, opaque token that is exchanged for a connection identity at upgrade time.
+
+### Ticket flow
+
+1. The frontend calls `POST /v1/auth/ws-ticket` with the access token in the `Authorization` header.
+2. The Auth service validates the access token, generates a 128-bit random ticket value, and stores `ws:ticket:<value> → <userId>` in Redis with a 30-second TTL.
+3. The Auth service returns `{ ticket: "<value>" }`.
+4. The frontend opens a WebSocket connection to the Realtime Service: `wss://realtime.collabspace.io/ws?ticket=<value>`.
+5. The Realtime Service reads the ticket from the query string, performs Redis GET `ws:ticket:<value>` → `userId` (then DEL to invalidate), and registers the connection.
+6. If the ticket is not found or has expired, the Realtime Service rejects the upgrade with HTTP 401.
+
+### Connection registry
+
+On successful auth, the Realtime Service stores:
+
+```
+Redis HSET ws:conn:<connectionId>  userId <userId>  workspaces <json>  expiresAt <epoch>
+```
+
+The `workspaces` value is fetched from the Auth service (or derived from the userId) so that messages can be routed to workspace-scoped subscribers.
+
+The registry is in Redis (shared Upstash instance) so that multiple Realtime Service EC2 instances can route broadcast messages across connections they do not directly own.
+
+### Token expiry during an active connection
+
+The Realtime Service runs a background sweep every 30 seconds, checking `expiresAt` for each registered connection. When a connection's original access token expires, the server sends WebSocket close code `4001`.
+
+The client's `onclose` handler detects `4001`, calls `POST /v1/auth/refresh` to obtain a new access token, fetches a new WebSocket ticket, and reconnects. From the user's perspective, this is invisible — the reconnection completes in under 200ms.
+
+See [ADR-020](../06-decisions/adr-020-websocket-authentication.md) for the full rationale, alternatives considered, and connection lifecycle diagram.
+
+### `POST /v1/auth/ws-ticket`
+
+|              |                                                   |
+| ------------ | ------------------------------------------------- |
+| Auth         | Required (`Authorization: Bearer <access-token>`) |
+| Request body | None                                              |
+| Response     | `{ "ticket": "<128-bit hex value>" }`             |
+| Ticket TTL   | 30 seconds                                        |
+| Ticket reuse | Single-use (deleted on first redemption)          |
 
 ---
 
