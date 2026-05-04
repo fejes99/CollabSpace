@@ -45,6 +45,7 @@ target/
 *.nar
 hs_err_pid*
 replay_pid*
+*.hprof
 .mvn/wrapper/maven-wrapper.jar
 # Spring Boot local profile config (may contain real credentials/URLs)
 **/application-local*.yml
