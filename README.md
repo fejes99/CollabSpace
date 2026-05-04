@@ -13,10 +13,10 @@ Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security
 | Layer            | Technology                                            |
 | ---------------- | ----------------------------------------------------- |
 | Auth & Workspace | Java 25, Spring Boot 4, PostgreSQL, Redis             |
-| Document Service | Node.js 22, TypeScript, Express, MongoDB Atlas        |
-| Realtime Service | Node.js 22, TypeScript, WebSocket (ws), Redis pub/sub |
+| Document Service | Node.js 24, TypeScript, Fastify, MongoDB Atlas        |
+| Realtime Service | Node.js 24, TypeScript, WebSocket (ws), Redis pub/sub |
 | AI Assistant     | Python 3.13, FastAPI, PostgreSQL + pgvector           |
-| Notification     | AWS Lambda (Node.js 22)                               |
+| Notification     | AWS Lambda (Node.js 24)                               |
 | Messaging        | SNS + SQS (fan-out), Kafka on EC2 (AI events)         |
 | Infrastructure   | AWS, Terraform, ECS Fargate, EC2, GitHub Actions      |
 

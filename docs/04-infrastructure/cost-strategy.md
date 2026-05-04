@@ -16,7 +16,7 @@ AWS free tier has two flavours: **12-month** (resets to paid after the first yea
 | Document Service | ECS Fargate            | MongoDB Atlas M0             | 512 MB cluster, no expiry              | Yes (Atlas)   |
 | Realtime Service | EC2 t3.micro           | Redis via Upstash            | 750 instance-hr / month (shared pool)  | No (12-month) |
 | AI Assistant     | ECS Fargate            | RDS PostgreSQL (`vector_db`) | Co-located on Auth RDS instance        | No (12-month) |
-| Notification     | Lambda (Node 22)       | —                            | 1M invocations + 400K GB-sec / month   | Yes           |
+| Notification     | Lambda (Node 24)       | —                            | 1M invocations + 400K GB-sec / month   | Yes           |
 | Kafka broker     | EC2 t3.micro           | — (disk only)                | 750 instance-hr / month (shared pool)  | No (12-month) |
 | Messaging        | SNS + SQS              | —                            | 1M publishes + 1M requests / month     | Yes           |
 | API entry        | API Gateway (HTTP API) | —                            | 1M calls / month                       | No (12-month) |

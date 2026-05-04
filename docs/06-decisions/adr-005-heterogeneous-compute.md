@@ -73,7 +73,7 @@ Two t3.micro instances running simultaneously consume ~1,440 hours/month
 against the 750-hour allocation — exceeding it by ~$8/month if left
 running. Stop both instances between development sessions.
 
-### Lambda (Node.js 22) — Notification Service
+### Lambda (Node.js 24) — Notification Service
 
 The Notification Service is stateless, event-driven, and infrequent. It
 has no reason to be a persistent process.

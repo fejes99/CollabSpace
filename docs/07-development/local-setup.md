@@ -14,7 +14,7 @@ Install these before running anything:
 |---|---|---|
 | Docker Desktop (or Rancher Desktop) | Container runtime for infrastructure | [docker.com](https://docker.com) |
 | Java 25 (JDK) | Auth & Workspace service | `sdk install java 25-tem` via SDKMAN |
-| Node.js 22 | Document, Realtime, Notification services and frontend | `nvm install 22` |
+| Node.js 24 | Document, Realtime, Notification services and frontend | `nvm install 24` |
 | Python 3.13 | AI Assistant service | `pyenv install 3.13` |
 | AWS CLI v2 | LocalStack interaction, ECR login | [aws.amazon.com/cli](https://aws.amazon.com/cli) |
 | Terraform 1.9+ | Optional — only needed to run `terraform plan/apply` locally | [terraform.io](https://terraform.io) |
@@ -71,7 +71,7 @@ Runs on port `8080`. Hot reload is not enabled for Spring Boot by default — ad
 
 Health check: `curl http://localhost:8080/actuator/health`
 
-### Document Service (TypeScript / Express)
+### Document Service (TypeScript / Fastify)
 
 ```bash
 cd services/document-service

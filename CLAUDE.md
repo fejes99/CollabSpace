@@ -42,7 +42,7 @@ See /docs for full architecture once those files exist.
 ```
 /services/
   /auth-workspace/    — Java + Spring Boot (Stage 1+)
-  /document-service/  — TypeScript + Express (Stage 1+)
+  /document-service/  — TypeScript + Fastify (Stage 1+)
   /realtime-service/  — TypeScript + ws (Stage 1+)
   /ai-assistant/      — Python + FastAPI (Stage 1+)
   /notification/      — Node.js Lambda (Stage 1+)
@@ -78,7 +78,7 @@ See /docs for full architecture once those files exist.
 - Cite the relevant ADR when making non-trivial choices. If no ADR exists for
   a decision you're about to make, say so and offer to write one.
 - Idiomatic per language: Pythonic Python, Spring conventions for Java,
-  modern TypeScript with strict mode for Node/Express.
+  modern TypeScript with strict mode for Node/Fastify.
 
 ### Code style
 
@@ -161,7 +161,7 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: auth-workspace (next to scaffold)
+Current service: auth-workspace (scaffolded — Dockerfile + CI/CD next)
 Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in dev, deployed by GitHub Actions CI
 
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
@@ -183,8 +183,9 @@ Completed:
 - modules/alb/ — internet-facing ALB + HTTP listener with fixed-response default; services plug in via listener rules
 - modules/ecs-service/ — generic reusable module: target group, listener rule, task definition, ECS service; CI/CD manages task definition after initial creation (see ADR-012)
 - environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired; image placeholder :skeleton pending first ECR push
+- services/auth-workspace/ — Spring Boot 4.0.6 + Java 25 project scaffolded; spring-boot-starter-web + spring-boot-starter-actuator; /actuator/health endpoint live; Maven build and tests pass
 
-Next milestone: Build auth-workspace Spring Boot container (returning 200 OK on /actuator/health), push :skeleton tag to ECR, write GitHub Actions deploy workflow. Service becomes reachable at the ALB DNS name.
+Next milestone: Write Dockerfile (multi-stage, eclipse-temurin:25 ARM64), push :skeleton tag to ECR, write .github/workflows/service-auth.yml CI/CD workflow. Service becomes reachable at the ALB DNS name.
 
 ## LAYER 3: POINTERS
 

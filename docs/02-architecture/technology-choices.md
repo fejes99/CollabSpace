@@ -9,10 +9,10 @@ This document records every technology decision for CollabSpace v1 and the ratio
 | Service          | Language             | Framework          | Database                            | Sync API                      | Async                        |
 | ---------------- | -------------------- | ------------------ | ----------------------------------- | ----------------------------- | ---------------------------- |
 | Auth & Workspace | Java 25              | Spring Boot 4      | PostgreSQL (RDS) + Redis (Upstash)  | REST → API Gateway (HTTP API) | SNS publisher                |
-| Document Service | TypeScript · Node 22 | Express            | MongoDB Atlas                       | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
-| Realtime Service | TypeScript · Node 22 | ws                 | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
+| Document Service | TypeScript · Node 24 | Fastify            | MongoDB Atlas                       | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
+| Realtime Service | TypeScript · Node 24 | ws                 | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
 | AI Assistant     | Python 3.13          | FastAPI            | PostgreSQL + pgvector               | REST → API Gateway (HTTP API) | Kafka consumer               |
-| Notification     | TypeScript · Node 22 | — (Lambda runtime) | —                                   | —                             | SQS trigger (Lambda)         |
+| Notification     | TypeScript · Node 24 | — (Lambda runtime) | —                                   | —                             | SQS trigger (Lambda)         |
 
 ---
 
@@ -26,7 +26,7 @@ PostgreSQL is the natural fit for relational, transactional data: users, workspa
 
 ### Document Service
 
-Node.js with TypeScript and Express is chosen for its JSON-native I/O model and the ecosystem fit with MongoDB. Documents are schema-flexible by nature — a rigid SQL schema would require migrations for every structural change to the document model. Express is intentionally minimal; the service does not need the opinions that come with a heavier framework. → **ADR-004**
+Node.js 24 with TypeScript and Fastify is chosen for its JSON-native I/O model and the ecosystem fit with MongoDB. Documents are schema-flexible by nature — a rigid SQL schema would require migrations for every structural change to the document model. Fastify is chosen over Express for its built-in JSON Schema validation, significantly faster JSON serialization, and first-class TypeScript support. → **ADR-004**, **ADR-017**
 
 MongoDB Atlas is used over a self-managed MongoDB instance for the same reason as Upstash Redis: operational overhead is out of scope for a learning project at this stage. The Atlas free tier (512 MB) is sufficient for v1. → **ADR-004**
 
@@ -52,7 +52,7 @@ Kafka (self-managed on EC2) is used for the AI indexing pipeline rather than SNS
 
 ### Notification Service
 
-AWS Lambda (Node.js 22) is used because notifications are event-driven, stateless, and infrequent. There is no reason to run a persistent process for a function that executes once per document save. Lambda eliminates the need to provision, scale, or pay for idle compute for this concern. → **ADR-005**
+AWS Lambda (Node.js 24) is used because notifications are event-driven, stateless, and infrequent. There is no reason to run a persistent process for a function that executes once per document save. Lambda eliminates the need to provision, scale, or pay for idle compute for this concern. → **ADR-005**
 
 The Lambda is triggered by SQS (not SNS directly) to benefit from SQS's retry behaviour and dead-letter queue support. A failed notification delivery is retried automatically without custom retry logic in the function.
 

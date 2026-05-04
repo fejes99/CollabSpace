@@ -88,9 +88,9 @@ Stage 1 is the Walking Skeleton: five services deployed to AWS, each reachable a
 Stage 1 proceeds in six steps:
 
 1. **Shared infrastructure** _(complete)._ VPC, ECR repositories, IAM roles, security groups, CloudWatch log groups, ECS cluster, ALB, and the ECS service module. The foundation every subsequent step depends on.
-2. **First service skeleton — auth-workspace** _(in progress)._ A Spring Boot application with one endpoint: `GET /actuator/health → 200 OK`. Docker multi-stage build, image pushed to ECR with the `:skeleton` tag, ECS task stabilized and reachable at the ALB DNS name.
+2. **First service skeleton — auth-workspace** _(in progress)._ A Spring Boot application with one endpoint: `GET /actuator/health → 200 OK`. Spring Boot 4.0.6 + Java 25 project scaffolded and tests pass. Remaining: Docker multi-stage build, image pushed to ECR with the `:skeleton` tag, ECS task stabilized and reachable at the ALB DNS name.
 3. **CI/CD pipeline — auth-workspace.** GitHub Actions workflow: lint → test → Docker build → ECR push → ECS force-new-deployment. Triggered on push to `main`. Once working on the first service, every subsequent service is a configuration addition, not a new engineering problem.
-4. **Remaining service skeletons.** document-service (TypeScript/Express), realtime-service (TypeScript/ws), AI assistant (Python/FastAPI), notification (Node.js Lambda). Each slots into the existing CI/CD pattern. Realtime is the exception: ECS-on-EC2 rather than Fargate, and the health signal is a WebSocket echo rather than an HTTP endpoint.
+4. **Remaining service skeletons.** document-service (TypeScript/Fastify), realtime-service (TypeScript/ws), AI assistant (Python/FastAPI), notification (Node.js Lambda). Each slots into the existing CI/CD pattern. Realtime is the exception: ECS-on-EC2 rather than Fargate, and the health signal is a WebSocket echo rather than an HTTP endpoint.
 5. **Routing layer.** API Gateway routes wired to all services. ALB listener rule for WebSocket upgrade. SNS → SQS → Lambda subscription for notification. Each route verified from the public internet.
 6. **Observability baseline.** Structured JSON logs flowing from all services to CloudWatch. One CloudWatch dashboard per service showing request count, error count, and memory usage.
 
