@@ -127,7 +127,7 @@ jobs:
       #         If health checks never pass, the deployment times out (10 min
       #         default) and the job fails — the old tasks keep running.
       - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-def@v2
+        uses: aws-actions/amazon-ecs-deploy-task-def@v1
         with:
           task-definition: ${{ steps.render-task-def.outputs.task-definition }}
           service: ${{ env.ECS_SERVICE }}
