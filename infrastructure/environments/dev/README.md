@@ -14,7 +14,7 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `cloudwatch` | 5 log groups (`/collabspace/dev/{service}`), 7-day retention | Includes notification Lambda |
 | `ecs_cluster` | ECS cluster | Container Insights disabled in dev — see ADR-011 |
 | `alb` | Internet-facing ALB, HTTP listener (default: 404) | Services attach their own listener rules |
-| `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Running with `:skeleton` placeholder image — service stabilises once a real image is pushed |
+| `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Healthy — `/actuator/health` returns 200 OK; CI/CD manages image updates via `service-auth.yml` |
 
 **Not created here:**
 - RDS instances (added when auth-workspace service is built)
@@ -110,5 +110,6 @@ Safe to run between sessions for cost control. Only resources in this module are
 
 ## What comes next (Stage 1 continued)
 
-- Push to main → first CI run builds the image, pushes `:skeleton` + `:<sha>` to ECR, deploys to ECS
-- Verify the service is reachable: `terraform output alb_dns_name` then `curl http://<dns>/actuator/health`
+- Add `document-service` module call: second `ecs-service` module instance for document-service (TypeScript + Fastify), with its own target group and listener rule at a more specific path prefix
+- Repeat the Dockerfile + CI/CD pattern for document-service, realtime-service, ai-assistant, and notification
+- Wire the routing layer: API Gateway routes, ALB listener rule for WebSocket, SNS → SQS → Lambda subscription

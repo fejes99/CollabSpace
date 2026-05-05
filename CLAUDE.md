@@ -161,10 +161,10 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: auth-workspace (Dockerfile + CI/CD ready — pending first deploy)
-Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in dev, deployed by GitHub Actions CI
+Current service: document-service (next walking skeleton service)
+Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace complete, four remaining.
 
-Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
+Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
 Blocked on: nothing
 Recent ADRs: adr-001 to adr-021
@@ -182,12 +182,11 @@ Completed:
 - modules/ecs-cluster/ — ECS cluster with Container Insights toggle (disabled in dev; see ADR-011)
 - modules/alb/ — internet-facing ALB + HTTP listener with fixed-response default; services plug in via listener rules
 - modules/ecs-service/ — generic reusable module: target group, listener rule, task definition, ECS service; CI/CD manages task definition after initial creation (see ADR-012)
-- environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired; image placeholder :skeleton pending first ECR push
-- services/auth-workspace/ — Spring Boot 4.0.6 + Java 25 project scaffolded; spring-boot-starter-web + spring-boot-starter-actuator; /actuator/health endpoint live; Maven build and tests pass
-- services/auth-workspace/Dockerfile — multi-stage build (eclipse-temurin:25-jdk-noble → eclipse-temurin:25-jre-noble); non-root user; dependency layer cached
-- .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:skeleton + :<sha>) → ECS deploy with stability wait
+- environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired
+- services/auth-workspace/ — Spring Boot 4.0.6 + Java 25; /actuator/health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS name ✓
+- .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:skeleton + :<sha>) → ECS deploy with stability wait; path filter includes workflow file itself
 
-Next milestone: Push to main to trigger first CI run; verify service is reachable at the ALB DNS name (`terraform output alb_dns_name` in environments/dev/).
+Next milestone: Scaffold document-service (Node.js 24 + TypeScript + Fastify), add /health endpoint, multi-stage Dockerfile, CI/CD workflow, deploy to ECS Fargate. Wire into environments/dev as a second ecs-service module call.
 
 ## LAYER 3: POINTERS
 

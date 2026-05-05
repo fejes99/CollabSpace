@@ -2,7 +2,7 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Walking skeleton. The service starts, exposes `/actuator/health`, and is deployed to ECS Fargate via GitHub Actions CI. Full auth endpoints are not yet implemented.
+**Current state:** Walking skeleton — deployed and healthy. `/actuator/health` returns `200 OK` from ECS Fargate via the ALB. Full auth endpoints are not yet implemented.
 
 ## What it does (walking skeleton)
 
