@@ -48,6 +48,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | Idea                  | Status | Notes                                                                                                                                                                                                                                                                                                 |
 | --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Claude AI PR reviewer | Idea   | GitHub Actions workflow that calls the Claude API on every PR open/update, posts inline review comments. Requires `ANTHROPIC_API_KEY` repo secret and a custom workflow. Would run automatically without needing to invoke `/review` manually. Evaluate when first feature PRs are opened in Stage 1. |
+| SonarQube CI-based analysis | Planned — Stage 2 | Switch from automatic GitHub analysis to CI-based analysis once test suites exist. Each service adds a SonarQube scan step after `test`, passing coverage output (JaCoCo for Java, lcov for TypeScript, pytest-cov for Python). Enables coverage metrics and quality gate enforcement that blocks PR merges. Requires `SONAR_TOKEN` repo secret and a `sonar-project.properties` per service. Until then: automatic analysis is active via the GitHub integration. |
 
 ---
 
