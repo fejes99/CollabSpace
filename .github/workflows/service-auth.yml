@@ -8,8 +8,10 @@ on:
     paths:
       - services/auth-workspace/**
 
+# contents: read is the minimum needed by actions/checkout in both jobs.
+# id-token: write is scoped to build-and-deploy only (the job that assumes
+# the AWS OIDC role). Keeping it off the test job follows least-privilege.
 permissions:
-  id-token: write  # required to request the OIDC JWT from GitHub
   contents: read
 
 env:
@@ -46,18 +48,21 @@ jobs:
   # ── Job 2: Build, push, deploy ───────────────────────────────────────────────
   #
   # Builds the Docker image, pushes two tags to ECR, then rolls out the new
-  # image to ECS using the official AWS deploy actions.
+  # image to ECS via the AWS CLI.
   #
   # Two tags are pushed:
   #   :<short-sha>  Pinned to this exact commit. ECS always runs this tag.
-  #   :skeleton     Floating tag updated on every push. Useful for quick manual
-  #                 inspection via ECR ("what's the current image?") and keeps
-  #                 the Terraform-created task definition valid if the environment
-  #                 is destroyed and recreated before any CI run.
+  #   :skeleton     Floating tag updated on every push. Keeps the Terraform-
+  #                 created task definition pullable if the environment is
+  #                 destroyed and recreated before any CI run.
   build-and-deploy:
     name: Build, push, deploy
     needs: test
     runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write  # required to request the OIDC JWT for AWS auth
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -121,15 +126,27 @@ jobs:
           container-name: ${{ env.CONTAINER_NAME }}
           image: ${{ steps.build-image.outputs.image }}
 
-      # Step 3: Register the updated task definition as a new revision, then
-      #         update the ECS service to roll it out. Waits until the new tasks
-      #         pass the ALB health check before marking the deployment complete.
-      #         If health checks never pass, the deployment times out (10 min
-      #         default) and the job fails — the old tasks keep running.
-      - name: Deploy to ECS
-        uses: aws-actions/amazon-ecs-deploy-task-def@v1
-        with:
-          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      # Step 3: Register the updated task definition as a new revision, update
+      #         the ECS service to roll it out, then wait for the new tasks to
+      #         pass the ALB health check. If health checks never pass, the wait
+      #         command times out after 10 minutes and the job fails — the old
+      #         tasks keep running (circuit breaker catches this too).
+      - name: Register new task definition revision
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://${{ steps.render-task-def.outputs.task-definition }}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=${TASK_DEF_ARN}" >> "${GITHUB_OUTPUT}"
+
+      - name: Update ECS service and wait for stability
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.register-task-def.outputs.task_def_arn }}"
+
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
