@@ -110,7 +110,5 @@ Safe to run between sessions for cost control. Only resources in this module are
 
 ## What comes next (Stage 1 continued)
 
-- Build `auth-workspace` Spring Boot container returning 200 OK on `/actuator/health`
-- Push image to ECR with the `:skeleton` tag — ECS service will stabilise and become healthy
-- GitHub Actions workflow that builds, tests, and deploys on push to main
-- Verify the service is reachable at the ALB DNS name (`terraform output alb_dns_name`)
+- Push to main → first CI run builds the image, pushes `:skeleton` + `:<sha>` to ECR, deploys to ECS
+- Verify the service is reachable: `terraform output alb_dns_name` then `curl http://<dns>/actuator/health`

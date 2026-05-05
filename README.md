@@ -6,7 +6,7 @@ A learning project: a five-service real-time collaboration platform built on AWS
 
 **Stage 1 — Walking Skeleton, in progress**
 
-Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security groups, IAM roles, CloudWatch log groups. Next: push `auth-workspace` Spring Boot container to ECR and verify it's reachable via the ALB DNS name.
+Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security groups, IAM roles, CloudWatch log groups. `auth-workspace` Spring Boot service scaffolded with Dockerfile and CI/CD pipeline. Next: first CI run pushes image to ECR and deploys to ECS — service reachable at ALB DNS name.
 
 ## Tech Stack
 

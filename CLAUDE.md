@@ -161,7 +161,7 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: auth-workspace (scaffolded — Dockerfile + CI/CD next)
+Current service: auth-workspace (Dockerfile + CI/CD ready — pending first deploy)
 Current goal: ECS cluster + ALB + auth-workspace container reachable via HTTP in dev, deployed by GitHub Actions CI
 
 Out of scope next session: full service implementation, databases, inter-service communication. Walking Skeleton = one service reachable via HTTP in AWS dev, deployed by CI. Nothing more.
@@ -172,7 +172,7 @@ Recent ADRs: adr-001 to adr-021
 Completed:
 
 - infrastructure/bootstrap/ — applied to real AWS; S3 state bucket + DynamoDB lock table + billing alarm live
-- infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live
+- infrastructure/shared/ — applied to real AWS; 4 ECR repos + GitHub Actions OIDC provider + CI IAM role live; collabspace-ecs-deploy IAM policy added so CI can register task definitions and update ECS services
 - infrastructure/environments/dev/ — applied to real AWS; shared network foundation live:
   - VPC (10.0.0.0/16), 2 public subnets + 2 private subnets across eu-central-1a/b
   - Internet Gateway + public route table + S3 gateway endpoint (free ECR layer routing)
@@ -184,8 +184,10 @@ Completed:
 - modules/ecs-service/ — generic reusable module: target group, listener rule, task definition, ECS service; CI/CD manages task definition after initial creation (see ADR-012)
 - environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired; image placeholder :skeleton pending first ECR push
 - services/auth-workspace/ — Spring Boot 4.0.6 + Java 25 project scaffolded; spring-boot-starter-web + spring-boot-starter-actuator; /actuator/health endpoint live; Maven build and tests pass
+- services/auth-workspace/Dockerfile — multi-stage build (eclipse-temurin:25-jdk-noble → eclipse-temurin:25-jre-noble); non-root user; dependency layer cached
+- .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:skeleton + :<sha>) → ECS deploy with stability wait
 
-Next milestone: Write Dockerfile (multi-stage, eclipse-temurin:25 ARM64), push :skeleton tag to ECR, write .github/workflows/service-auth.yml CI/CD workflow. Service becomes reachable at the ALB DNS name.
+Next milestone: Push to main to trigger first CI run; verify service is reachable at the ALB DNS name (`terraform output alb_dns_name` in environments/dev/).
 
 ## LAYER 3: POINTERS
 

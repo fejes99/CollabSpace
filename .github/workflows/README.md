@@ -13,6 +13,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | File                      | Status | Purpose                                                                                                                                          |
 | ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `aws-oidc-smoke-test.yml` | Live   | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`. |
+| `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes to ECR (`:<sha>` + `:skeleton`), deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` changes. |
 
 ---
 
@@ -22,7 +23,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 | File                      | Status  | Purpose                                                                                                                  |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `service-auth.yml`        | Next up | CI/CD for `services/auth-workspace` (Java + Spring Boot). Lint, test, Docker build, ECR push, ECS deploy.                |
+| `service-auth.yml`        | Live    | See Active workflows above.                                                                                                |
 | `ci-service-template.yml` | Planned | Reusable workflow called by per-service workflows above. Extracts shared steps once two or more service workflows exist. |
 | `service-document.yml`    | Planned | CI/CD for `services/document-service` (TypeScript + Fastify).                                                            |
 | `service-realtime.yml`    | Planned | CI/CD for `services/realtime-service` (TypeScript + ws).                                                                 |

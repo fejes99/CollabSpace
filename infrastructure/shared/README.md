@@ -10,6 +10,7 @@ Account-wide resources shared across all environments: ECR repositories for cont
 | OIDC identity provider | `token.actions.githubusercontent.com` | Trusts GitHub as an identity provider for CI credentials |
 | IAM role | `collabspace-github-actions-ci` | Assumed by GitHub Actions workflows via OIDC |
 | IAM policy | `collabspace-ecr-push` | Grants the CI role permission to push images to the four ECR repos |
+| IAM policy | `collabspace-ecs-deploy` | Grants the CI role permission to register task definition revisions and update ECS services in dev |
 
 ECR repositories created:
 

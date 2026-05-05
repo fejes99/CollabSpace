@@ -1,0 +1,135 @@
+name: CI — auth-workspace
+
+# Triggers on any push to main that touches the service source or its
+# Dockerfile. Infrastructure and other service changes do not trigger this.
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/auth-workspace/**
+
+permissions:
+  id-token: write  # required to request the OIDC JWT from GitHub
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: collabspace-auth-workspace
+  ECS_CLUSTER: collabspace-dev
+  ECS_SERVICE: collabspace-dev-auth-workspace
+  CONTAINER_NAME: auth-workspace
+  TASK_DEFINITION_FAMILY: collabspace-dev-auth-workspace
+
+jobs:
+  # ── Job 1: Test ──────────────────────────────────────────────────────────────
+  #
+  # Run the full test suite before building the container image. A failed test
+  # aborts the pipeline before any image is pushed to ECR.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Java 25
+        uses: actions/setup-java@v4
+        with:
+          java-version: '25'
+          distribution: temurin
+          cache: maven  # caches ~/.m2 between runs; speeds up subsequent builds
+
+      - name: Run tests
+        working-directory: services/auth-workspace
+        run: ./mvnw test
+
+  # ── Job 2: Build, push, deploy ───────────────────────────────────────────────
+  #
+  # Builds the Docker image, pushes two tags to ECR, then rolls out the new
+  # image to ECS using the official AWS deploy actions.
+  #
+  # Two tags are pushed:
+  #   :<short-sha>  Pinned to this exact commit. ECS always runs this tag.
+  #   :skeleton     Floating tag updated on every push. Useful for quick manual
+  #                 inspection via ECR ("what's the current image?") and keeps
+  #                 the Terraform-created task definition valid if the environment
+  #                 is destroyed and recreated before any CI run.
+  build-and-deploy:
+    name: Build, push, deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── AWS auth ─────────────────────────────────────────────────────────────
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── ECR login ────────────────────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # ── Build and push ───────────────────────────────────────────────────────
+      #
+      # Builds for linux/amd64 (the Fargate X86_64 runtime). The short SHA tag
+      # is what ECS will actually run; :skeleton is updated as a reference tag.
+      - name: Build and push image to ECR
+        id: build-image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHORT_SHA="${GITHUB_SHA::7}"
+          SHA_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:${SHORT_SHA}"
+          SKELETON_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:skeleton"
+
+          docker build \
+            --platform linux/amd64 \
+            --tag "${SHA_IMAGE}" \
+            --tag "${SKELETON_IMAGE}" \
+            services/auth-workspace
+
+          docker push "${SHA_IMAGE}"
+          docker push "${SKELETON_IMAGE}"
+
+          echo "image=${SHA_IMAGE}" >> "${GITHUB_OUTPUT}"
+
+      # ── ECS deploy ───────────────────────────────────────────────────────────
+      #
+      # Step 1: Download the currently registered task definition as JSON.
+      #         This is the base for the new revision — all settings (roles,
+      #         log config, env vars) are preserved; only the image URL changes.
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${TASK_DEFINITION_FAMILY}" \
+            --query taskDefinition \
+            --output json > /tmp/task-def.json
+
+      # Step 2: Inject the new image URL into the task definition JSON.
+      #         amazon-ecs-render-task-definition finds the container by name
+      #         and rewrites its image field, then writes the result to a new file.
+      - name: Inject new image into task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@v1
+        with:
+          task-definition: /tmp/task-def.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      # Step 3: Register the updated task definition as a new revision, then
+      #         update the ECS service to roll it out. Waits until the new tasks
+      #         pass the ALB health check before marking the deployment complete.
+      #         If health checks never pass, the deployment times out (10 min
+      #         default) and the job fails — the old tasks keep running.
+      - name: Deploy to ECS
+        uses: aws-actions/amazon-ecs-deploy-task-def@v2
+        with:
+          task-definition: ${{ steps.render-task-def.outputs.task-definition }}
+          service: ${{ env.ECS_SERVICE }}
+          cluster: ${{ env.ECS_CLUSTER }}
+          wait-for-service-stability: true
