@@ -52,11 +52,10 @@ jobs:
   # Builds the Docker image, pushes two tags to ECR, then rolls out the new
   # image to ECS via the AWS CLI.
   #
-  # Two tags are pushed:
-  #   :<short-sha>  Pinned to this exact commit. ECS always runs this tag.
-  #   :skeleton     Floating tag updated on every push. Keeps the Terraform-
-  #                 created task definition pullable if the environment is
-  #                 destroyed and recreated before any CI run.
+  # One tag is pushed per run: :<short-sha>, pinned to the exact commit.
+  # ECR has IMMUTABLE tags — floating tags like :skeleton cannot be
+  # overwritten once pushed. :skeleton was pushed on the first CI run to
+  # stabilise the Terraform-created ECS service and is no longer updated.
   build-and-deploy:
     name: Build, push, deploy
     needs: test
@@ -82,27 +81,19 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       # ── Build and push ───────────────────────────────────────────────────────
-      #
-      # Builds for linux/amd64 (the Fargate X86_64 runtime). The short SHA tag
-      # is what ECS will actually run; :skeleton is updated as a reference tag.
       - name: Build and push image to ECR
         id: build-image
         env:
           REGISTRY: ${{ steps.login-ecr.outputs.registry }}
         run: |
-          SHORT_SHA="${GITHUB_SHA::7}"
-          SHA_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:${SHORT_SHA}"
-          SKELETON_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:skeleton"
+          SHA_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA::7}"
 
           docker build \
             --platform linux/amd64 \
             --tag "${SHA_IMAGE}" \
-            --tag "${SKELETON_IMAGE}" \
             services/auth-workspace
 
           docker push "${SHA_IMAGE}"
-          docker push "${SKELETON_IMAGE}"
-
           echo "image=${SHA_IMAGE}" >> "${GITHUB_OUTPUT}"
 
       # ── ECS deploy ───────────────────────────────────────────────────────────
