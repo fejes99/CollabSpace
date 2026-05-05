@@ -39,7 +39,7 @@ None required for the walking skeleton. Future variables (database URL, JWT sign
 Pushes to `main` that touch `services/auth-workspace/**` trigger `.github/workflows/service-auth.yml`, which:
 
 1. Runs `./mvnw test`
-2. Builds and pushes the Docker image to ECR (`collabspace-auth-workspace`) with two tags: `:<short-sha>` and `:skeleton`
+2. Builds and pushes the Docker image to ECR (`collabspace-auth-workspace`) tagged `:<short-sha>` (ECR tags are immutable; `:skeleton` was a one-time bootstrap tag pushed on the first CI run)
 3. Registers a new ECS task definition revision with the SHA-tagged image
 4. Updates the `collabspace-dev-auth-workspace` ECS service and waits for stability
 

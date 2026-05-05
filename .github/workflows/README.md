@@ -13,7 +13,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | File                      | Status | Purpose                                                                                                                                          |
 | ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `aws-oidc-smoke-test.yml` | Live   | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`. |
-| `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes to ECR (`:<sha>` + `:skeleton`), deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` changes. |
+| `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` or the workflow file changes. |
 
 ---
 

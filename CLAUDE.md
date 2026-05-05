@@ -184,7 +184,7 @@ Completed:
 - modules/ecs-service/ — generic reusable module: target group, listener rule, task definition, ECS service; CI/CD manages task definition after initial creation (see ADR-012)
 - environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired
 - services/auth-workspace/ — Spring Boot 4.0.6 + Java 25; /actuator/health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS name ✓
-- .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:skeleton + :<sha>) → ECS deploy with stability wait; path filter includes workflow file itself
+- .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:<sha> only; :skeleton was a one-time bootstrap tag, ECR tags are immutable) → ECS deploy with stability wait; path filter includes workflow file itself
 
 Next milestone: Scaffold document-service (Node.js 24 + TypeScript + Fastify), add /health endpoint, multi-stage Dockerfile, CI/CD workflow, deploy to ECS Fargate. Wire into environments/dev as a second ecs-service module call.
 
