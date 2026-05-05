@@ -7,6 +7,8 @@ on:
     branches: [main]
     paths:
       - services/auth-workspace/**
+      - .github/workflows/service-auth.yml
+  workflow_dispatch:  # allows manual trigger from the GitHub Actions UI
 
 # contents: read is the minimum needed by actions/checkout in both jobs.
 # id-token: write is scoped to build-and-deploy only (the job that assumes
