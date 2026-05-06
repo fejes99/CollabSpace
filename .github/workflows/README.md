@@ -10,9 +10,9 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 ## Active workflows
 
-| File                      | Status | Purpose                                                                                                                                          |
-| ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `aws-oidc-smoke-test.yml` | Live   | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`. |
+| File                      | Status | Purpose                                                                                                                                                                                                                              |
+| ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `aws-oidc-smoke-test.yml` | Live   | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`.                                                                                     |
 | `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` or the workflow file changes. |
 
 ---
@@ -23,7 +23,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 | File                      | Status  | Purpose                                                                                                                  |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
-| `service-auth.yml`        | Live    | See Active workflows above.                                                                                                |
+| `service-auth.yml`        | Live    | See Active workflows above.                                                                                              |
 | `ci-service-template.yml` | Planned | Reusable workflow called by per-service workflows above. Extracts shared steps once two or more service workflows exist. |
 | `service-document.yml`    | Planned | CI/CD for `services/document-service` (TypeScript + Fastify).                                                            |
 | `service-realtime.yml`    | Planned | CI/CD for `services/realtime-service` (TypeScript + ws).                                                                 |
@@ -45,9 +45,9 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 ### Future enhancements (not yet scoped)
 
-| Idea                  | Status | Notes                                                                                                                                                                                                                                                                                                 |
-| --------------------- | ------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Claude AI PR reviewer | Idea   | GitHub Actions workflow that calls the Claude API on every PR open/update, posts inline review comments. Requires `ANTHROPIC_API_KEY` repo secret and a custom workflow. Would run automatically without needing to invoke `/review` manually. Evaluate when first feature PRs are opened in Stage 1. |
+| Idea                        | Status            | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| --------------------------- | ----------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Claude AI PR reviewer       | Idea              | GitHub Actions workflow that calls the Claude API on every PR open/update, posts inline review comments. Requires `ANTHROPIC_API_KEY` repo secret and a custom workflow. Would run automatically without needing to invoke `/review` manually. Evaluate when first feature PRs are opened in Stage 1.                                                                                                                                                              |
 | SonarQube CI-based analysis | Planned — Stage 2 | Switch from automatic GitHub analysis to CI-based analysis once test suites exist. Each service adds a SonarQube scan step after `test`, passing coverage output (JaCoCo for Java, lcov for TypeScript, pytest-cov for Python). Enables coverage metrics and quality gate enforcement that blocks PR merges. Requires `SONAR_TOKEN` repo secret and a `sonar-project.properties` per service. Until then: automatic analysis is active via the GitHub integration. |
 
 ---

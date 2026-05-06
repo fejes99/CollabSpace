@@ -185,8 +185,9 @@ Completed:
 - environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired
 - services/auth-workspace/ — Spring Boot 4.0.6 + Java 25; /actuator/health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS name ✓
 - .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:<sha> only; :skeleton was a one-time bootstrap tag, ECR tags are immutable) → ECS deploy with stability wait; path filter includes workflow file itself
+- services/document-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, type-aware ESLint, c8 coverage, pnpm; app/server split for integration testing; zod env validation; scaffolded locally, not yet deployed
 
-Next milestone: Scaffold document-service (Node.js 24 + TypeScript + Fastify), add /health endpoint, multi-stage Dockerfile, CI/CD workflow, deploy to ECS Fargate. Wire into environments/dev as a second ecs-service module call.
+Next milestone: Add CI/CD workflow (service-document.yml): lint → test → build (linux/amd64) → ECR push → ECS deploy with stability wait. Wire document-service into environments/dev as a second ecs-service module call.
 
 ## LAYER 3: POINTERS
 
@@ -215,6 +216,7 @@ Next milestone: Scaffold document-service (Node.js 24 + TypeScript + Fastify), a
 - Kafka retry policy and DLT: docs/02-architecture/kafka-retry-policy.md (exponential backoff, dead-letter topic, replay runbook)
 - Node.js framework: Fastify v5 (see ADR-017); pnpm (see ADR-018); Node.js 24 LTS (newer LTS line, longer support window)
 - Service-to-service auth: docs/06-decisions/adr-021-service-to-service-auth.md (internal service JWTs, RS256, 1-hour lifetime)
+- document-service: services/document-service/README.md (stack, endpoints, env vars, scripts, project structure)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 
