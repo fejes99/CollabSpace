@@ -14,6 +14,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | ------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `aws-oidc-smoke-test.yml` | Live   | Validates OIDC trust chain, STS identity, and scoped ECR access. Runs on push to `infrastructure/shared/**` or manually via `workflow_dispatch`.                                                                                     |
 | `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` or the workflow file changes. |
+| `service-document.yml`    | Live   | CI/CD for `services/document-service`. Runs lint + tests (Node.js 24 + pnpm), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/document-service/**` or the workflow file changes. |
 
 ---
 
@@ -25,7 +26,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------ |
 | `service-auth.yml`        | Live    | See Active workflows above.                                                                                              |
 | `ci-service-template.yml` | Planned | Reusable workflow called by per-service workflows above. Extracts shared steps once two or more service workflows exist. |
-| `service-document.yml`    | Planned | CI/CD for `services/document-service` (TypeScript + Fastify).                                                            |
+| `service-document.yml`    | Live    | See Active workflows above.                                                                                              |
 | `service-realtime.yml`    | Planned | CI/CD for `services/realtime-service` (TypeScript + ws).                                                                 |
 | `service-ai.yml`          | Planned | CI/CD for `services/ai-assistant` (Python + FastAPI).                                                                    |
 

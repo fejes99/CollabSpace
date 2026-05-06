@@ -178,3 +178,45 @@ module "auth_workspace" {
     SPRING_PROFILES_ACTIVE = var.environment
   }
 }
+
+# ── document-service ECS service ─────────────────────────────────────────────
+# Walking skeleton: one task, minimum CPU/memory, reachable at /documents/*.
+# Priority 50 — more specific than auth-workspace's /* catch-all at 100.
+# The image tag :skeleton is a one-time bootstrap placeholder. CI/CD manages
+# image updates via service-document.yml after the first deploy.
+
+module "document_service" {
+  source = "../../modules/ecs-service"
+
+  project_name = var.project_name
+  environment  = var.environment
+  service_name = "document-service"
+
+  cluster_id = module.ecs_cluster.cluster_id
+  image_url  = "${data.terraform_remote_state.shared.outputs.ecr_repository_urls["document-service"]}:skeleton"
+
+  container_port = 3000
+  cpu            = 256
+  memory         = 512
+  desired_count  = 1
+
+  task_execution_role_arn = module.iam_ecs.task_execution_role_arn
+  task_role_arn           = module.iam_ecs.task_role_arns["document-service"]
+
+  vpc_id             = module.vpc.vpc_id
+  subnet_ids         = module.vpc.public_subnet_ids
+  security_group_ids = [module.security_groups.ecs_tasks_sg_id]
+
+  listener_arn           = module.alb.listener_arn
+  path_patterns          = ["/documents", "/documents/*"]
+  listener_rule_priority = 50
+
+  health_check_path = "/health"
+  log_group_name    = module.cloudwatch.log_group_names["document-service"]
+  aws_region        = var.aws_region
+
+  environment_variables = {
+    NODE_ENV  = var.environment
+    LOG_LEVEL = "info"
+  }
+}

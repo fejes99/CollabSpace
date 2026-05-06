@@ -15,6 +15,7 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `ecs_cluster` | ECS cluster | Container Insights disabled in dev — see ADR-011 |
 | `alb` | Internet-facing ALB, HTTP listener (default: 404) | Services attach their own listener rules |
 | `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Healthy — `/actuator/health` returns 200 OK; CI/CD manages image updates via `service-auth.yml` |
+| `document_service` | Target group, listener rule, task definition, ECS service for document-service | Walking skeleton — `/health` returns 200 OK; path prefix `/documents/*` at priority 50; CI/CD via `service-document.yml` |
 
 **Not created here:**
 - RDS instances (added when auth-workspace service is built)
@@ -84,7 +85,7 @@ Designed to stay within the AWS free tier for active development:
 | CloudWatch log groups (7-day retention, low volume) | Free tier |
 | ECS cluster | Free |
 | ALB | ~$0.022/hour (~$16/month) + $0.008/LCU — main non-free cost in dev |
-| ECS Fargate task (256 CPU / 512 MB, 1 task) | ~$0.011/hour (~$8/month) |
+| ECS Fargate tasks (256 CPU / 512 MB, 2 tasks) | ~$0.022/hour (~$16/month) |
 | Container Insights | Disabled — $0 (see ADR-011) |
 
 **Estimated total: ~$1–2/day when running.** Destroy the environment between sessions to stay within budget.
@@ -110,6 +111,5 @@ Safe to run between sessions for cost control. Only resources in this module are
 
 ## What comes next (Stage 1 continued)
 
-- Add `document-service` module call: second `ecs-service` module instance for document-service (TypeScript + Fastify), with its own target group and listener rule at a more specific path prefix
-- Repeat the Dockerfile + CI/CD pattern for document-service, realtime-service, ai-assistant, and notification
+- Repeat the Dockerfile + CI/CD pattern for realtime-service, ai-assistant, and notification
 - Wire the routing layer: API Gateway routes, ALB listener rule for WebSocket, SNS → SQS → Lambda subscription
