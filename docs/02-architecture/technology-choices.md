@@ -10,7 +10,7 @@ This document records every technology decision for CollabSpace v1 and the ratio
 | ---------------- | -------------------- | ------------------ | ----------------------------------- | ----------------------------- | ---------------------------- |
 | Auth & Workspace | Java 25              | Spring Boot 4      | PostgreSQL (RDS) + Redis (Upstash)  | REST → API Gateway (HTTP API) | SNS publisher                |
 | Document Service | TypeScript · Node 24 | Fastify            | MongoDB Atlas                       | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
-| Realtime Service | TypeScript · Node 24 | ws                 | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
+| Realtime Service | TypeScript · Node 24 | Fastify + ws       | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
 | AI Assistant     | Python 3.13          | FastAPI            | PostgreSQL + pgvector               | REST → API Gateway (HTTP API) | Kafka consumer               |
 | Notification     | TypeScript · Node 24 | — (Lambda runtime) | —                                   | —                             | SQS trigger (Lambda)         |
 
@@ -34,7 +34,7 @@ The Document Service is both a SNS publisher (it fires `document.updated` on sav
 
 ### Realtime Service
 
-The Realtime Service uses the `ws` library directly rather than Socket.IO. Socket.IO's fallback transports, rooms abstraction, and auto-reconnect logic are valuable in production at scale but add opacity that conflicts with the learning goal. Managing the WebSocket lifecycle explicitly is the point. → **ADR-005**
+The Realtime Service uses Fastify (same choice as Document Service — see ADR-017) with `@fastify/websocket`, which wraps `ws` under the hood. Fastify is needed because the ALB health check requires an HTTP endpoint alongside the WebSocket server; both are served from the same Fastify instance. `@fastify/websocket` is used rather than Socket.IO: Socket.IO's fallback transports, rooms abstraction, and auto-reconnect logic are valuable in production at scale but add opacity that conflicts with the learning goal. Managing the WebSocket lifecycle explicitly is the point. → **ADR-005**, **ADR-017**
 
 Redis pub/sub (via Upstash) is used as a coordination layer, not a primary store. When the service runs as multiple EC2 instances, a message arriving on one instance must be broadcast to clients connected to other instances. Redis pub/sub is the standard solution for this fan-out within the Realtime Service itself. If only one instance is running (as in dev and early staging), Redis pub/sub is still used for consistency.
 

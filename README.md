@@ -6,7 +6,7 @@ A learning project: a five-service real-time collaboration platform built on AWS
 
 **Stage 1 — Walking Skeleton, in progress**
 
-Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security groups, IAM roles, CloudWatch log groups. `auth-workspace` and `document-service` deployed to ECS Fargate via GitHub Actions CI — health endpoints return `200 OK` at the ALB DNS name. Three service skeletons not yet started: realtime-service, ai-assistant, notification.
+Infrastructure live in AWS dev (`eu-central-1`): VPC, ECS cluster, ALB, security groups, IAM roles, CloudWatch log groups. `auth-workspace` and `document-service` deployed to ECS Fargate via GitHub Actions CI — health endpoints return `200 OK` at the ALB DNS name. `realtime-service` scaffold complete (lint + tests pass, Dockerfile present) — CI/CD and Terraform wiring pending. Two service skeletons not yet started: ai-assistant, notification.
 
 ## Tech Stack
 

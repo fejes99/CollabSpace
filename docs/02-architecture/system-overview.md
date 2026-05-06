@@ -18,7 +18,7 @@ flowchart TD
     subgraph services["Services"]
         AW["Auth & Workspace\nJava · Spring Boot · Fargate"]
         DS["Document Service\nTypeScript · Fastify · Fargate"]
-        RS["Realtime Service\nTypeScript · ws · EC2"]
+        RS["Realtime Service\nTypeScript · Fastify · EC2"]
         AI["AI Assistant\nPython · FastAPI · Fargate"]
         NL["Notification\nNode.js · Lambda"]
     end

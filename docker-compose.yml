@@ -66,6 +66,31 @@ services:
       retries: 5
 
   # ---------------------------------------------------------------------------
+  # realtime-service — Node.js 24 / TypeScript / Fastify / ws
+  # Requires: nothing (walking skeleton — health endpoint only)
+  # Add: redis depends_on when service implementation begins (Stage 2)
+  # ---------------------------------------------------------------------------
+  realtime-service:
+    profiles: ["services"]
+    build:
+      context: ./services/realtime-service
+      dockerfile: Dockerfile
+    image: realtime-service:local
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      LOG_LEVEL: info
+      PORT: "3001"
+    networks:
+      - collabspace
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:3001/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ---------------------------------------------------------------------------
   # Infrastructure services — uncomment incrementally as services need them
   # ---------------------------------------------------------------------------
 

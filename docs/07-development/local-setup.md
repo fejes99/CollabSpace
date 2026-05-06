@@ -75,25 +75,25 @@ Health check: `curl http://localhost:8080/actuator/health`
 
 ```bash
 cd services/document-service
-npm install        # first time only
-npm run dev
+pnpm install       # first time only
+pnpm dev
 ```
 
-Runs on port `3001`. `npm run dev` uses `tsx --watch` (or the equivalent) for TypeScript hot reload on file save.
+Runs on port `3000`. `pnpm dev` uses `ts-node` for TypeScript execution with no separate compile step.
 
-Health check: `curl http://localhost:3001/health`
+Health check: `curl http://localhost:3000/health`
 
-### Realtime Service (TypeScript / ws)
+### Realtime Service (TypeScript / Fastify)
 
 ```bash
 cd services/realtime-service
-npm install        # first time only
-npm run dev
+pnpm install       # first time only
+pnpm dev
 ```
 
-Runs on port `3002` (HTTP health check) and opens the WebSocket server on port `3003`. In local dev, the WebSocket server does not sit behind an ALB — the frontend connects directly to `ws://localhost:3003`.
+Runs on port `3001`. WebSocket support (`@fastify/websocket`) and Redis pub/sub coordination are Stage 2 — the walking skeleton exposes HTTP only.
 
-Health check: `curl http://localhost:3002/health`
+Health check: `curl http://localhost:3001/health`
 
 ### AI Assistant (Python 3.13 / FastAPI)
 
@@ -131,7 +131,7 @@ npm install        # first time only
 npm run dev
 ```
 
-Runs on port `5173` (Vite's default). Points at `http://localhost:8080` (Auth), `http://localhost:3001` (Document), `http://localhost:8001` (AI), and `ws://localhost:3003` (Realtime) via `.env.local`.
+Runs on port `5173` (Vite's default). Points at `http://localhost:8080` (Auth), `http://localhost:3000` (Document), `http://localhost:8001` (AI), and `ws://localhost:3001` (Realtime — Stage 2+) via `.env.local`.
 
 ---
 

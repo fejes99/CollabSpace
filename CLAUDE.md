@@ -189,7 +189,7 @@ Completed:
 - .github/workflows/service-document.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
 - environments/dev/main.tf updated — document-service ecs-service module call wired; listener rule at priority 50 (/documents/*); NODE_ENV=production (zod rejects "dev")
 
-Next milestone: Scaffold and deploy realtime-service walking skeleton (Node.js 24 + TypeScript + Fastify + ws; /health returns 200 OK from AWS).
+Next milestone: Wire CI/CD pipeline (.github/workflows/service-realtime.yml) and Terraform ecs-service module call for realtime-service; deploy to ECS Fargate so /health returns 200 OK from AWS. Scaffold complete locally (lint + tests pass, Dockerfile present).
 
 ## LAYER 3: POINTERS
 
@@ -219,6 +219,7 @@ Next milestone: Scaffold and deploy realtime-service walking skeleton (Node.js 2
 - Node.js framework: Fastify v5 (see ADR-017); pnpm (see ADR-018); Node.js 24 LTS (newer LTS line, longer support window)
 - Service-to-service auth: docs/06-decisions/adr-021-service-to-service-auth.md (internal service JWTs, RS256, 1-hour lifetime)
 - document-service: services/document-service/README.md (stack, endpoints, env vars, scripts, project structure)
+- realtime-service: services/realtime-service/README.md (stack, endpoints, env vars, scripts, project structure; WebSocket + Redis pub/sub Stage 2+)
 - Dev environment lifecycle: docs/06-decisions/adr-022-dev-environment-lifecycle.md (destroy/apply between sessions for $0 cost; scale-to-zero for within-session pauses)
 - Makefile: Makefile (local dev + AWS dev lifecycle targets; run `make help` for full list)
 
