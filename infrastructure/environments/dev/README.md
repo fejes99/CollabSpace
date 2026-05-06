@@ -28,6 +28,25 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 - AWS CLI authenticated to the CollabSpace account (`aws sts get-caller-identity`)
 - `infrastructure/bootstrap/` and `infrastructure/shared/` already applied
 
+## Lifecycle
+
+The dev environment is brought up on demand and destroyed between sessions to keep costs at $0 when not in use. See [ADR-022](../../../docs/06-decisions/adr-022-dev-environment-lifecycle.md).
+
+Run these from the **repository root** (not this directory):
+
+| Target | What it does | When to use |
+|---|---|---|
+| `make dev-plan` | `terraform plan` — previews changes without applying | Before any apply |
+| `make dev-up` | `terraform apply` — full environment up (5–10 min) | Start of a verification session |
+| `make dev-down` | `terraform destroy` — tears everything down to $0 | End of session |
+| `make dev-pause` | Scales all ECS tasks to 0 — stops Fargate billing | Within-session pause; ALB still runs |
+| `make dev-resume` | Scales all ECS tasks back to 1 | Resume after a pause |
+| `make dev-status` | Shows running/desired task counts | Verify state at any time |
+
+**Cost when up:** ~$1–2/day (ALB + Fargate). **Cost when destroyed:** $0.
+
+> CI/CD deploy workflows fail when the environment is destroyed — run `make dev-up` before pushing a commit that triggers an ECS deploy.
+
 ## Usage
 
 All commands run from this directory:

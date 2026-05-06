@@ -274,6 +274,21 @@ make logs         — Tail docker-compose logs for all infrastructure services
 make logs s=<svc> — Tail logs for a specific service (e.g., make logs s=postgres)
 ```
 
+### AWS dev environment targets
+
+These targets manage the AWS dev environment lifecycle (see [ADR-022](../../docs/06-decisions/adr-022-dev-environment-lifecycle.md)). Run from the repository root.
+
+```
+make dev-plan     — terraform plan: preview AWS changes without applying
+make dev-up       — terraform apply: bring up the full dev environment (~5–10 min)
+make dev-down     — terraform destroy: tear down to $0 between sessions
+make dev-pause    — scale all ECS services to 0 (stops Fargate billing; ALB still runs)
+make dev-resume   — scale all ECS services back to 1
+make dev-status   — show running/desired task counts for all ECS services
+```
+
+Run `make` or `make help` at the repository root to see all targets with descriptions.
+
 ---
 
 ## Typical development session

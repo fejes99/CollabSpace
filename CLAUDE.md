@@ -167,7 +167,7 @@ Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspa
 Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-021
+Recent ADRs: adr-001 to adr-022
 
 Completed:
 
@@ -219,6 +219,8 @@ Next milestone: Scaffold and deploy realtime-service walking skeleton (Node.js 2
 - Node.js framework: Fastify v5 (see ADR-017); pnpm (see ADR-018); Node.js 24 LTS (newer LTS line, longer support window)
 - Service-to-service auth: docs/06-decisions/adr-021-service-to-service-auth.md (internal service JWTs, RS256, 1-hour lifetime)
 - document-service: services/document-service/README.md (stack, endpoints, env vars, scripts, project structure)
+- Dev environment lifecycle: docs/06-decisions/adr-022-dev-environment-lifecycle.md (destroy/apply between sessions for $0 cost; scale-to-zero for within-session pauses)
+- Makefile: Makefile (local dev + AWS dev lifecycle targets; run `make help` for full list)
 
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 
