@@ -25,7 +25,8 @@ DEV_REGION  := eu-central-1
 # See ADR-022 for the lifecycle strategy these targets implement.
 DEV_SERVICES := \
 	auth-workspace \
-	document-service
+	document-service \
+	realtime-service
 
 # ── Local infrastructure (Docker Compose) ────────────────────────────────────
 

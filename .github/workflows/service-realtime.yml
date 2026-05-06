@@ -1,0 +1,158 @@
+name: CI — realtime-service
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/realtime-service/**
+      - .github/workflows/service-realtime.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  ECR_REPOSITORY: collabspace-realtime-service
+  ECS_CLUSTER: collabspace-dev
+  ECS_SERVICE: collabspace-dev-realtime-service
+  CONTAINER_NAME: realtime-service
+  TASK_DEFINITION_FAMILY: collabspace-dev-realtime-service
+
+jobs:
+  # ── Job 1: Test ──────────────────────────────────────────────────────────────
+  #
+  # Lint and test before building the container image. A failure here aborts
+  # the pipeline before any image is pushed to ECR.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: '10'
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache pnpm store
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('services/realtime-service/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: services/realtime-service
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        working-directory: services/realtime-service
+        run: pnpm lint
+
+      - name: Test
+        working-directory: services/realtime-service
+        run: pnpm test
+
+  # ── Job 2: Build, push, deploy ───────────────────────────────────────────────
+  #
+  # Builds the Docker image for linux/amd64, pushes :<sha> to ECR, then rolls
+  # out the new image to ECS and waits for the service to stabilise.
+  #
+  # ECR tags are immutable — only :<sha> is pushed. :skeleton was a one-time
+  # bootstrap tag used to create the ECS service via Terraform and is not
+  # updated by CI.
+  build-and-deploy:
+    name: Build, push, deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write  # required to request the OIDC JWT for AWS auth
+      contents: read
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      # ── AWS auth ─────────────────────────────────────────────────────────────
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── ECR login ────────────────────────────────────────────────────────────
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@19d944daaa35f0fa1d3f7f8af1d3f2e5de25c5b7 # v2
+
+      # ── Build and push ───────────────────────────────────────────────────────
+      - name: Build and push image to ECR
+        id: build-image
+        env:
+          REGISTRY: ${{ steps.login-ecr.outputs.registry }}
+        run: |
+          SHA_IMAGE="${REGISTRY}/${ECR_REPOSITORY}:${GITHUB_SHA::7}"
+
+          docker build \
+            --platform linux/amd64 \
+            --tag "${SHA_IMAGE}" \
+            services/realtime-service
+
+          docker push "${SHA_IMAGE}"
+          echo "image=${SHA_IMAGE}" >> "${GITHUB_OUTPUT}"
+
+      # ── ECS deploy ───────────────────────────────────────────────────────────
+      #
+      # Step 1: Download the currently registered task definition as JSON.
+      #         All settings (roles, log config, env vars) are preserved;
+      #         only the image URL is updated.
+      - name: Download current task definition
+        run: |
+          aws ecs describe-task-definition \
+            --task-definition "${TASK_DEFINITION_FAMILY}" \
+            --query taskDefinition \
+            --output json > /tmp/task-def.json
+
+      # Step 2: Inject the new image URL into the task definition JSON.
+      - name: Inject new image into task definition
+        id: render-task-def
+        uses: aws-actions/amazon-ecs-render-task-definition@6853cfae8c3a7d978fbf68b5a55453395541dfbb # v1
+        with:
+          task-definition: /tmp/task-def.json
+          container-name: ${{ env.CONTAINER_NAME }}
+          image: ${{ steps.build-image.outputs.image }}
+
+      # Step 3: Register the updated task definition, update the service, and
+      #         wait for new tasks to pass the ALB health check. Times out after
+      #         10 minutes; old tasks keep running if the rollout fails.
+      - name: Register new task definition revision
+        id: register-task-def
+        run: |
+          TASK_DEF_ARN=$(aws ecs register-task-definition \
+            --cli-input-json "file://${{ steps.render-task-def.outputs.task-definition }}" \
+            --query 'taskDefinition.taskDefinitionArn' \
+            --output text)
+          echo "task_def_arn=${TASK_DEF_ARN}" >> "${GITHUB_OUTPUT}"
+
+      - name: Update ECS service and wait for stability
+        run: |
+          aws ecs update-service \
+            --cluster "${ECS_CLUSTER}" \
+            --service "${ECS_SERVICE}" \
+            --task-definition "${{ steps.register-task-def.outputs.task_def_arn }}"
+
+          aws ecs wait services-stable \
+            --cluster "${ECS_CLUSTER}" \
+            --services "${ECS_SERVICE}"
