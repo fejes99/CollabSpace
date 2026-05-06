@@ -4,7 +4,7 @@ WebSocket-based real-time collaboration service for CollabSpace.
 
 **Stack:** Node.js 24 · TypeScript · Fastify 5 · ws (Stage 2+) · Redis pub/sub (Stage 2+)
 
-**Current stage:** Walking skeleton — health endpoint only
+**Current stage:** Walking skeleton — health endpoint only.
 
 ## Endpoints
 

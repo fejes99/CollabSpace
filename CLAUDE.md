@@ -161,8 +161,8 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: realtime-service (next walking skeleton service)
-Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace and document-service complete, three remaining.
+Current service: ai-assistant (next walking skeleton service)
+Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, and realtime-service complete, two remaining.
 
 Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
@@ -188,8 +188,11 @@ Completed:
 - services/document-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, type-aware ESLint, c8 coverage, pnpm; app/server split for integration testing; zod env validation; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /documents/health ✓
 - .github/workflows/service-document.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
 - environments/dev/main.tf updated — document-service ecs-service module call wired; listener rule at priority 50 (/documents/*); NODE_ENV=production (zod rejects "dev")
+- services/realtime-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, pnpm; zod env validation; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /realtime/health ✓
+- .github/workflows/service-realtime.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
+- environments/dev/main.tf updated — realtime-service ecs-service module call wired; listener rule at priority 40 (/realtime/*); NODE_ENV=production
 
-Next milestone: Wire CI/CD pipeline (.github/workflows/service-realtime.yml) and Terraform ecs-service module call for realtime-service; deploy to ECS Fargate so /health returns 200 OK from AWS. Scaffold complete locally (lint + tests pass, Dockerfile present).
+Next milestone: Scaffold ai-assistant walking skeleton (Python 3.13 + FastAPI); /health returns 200 OK; multi-stage Dockerfile; deploy to ECS Fargate via CI/CD (.github/workflows/service-ai.yml).
 
 ## LAYER 3: POINTERS
 
