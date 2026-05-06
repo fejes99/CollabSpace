@@ -216,7 +216,7 @@ module "document_service" {
   aws_region        = var.aws_region
 
   environment_variables = {
-    NODE_ENV  = var.environment
+    NODE_ENV  = "production"
     LOG_LEVEL = "info"
   }
 }
