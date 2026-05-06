@@ -161,8 +161,8 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: document-service (next walking skeleton service)
-Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace complete, four remaining.
+Current service: realtime-service (next walking skeleton service)
+Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace and document-service complete, three remaining.
 
 Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
@@ -185,9 +185,11 @@ Completed:
 - environments/dev/main.tf updated — ECS cluster, ALB, and auth-workspace walking skeleton wired
 - services/auth-workspace/ — Spring Boot 4.0.6 + Java 25; /actuator/health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS name ✓
 - .github/workflows/service-auth.yml — CI/CD pipeline: test → build (linux/amd64) → ECR push (:<sha> only; :skeleton was a one-time bootstrap tag, ECR tags are immutable) → ECS deploy with stability wait; path filter includes workflow file itself
-- services/document-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, type-aware ESLint, c8 coverage, pnpm; app/server split for integration testing; zod env validation; scaffolded locally, not yet deployed
+- services/document-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, type-aware ESLint, c8 coverage, pnpm; app/server split for integration testing; zod env validation; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /documents/health ✓
+- .github/workflows/service-document.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
+- environments/dev/main.tf updated — document-service ecs-service module call wired; listener rule at priority 50 (/documents/*); NODE_ENV=production (zod rejects "dev")
 
-Next milestone: Add CI/CD workflow (service-document.yml): lint → test → build (linux/amd64) → ECR push → ECS deploy with stability wait. Wire document-service into environments/dev as a second ecs-service module call.
+Next milestone: Scaffold and deploy realtime-service walking skeleton (Node.js 24 + TypeScript + Fastify + ws; /health returns 200 OK from AWS).
 
 ## LAYER 3: POINTERS
 
