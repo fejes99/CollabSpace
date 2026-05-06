@@ -11,15 +11,15 @@ const server = Fastify({
   },
 });
 
-void server.register(app);
-
-const start = async (): Promise<void> => {
+(async () => {
+  await server.register(app);
   try {
     await server.listen({ port: env.PORT, host: "0.0.0.0" });
   } catch (err) {
     server.log.error(err);
     process.exit(1);
   }
-};
-
-void start();
+})().catch((err: unknown) => {
+  process.stderr.write(`Fatal startup error: ${String(err)}\n`);
+  process.exit(1);
+});
