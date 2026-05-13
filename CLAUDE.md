@@ -20,7 +20,7 @@ See /docs for full architecture once those files exist.
 - Auth & Workspace: Java 25 + Spring Boot 4, PostgreSQL (RDS), Redis (Upstash)
 - Document Service: Node.js 24 + TypeScript + Fastify, MongoDB Atlas
 - Realtime Service: Node.js 24 + TypeScript + Fastify + ws, Redis pub/sub coordination
-- AI Assistant: Python 3.13 + FastAPI, Postgres + pgvector
+- AI Assistant: Python 3.14 + FastAPI, Postgres + pgvector
 - Notification: AWS Lambda (Node.js 24)
 
 ### Communication
@@ -107,6 +107,8 @@ Python (FastAPI):
 - async def for I/O-bound code
 - structlog for logging
 - ruff for lint, black for format
+- Do not use `response_model=` on route decorators when the return type annotation is already present — it duplicates information; FastAPI infers the schema from the annotation
+- Each Python service needs a `pyrightconfig.json` with `"reportUntypedFunctionDecorator": "none"` — pyright cannot infer through FastAPI's route decorator generics; this suppresses the false positive without weakening ruff or black
 
 Terraform:
 

@@ -16,6 +16,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | `service-auth.yml`        | Live   | CI/CD for `services/auth-workspace`. Runs tests, builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/auth-workspace/**` or the workflow file changes. |
 | `service-document.yml`    | Live   | CI/CD for `services/document-service`. Runs lint + tests (Node.js 24 + pnpm), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/document-service/**` or the workflow file changes. |
 | `service-realtime.yml`    | Live   | CI/CD for `services/realtime-service`. Runs lint + tests (Node.js 24 + pnpm), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/realtime-service/**` or the workflow file changes. |
+| `service-ai.yml`          | Live   | CI/CD for `services/ai-assistant`. Runs lint (ruff) + format check (black) + tests (pytest, Python 3.14), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/ai-assistant/**` or the workflow file changes. |
 
 ---
 
@@ -29,7 +30,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | `ci-service-template.yml` | Planned | Reusable workflow called by per-service workflows above. Extracts shared steps once two or more service workflows exist. |
 | `service-document.yml`    | Live    | See Active workflows above.                                                                                              |
 | `service-realtime.yml`    | Live    | See Active workflows above.                                                                                              |
-| `service-ai.yml`          | Planned | CI/CD for `services/ai-assistant` (Python + FastAPI).                                                                    |
+| `service-ai.yml`          | Live    | See Active workflows above.                                                                                              |
 
 ### Lambda
 

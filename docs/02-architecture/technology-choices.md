@@ -11,7 +11,7 @@ This document records every technology decision for CollabSpace v1 and the ratio
 | Auth & Workspace | Java 25              | Spring Boot 4      | PostgreSQL (RDS) + Redis (Upstash)  | REST → API Gateway (HTTP API) | SNS publisher                |
 | Document Service | TypeScript · Node 24 | Fastify            | MongoDB Atlas                       | REST → API Gateway (HTTP API) | SNS publisher · SQS consumer |
 | Realtime Service | TypeScript · Node 24 | Fastify + ws       | Redis (Upstash) — coordination only | WebSocket → ALB               | SQS consumer                 |
-| AI Assistant     | Python 3.13          | FastAPI            | PostgreSQL + pgvector               | REST → API Gateway (HTTP API) | Kafka consumer               |
+| AI Assistant     | Python 3.14          | FastAPI            | PostgreSQL + pgvector               | REST → API Gateway (HTTP API) | Kafka consumer               |
 | Notification     | TypeScript · Node 24 | — (Lambda runtime) | —                                   | —                             | SQS trigger (Lambda)         |
 
 ---
@@ -42,7 +42,7 @@ The Realtime Service runs on EC2 rather than ECS Fargate. EC2 gives predictable 
 
 ### AI Assistant
 
-Python 3.13 with FastAPI is the natural choice for an ML-adjacent service: the embedding libraries (sentence-transformers, or the Anthropic SDK for embeddings), pgvector drivers, and async I/O support are all first-class in the Python ecosystem. FastAPI's async-native design matches the I/O-heavy pattern of making LLM API calls. → _See [ADR index](#adr-index) — Claude API ADR planned for AI Assistant implementation stage._
+Python 3.14 with FastAPI is the natural choice for an ML-adjacent service: the embedding libraries (sentence-transformers, or the Anthropic SDK for embeddings), pgvector drivers, and async I/O support are all first-class in the Python ecosystem. FastAPI's async-native design matches the I/O-heavy pattern of making LLM API calls. → _See [ADR index](#adr-index) — Claude API ADR planned for AI Assistant implementation stage._
 
 PostgreSQL with the pgvector extension stores document embeddings alongside metadata. This avoids introducing a dedicated vector database (Pinecone, Weaviate) at a stage where the data volume does not justify the operational cost. pgvector is sufficient for a workspace of 5–15 people generating hundreds to low thousands of document chunks. The AI Assistant uses a separate database (`vector_db`) on the same RDS instance as Auth & Workspace (`auth_db`), with separate RDS users and least-privilege grants between them. This is a cost optimisation for v1 — co-location avoids a second RDS instance. Revisit criteria and split conditions are documented in ADR-005. → **ADR-005**
 

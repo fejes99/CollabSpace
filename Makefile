@@ -26,7 +26,10 @@ DEV_REGION  := eu-central-1
 DEV_SERVICES := \
 	auth-workspace \
 	document-service \
-	realtime-service
+	realtime-service \
+	ai-assistant
+# TODO(Stage 2): add a dev-ai target (native uvicorn run + pgvector DB) once the
+# database dependency is wired. See services/ai-assistant/README.md.
 
 # ── Local infrastructure (Docker Compose) ────────────────────────────────────
 

@@ -17,6 +17,7 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `auth_workspace` | Target group, listener rule, task definition, ECS service for auth-workspace | Healthy — `/actuator/health` returns 200 OK; CI/CD manages image updates via `service-auth.yml` |
 | `document_service` | Target group, listener rule, task definition, ECS service for document-service | Walking skeleton — `/health` returns 200 OK; path prefix `/documents/*` at priority 50; CI/CD via `service-document.yml` |
 | `realtime_service` | Target group, listener rule, task definition, ECS service for realtime-service | Walking skeleton — `/health` returns 200 OK; path prefix `/realtime/*` at priority 40; CI/CD via `service-realtime.yml` |
+| `ai_assistant` | Target group, listener rule, task definition, ECS service for ai-assistant | Walking skeleton — `/health` returns 200 OK; path prefix `/assistant/*` at priority 30; CI/CD via `service-ai.yml` |
 
 **Not created here:**
 - RDS instances (added when auth-workspace service is built)
@@ -105,10 +106,10 @@ Designed to stay within the AWS free tier for active development:
 | CloudWatch log groups (7-day retention, low volume) | Free tier |
 | ECS cluster | Free |
 | ALB | ~$0.022/hour (~$16/month) + $0.008/LCU — main non-free cost in dev |
-| ECS Fargate tasks (256 CPU / 512 MB, 3 tasks) | ~$0.033/hour (~$24/month) |
+| ECS Fargate tasks (256 CPU / 512 MB, 4 tasks) | ~$0.044/hour (~$32/month) |
 | Container Insights | Disabled — $0 (see ADR-011) |
 
-**Estimated total: ~$1–3/day when running.** Destroy the environment between sessions to stay within budget.
+**Estimated total: ~$1–4/day when running.** Destroy the environment between sessions to stay within budget.
 
 No NAT Gateway (that alone would be ~$32/month). See [ADR-009](../../../docs/06-decisions/adr-009-ecs-public-subnet-strategy.md).
 
@@ -131,5 +132,5 @@ Safe to run between sessions for cost control. Only resources in this module are
 
 ## What comes next (Stage 1 continued)
 
-- Repeat the Dockerfile + CI/CD pattern for ai-assistant and notification
+- Repeat the Dockerfile + CI/CD pattern for notification
 - Wire the routing layer: API Gateway routes, ALB listener rule for WebSocket, SNS → SQS → Lambda subscription
