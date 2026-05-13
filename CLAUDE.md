@@ -163,8 +163,8 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: ai-assistant (next walking skeleton service)
-Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, and realtime-service complete, two remaining.
+Current service: notification (final walking skeleton service)
+Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, realtime-service, and ai-assistant complete, one remaining.
 
 Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
@@ -193,8 +193,11 @@ Completed:
 - services/realtime-service/ — Node.js 24 + TypeScript + Fastify 5; /health returns 200 OK; multi-stage Dockerfile; strict TypeScript, pnpm; zod env validation; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /realtime/health ✓
 - .github/workflows/service-realtime.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
 - environments/dev/main.tf updated — realtime-service ecs-service module call wired; listener rule at priority 40 (/realtime/*); NODE_ENV=production
+- services/ai-assistant/ — Python 3.14 + FastAPI; /health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /assistant/health ✓
+- .github/workflows/service-ai.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
+- environments/dev/main.tf updated — ai-assistant ecs-service module call wired; listener rule at priority 30 (/assistant/*)
 
-Next milestone: Scaffold ai-assistant walking skeleton (Python 3.13 + FastAPI); /health returns 200 OK; multi-stage Dockerfile; deploy to ECS Fargate via CI/CD (.github/workflows/service-ai.yml).
+Next milestone: Scaffold notification walking skeleton (Node.js 24 Lambda); /health (or equivalent) returns 200 OK; deploy to AWS Lambda via CI/CD (.github/workflows/service-notification.yml).
 
 ## LAYER 3: POINTERS
 
@@ -225,6 +228,7 @@ Next milestone: Scaffold ai-assistant walking skeleton (Python 3.13 + FastAPI); 
 - Service-to-service auth: docs/06-decisions/adr-021-service-to-service-auth.md (internal service JWTs, RS256, 1-hour lifetime)
 - document-service: services/document-service/README.md (stack, endpoints, env vars, scripts, project structure)
 - realtime-service: services/realtime-service/README.md (stack, endpoints, env vars, scripts, project structure; WebSocket + Redis pub/sub Stage 2+)
+- ai-assistant: services/ai-assistant/README.md (stack, endpoints, env vars, scripts, project structure; PostgreSQL + pgvector + Kafka Stage 2+)
 - Dev environment lifecycle: docs/06-decisions/adr-022-dev-environment-lifecycle.md (destroy/apply between sessions for $0 cost; scale-to-zero for within-session pauses)
 - Makefile: Makefile (local dev + AWS dev lifecycle targets; run `make help` for full list)
 
