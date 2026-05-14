@@ -22,4 +22,12 @@ export default defineConfig(
       "no-console": "error",
     },
   },
+  {
+    // Lambda handler contract requires async even when no await is present —
+    // the runtime only captures return values from Promises, not sync returns.
+    files: ["src/handler.ts"],
+    rules: {
+      "@typescript-eslint/require-await": "off",
+    },
+  },
 );
