@@ -20,7 +20,7 @@ The cost dimension is real. The project has an explicit ~$5/month operational bu
 
 Add a GitHub Action that invokes `anthropics/claude-code-action` on `pull_request` (`ready_for_review` and `opened` with a draft guard) and on `issue_comment` events containing `@claude` from the repository `OWNER`. Use the `claude-sonnet-4-6` model. Cap per-run output at 12,000 tokens; cap workflow runtime at 10 minutes; skip `[fast]`-prefixed PRs (case-insensitive), fork PRs, and PRs exceeding 100 changed files or 5,000 line changes.
 
-The action is tag-pinned to `@v1`, not SHA-pinned. Upstream patches and minor releases within the `v1` line are accepted automatically; a breaking `v2` would require an explicit upgrade.
+The action is **SHA-pinned**, following the GitHub Actions security best practice flagged by our action linter. The current pin is `anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2` (`v1.0.122`, which is what `v1` currently dereferences to). Rotation cadence: every 3 months, or sooner if a CVE is disclosed in the upstream action. The workflow comment above the `uses:` line documents how to resolve a new SHA.
 
 The `@claude` trigger is restricted to `comment.author_association == 'OWNER'`. This prevents cost-attack vectors that the `issue_comment` event's default permissions would otherwise allow if the repo were public.
 
@@ -37,7 +37,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - **Self-hosted runner with custom Anthropic-SDK code.** Overkill at this scale; reimplements the official action with no added value.
 - **No size guard.** Considered. Rejected because a single 50,000-line PR (e.g., a vendored dependency commit) could blow past the per-run cost estimate.
 - **Allow-list of `MEMBER` / `COLLABORATOR` for `@claude`.** Considered. Rejected for v1 because the project is solo. Revisit when a collaborator joins.
-- **SHA-pin the action instead of tag-pin.** Considered. SHA pinning is the GitHub Actions security best practice — it prevents a supply-chain attack in which a tag is force-pushed to a malicious commit. Rejected for v1 because (a) the action is published by Anthropic, who is also the LLM provider and has direct interest in not compromising it, (b) SHA pins require manual rotation cadence, which is friction that does not pay off at this scale, and (c) tag pinning still receives upstream security patches within the major version without intervention. Revisit if the threat model changes (e.g., the repo becomes part of a wider supply chain).
+- **Tag-pin (`@v1`) instead of SHA-pin.** Initially chosen for low friction — `@v1` receives upstream patches automatically and avoids manual rotation. Rejected after the action linter (correctly) flagged this as a supply-chain risk: a tag can be force-pushed to a malicious commit, and the workflow runs with a paid API key. The friction cost of quarterly SHA rotation is real but small compared to the downside of an undetected upstream compromise.
 
 ## Consequences
 
@@ -47,7 +47,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - Per-run cost is bounded; worst case ~$0.50, typical $0.15–$0.25.
 - The `[fast]` skip, fork skip, and size guard prevent obvious cost-burn vectors.
 - The `OWNER`-only `@claude` guard prevents cost attack via comments on a public repo.
-- The action is tag-pinned to `@v1`; upstream patches within the major version are picked up automatically.
+- The action is SHA-pinned; the workflow's behavior cannot change without an explicit commit to update the pin.
 - The pedagogical loop (write code → Claude review → reflect) accelerates learning.
 
 **−**
@@ -55,7 +55,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - Monthly spend depends on PR volume. At current cost estimates, $4 buys 16–30 reviews; if Stage 2 generates more PRs than expected, the budget runs out before the month ends.
 - The action's output is advisory only — the workflow does not block merges based on review feedback. A junior author might ignore valid feedback if discipline slips.
 - The `OWNER`-only restriction blocks future collaborators from triggering `@claude` until this ADR is revisited.
-- Tag pinning trusts the upstream not to force-push `v1` to a malicious commit. The action is Anthropic's official action, so the trust assumption is reasonable but not zero — a supply-chain compromise would silently affect this workflow.
+- SHA pinning means upstream patches (security, bug fixes) are NOT picked up automatically. The rotation cadence (every 3 months, or sooner on disclosed CVE) is the mitigation; if forgotten, the workflow runs on an older action than upstream considers current.
 - The size guard (100 files / 5,000 lines) is a hard cutoff. Large legitimate PRs (e.g., a generated SDK update) will be skipped without review.
 - The "any comment containing `@claude`" pattern is permissive — quoted text in a reply triggers a re-review. Accepted as low-frequency, low-cost noise rather than complicating with regex.
 - The 12,000-token output cap could truncate a review of a particularly large PR. The size guard mitigates this in practice.
@@ -66,6 +66,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - A review demonstrates Sonnet 4.6 missing things Opus 4.7 catches — try Opus on the next 3 PRs and measure cost vs. value.
 - A collaborator joins the project — decide whether to extend the `@claude` allow-list and accept shared budget exposure.
 - A genuine large PR is consistently skipped by the size guard — raise the threshold or add a manual override path.
-- `anthropics/claude-code-action` releases a `v2` (breaking) — evaluate the upgrade and decide whether to follow or pin further.
+- The 3-month SHA-rotation review — fetch `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1`, compare to the current pin, update the workflow and this ADR together. The plan doc records the command.
+- `anthropics/claude-code-action` releases a `v2` (breaking) — evaluate the upgrade alongside a rotation.
 - This repo is made public — re-verify the `OWNER`-only check and consider tightening further (e.g., spend rate limiting).
 - The Claude review feedback is consistently ignored by the author — review whether the integration is providing value or just generating noise.

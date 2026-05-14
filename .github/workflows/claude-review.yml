@@ -132,12 +132,12 @@ jobs:
         if: steps.gate.outputs.should-review == 'true'
         uses: actions/checkout@v4
 
-      # Tag-pinned to @v1 (not SHA-pinned). Accept upstream v1.x patches
-      # automatically; revisit if anthropics/claude-code-action releases a
-      # breaking v2. Trade-off rationale in ADR-024.
+      # SHA-pinned (GitHub Actions security best practice — see ADR-024).
+      # Resolve a new SHA via: `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1`
+      # then take the line ending in `refs/tags/v1^{}`. Rotation cadence in ADR-024.
       - name: Run Claude code review
         if: steps.gate.outputs.should-review == 'true'
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2  # v1.0.122 (= current @v1)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           model: claude-sonnet-4-6

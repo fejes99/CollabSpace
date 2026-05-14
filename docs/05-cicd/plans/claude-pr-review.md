@@ -50,7 +50,8 @@ Every PR opened as ready-for-review receives a Claude code review comment.
 
 **Action**
 
-- `anthropics/claude-code-action@v1` — tag-pinned (not SHA-pinned); rationale in [ADR-024](../../06-decisions/adr-024-claude-pr-review.md)
+- `anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2` (`v1.0.122`) — SHA-pinned; rotation cadence in [ADR-024](../../06-decisions/adr-024-claude-pr-review.md)
+- Resolve a new SHA via `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1` and take the line ending in `refs/tags/v1^{}`
 - Model: `claude-sonnet-4-6`
 - Reads `secrets.ANTHROPIC_API_KEY`
 
@@ -113,3 +114,4 @@ No correlation ID — this is CI, not a service request path.
 - The action's behavior on duplicate review comments — does it edit the previous Claude comment or post a new one each time?
 - The action's context-loading scope — how many tokens does it ingest beyond the diff?
 - The action's exact input field names (`anthropic_api_key`, `model`, `max_tokens`) — verify against the action's current README before merge.
+- SHA-pin rotation: scheduled every 3 months (next: 2026-08-14) or sooner on a disclosed CVE in `anthropics/claude-code-action`.
