@@ -180,3 +180,43 @@ resource "aws_iam_role_policy_attachment" "github_actions_ecs_deploy" {
   role       = aws_iam_role.github_actions_ci.name
   policy_arn = aws_iam_policy.ecs_deploy.arn
 }
+
+# ── Lambda deploy policy ───────────────────────────────────────────────────────
+#
+# Grants the CI role the minimum permissions to deploy a ZIP to Lambda:
+#   1. UpdateFunctionCode: replaces the function code with the new ZIP.
+#   2. GetFunction: polled by `aws lambda wait function-updated-v2` until the
+#      update completes and the function returns to Active state.
+#
+# Both actions are scoped to Lambda functions in the dev environment only
+# (naming pattern: <project>-dev-*).
+
+data "aws_iam_policy_document" "lambda_deploy" {
+  statement {
+    sid    = "LambdaDeploy"
+    effect = "Allow"
+    actions = [
+      "lambda:UpdateFunctionCode",
+      "lambda:GetFunction",
+    ]
+    resources = ["arn:aws:lambda:${var.aws_region}:${data.aws_caller_identity.current.account_id}:function:${var.project_name}-dev-*"]
+  }
+}
+
+resource "aws_iam_policy" "lambda_deploy" {
+  name        = "${var.project_name}-lambda-deploy"
+  description = "Allows GitHub Actions CI to deploy ZIP artifacts to Lambda functions in dev."
+  policy      = data.aws_iam_policy_document.lambda_deploy.json
+
+  tags = {
+    Name        = "${var.project_name}-lambda-deploy"
+    Environment = "global"
+    Service     = "iam"
+    ManagedBy   = "terraform"
+  }
+}
+
+resource "aws_iam_role_policy_attachment" "github_actions_lambda_deploy" {
+  role       = aws_iam_role.github_actions_ci.name
+  policy_arn = aws_iam_policy.lambda_deploy.arn
+}
