@@ -18,7 +18,7 @@ describe("handler", () => {
     const result = handler(albEvent("GET", "/notifications/health"));
 
     expect(result.statusCode).toBe(200);
-    expect(JSON.parse(result.body)).toEqual({ status: "ok" });
+    expect(result.body).toBe(JSON.stringify({ status: "ok" }));
   });
 
   it("returns 404 for unknown routes", () => {
