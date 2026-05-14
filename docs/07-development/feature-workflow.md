@@ -206,12 +206,15 @@ If a rebase conflict is non-trivial, that itself is a signal that the branch is 
 
 ### Merging
 
-Squash-merge through GitHub. The branch's WIP commits become one clean commit on main with the PR title as the message and the PR description as the body. Then delete the branch:
+Squash-merge through GitHub. The branch's WIP commits become one clean commit on main with the PR title as the message and the PR description as the body. The remote branch is **auto-deleted by GitHub** (repo setting *Automatically delete head branches* is enabled). Sync main and clean up the local branch:
 
 ```bash
+git checkout main
+git pull origin main
 git branch -d feat/<service>/<slug>
-git push origin --delete feat/<service>/<slug>
 ```
+
+`git branch -d` will print a warning that the branch is not merged to HEAD — that's expected after a squash-merge, since the squashed commit on main has a different SHA than the feature branch's commits. The branch is still safely deleted; git compares against the remote tracking ref, which knows the PR was merged.
 
 ### Direct commits to main
 
