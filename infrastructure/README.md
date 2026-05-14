@@ -77,3 +77,4 @@ Reusable modules live in `modules/`. Each module encapsulates one concept and is
 | [`modules/ecs-cluster/`](modules/ecs-cluster/README.md) | ECS cluster with Container Insights toggle |
 | [`modules/alb/`](modules/alb/README.md) | Internet-facing ALB, HTTP listener with fixed-response default |
 | [`modules/ecs-service/`](modules/ecs-service/README.md) | Target group, listener rule, task definition, ECS service (generic, one call per service) |
+| [`modules/lambda-function/`](modules/lambda-function/README.md) | Lambda function, execution IAM role, ALB target group + listener rule (for event-driven services) |

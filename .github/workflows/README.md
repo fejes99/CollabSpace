@@ -17,6 +17,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 | `service-document.yml`    | Live   | CI/CD for `services/document-service`. Runs lint + tests (Node.js 24 + pnpm), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/document-service/**` or the workflow file changes. |
 | `service-realtime.yml`    | Live   | CI/CD for `services/realtime-service`. Runs lint + tests (Node.js 24 + pnpm), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/realtime-service/**` or the workflow file changes. |
 | `service-ai.yml`          | Live   | CI/CD for `services/ai-assistant`. Runs lint (ruff) + format check (black) + tests (pytest, Python 3.14), builds Docker image, pushes `:<sha>` tag to ECR, deploys to ECS and waits for stability. Triggers on push to `main` when `services/ai-assistant/**` or the workflow file changes. |
+| `service-notification.yml` | Live  | CI/CD for `services/notification`. Runs lint + tests + typecheck (Node.js 24 + pnpm + vitest), bundles with esbuild, deploys ZIP directly to Lambda via `update-function-code`. No Docker, no ECR — see ADR-023. Triggers on push to `main` when `services/notification/**` or the workflow file changes. |
 
 ---
 
@@ -36,7 +37,7 @@ stored as secrets. See `docs/05-cicd/` for the full pipeline design.
 
 | File                      | Status  | Purpose                                                                                                                        |
 | ------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| `lambda-notification.yml` | Planned | Package and deploy `services/notification` to AWS Lambda. Triggered on push to `main` when `services/notification/**` changes. |
+| `service-notification.yml` | Live   | See Active workflows above. |
 
 ### Infrastructure
 

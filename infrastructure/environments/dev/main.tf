@@ -6,6 +6,10 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
+    archive = {
+      source  = "hashicorp/archive"
+      version = "~> 2.0"
+    }
   }
 
   backend "s3" {
@@ -261,6 +265,29 @@ module "ai_assistant" {
     ENVIRONMENT = "production"
     LOG_LEVEL   = "info"
   }
+}
+
+# ── notification Lambda ───────────────────────────────────────────────────────
+# Walking skeleton: one Lambda function reachable at /notifications/health via
+# ALB. Priority 20 — more specific than realtime-service's /realtime/* at 40.
+# On first apply, Terraform creates the function with a bootstrap placeholder
+# ZIP. The CI/CD pipeline (service-notification.yml) replaces it on first deploy.
+# Subsequent Terraform applies will not revert CI-deployed code (ignore_changes
+# on filename and source_code_hash — see lambda-function module README).
+
+module "notification" {
+  source = "../../modules/lambda-function"
+
+  project_name = var.project_name
+  environment  = var.environment
+  service_name = "notification"
+
+  listener_arn           = module.alb.listener_arn
+  path_patterns          = ["/notifications", "/notifications/*"]
+  listener_rule_priority = 20
+
+  health_check_path = "/notifications/health"
+  log_group_name    = module.cloudwatch.log_group_names["notification"]
 }
 
 # ── document-service ECS service ─────────────────────────────────────────────

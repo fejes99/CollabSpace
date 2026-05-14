@@ -1,0 +1,137 @@
+name: CI — notification
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - services/notification/**
+      - .github/workflows/service-notification.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  AWS_REGION: eu-central-1
+  LAMBDA_FUNCTION: collabspace-dev-notification
+
+jobs:
+  # ── Job 1: Test ──────────────────────────────────────────────────────────────
+  #
+  # Lint and test before building the deployment artifact. A failure here aborts
+  # the pipeline before any ZIP is deployed to Lambda.
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: '10'
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache pnpm store
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('services/notification/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: services/notification
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        working-directory: services/notification
+        run: pnpm lint
+
+      - name: Test
+        working-directory: services/notification
+        run: pnpm test
+
+      - name: Typecheck
+        working-directory: services/notification
+        run: pnpm typecheck
+
+  # ── Job 2: Build and deploy ──────────────────────────────────────────────────
+  #
+  # Bundles the TypeScript handler with esbuild, zips the output, and deploys
+  # directly to Lambda via update-function-code. No Docker, no ECR — see ADR-023.
+  #
+  # aws lambda wait function-updated-v2 polls until the function state returns
+  # to Active (or times out after 60 seconds × 20 attempts = ~20 minutes).
+  # This ensures the deployed code is live before the job exits.
+  build-and-deploy:
+    name: Build and deploy
+    needs: test
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write  # required to request the OIDC JWT for AWS auth
+      contents: read
+
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Set up Node.js 24
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: '24'
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@a7487c7e89a18df4991f7f222e4898a00d66ddda # v4
+        with:
+          version: '10'
+          run_install: false
+
+      - name: Get pnpm store path
+        id: pnpm-cache
+        run: echo "store=$(pnpm store path)" >> "${GITHUB_OUTPUT}"
+
+      - name: Cache pnpm store
+        uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.store }}
+          key: pnpm-${{ runner.os }}-${{ hashFiles('services/notification/pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install dependencies
+        working-directory: services/notification
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      # ── Build ─────────────────────────────────────────────────────────────────
+      - name: Build and package
+        working-directory: services/notification
+        run: pnpm run package
+
+      # ── AWS auth ─────────────────────────────────────────────────────────────
+      - name: Configure AWS credentials via OIDC
+        uses: aws-actions/configure-aws-credentials@7474bc4690e29a8392af63c5b98e7449536d5c3a # v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      # ── Deploy ────────────────────────────────────────────────────────────────
+      - name: Deploy ZIP to Lambda
+        working-directory: services/notification
+        run: |
+          aws lambda update-function-code \
+            --function-name "${LAMBDA_FUNCTION}" \
+            --zip-file fileb://function.zip
+
+      - name: Wait for Lambda update to complete
+        run: |
+          aws lambda wait function-updated-v2 \
+            --function-name "${LAMBDA_FUNCTION}"

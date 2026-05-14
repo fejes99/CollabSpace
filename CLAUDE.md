@@ -163,13 +163,13 @@ Terraform:
 ## LAYER 2: CURRENT FOCUS
 
 Current stage: Stage 1 — Walking Skeleton
-Current service: notification (final walking skeleton service)
-Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, realtime-service, and ai-assistant complete, one remaining.
+Current service: notification (scaffolded; pending first deploy to AWS)
+Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, realtime-service, and ai-assistant complete; notification scaffolded and pending terraform apply + first CI deploy.
 
 Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-022
+Recent ADRs: adr-001 to adr-023
 
 Completed:
 
@@ -196,8 +196,13 @@ Completed:
 - services/ai-assistant/ — Python 3.14 + FastAPI; /health returns 200 OK; multi-stage Dockerfile; deployed to ECS Fargate via GitHub Actions CI; reachable at ALB DNS /assistant/health ✓
 - .github/workflows/service-ai.yml — CI/CD pipeline: lint → test → build (linux/amd64) → ECR push (:<sha> only) → ECS deploy with stability wait; path filter includes workflow file itself
 - environments/dev/main.tf updated — ai-assistant ecs-service module call wired; listener rule at priority 30 (/assistant/*)
+- services/notification/ — Node.js 24 + TypeScript + esbuild; /notifications/health returns 200 OK via ALB; ZIP deploy (no Docker, no ECR — see ADR-023); vitest for tests
+- infrastructure/modules/lambda-function/ — reusable Terraform module: Lambda function, execution IAM role, ALB target group (target_type=lambda), listener rule; bootstrap placeholder ZIP on first apply
+- .github/workflows/service-notification.yml — CI/CD pipeline: lint → test → typecheck → esbuild bundle → zip → Lambda update-function-code → wait for stability
+- environments/dev/main.tf updated — notification lambda-function module call wired; listener rule at priority 20 (/notifications/*); archive provider added
+- ADR-023 — Lambda ZIP deployment rationale
 
-Next milestone: Scaffold notification walking skeleton (Node.js 24 Lambda); /health (or equivalent) returns 200 OK; deploy to AWS Lambda via CI/CD (.github/workflows/service-notification.yml).
+Next milestone: Run terraform apply for dev environment (adds archive provider + Lambda resources), then push to main to trigger first CI deploy; verify /notifications/health returns 200 OK at ALB DNS.
 
 ## LAYER 3: POINTERS
 
@@ -215,6 +220,8 @@ Next milestone: Scaffold notification walking skeleton (Node.js 24 Lambda); /hea
 - ECS cluster module: infrastructure/modules/ecs-cluster/ (Container Insights toggle — see ADR-011)
 - ALB module: infrastructure/modules/alb/ (internet-facing ALB + HTTP listener; services own their target groups)
 - ECS service module: infrastructure/modules/ecs-service/ (generic per-service module; ignore_changes on task_definition — see ADR-012)
+- Lambda function module: infrastructure/modules/lambda-function/ (Lambda + IAM execution role + ALB target group; ignore_changes on code — same pattern as ADR-012; see ADR-023)
+- notification service: services/notification/README.md (stack, endpoints, env vars, scripts; ZIP deploy; SNS/SQS Stage 2+)
 - Pre-commit checklist: docs/07-development/commit-checklist.md (run through before every commit)
 - Project roadmap and scope contract: docs/roadmap.md (MVP / v1.5 / out-of-scope; everything downstream references this)
 - Authentication architecture: docs/02-architecture/authentication.md (bcrypt, RS256, access+refresh tokens, flows)

@@ -18,6 +18,7 @@ Composes reusable modules from `infrastructure/modules/` and reads account-wide 
 | `document_service` | Target group, listener rule, task definition, ECS service for document-service | Walking skeleton — `/health` returns 200 OK; path prefix `/documents/*` at priority 50; CI/CD via `service-document.yml` |
 | `realtime_service` | Target group, listener rule, task definition, ECS service for realtime-service | Walking skeleton — `/health` returns 200 OK; path prefix `/realtime/*` at priority 40; CI/CD via `service-realtime.yml` |
 | `ai_assistant` | Target group, listener rule, task definition, ECS service for ai-assistant | Walking skeleton — `/health` returns 200 OK; path prefix `/assistant/*` at priority 30; CI/CD via `service-ai.yml` |
+| `notification` | Lambda function, execution role, ALB target group + listener rule | Walking skeleton — `/notifications/health` returns 200 OK; path prefix `/notifications/*` at priority 20; CI/CD via `service-notification.yml` (ZIP deploy, no ECR — see ADR-023) |
 
 **Not created here:**
 - RDS instances (added when auth-workspace service is built)
@@ -130,7 +131,10 @@ terraform destroy
 
 Safe to run between sessions for cost control. Only resources in this module are destroyed. The `shared/` and `bootstrap/` layers are not affected.
 
-## What comes next (Stage 1 continued)
+## What comes next
 
-- Repeat the Dockerfile + CI/CD pattern for notification
+Walking skeleton complete — all five services deployed. Stage 2 work:
+
 - Wire the routing layer: API Gateway routes, ALB listener rule for WebSocket, SNS → SQS → Lambda subscription
+- Provision data stores: RDS (auth-workspace), MongoDB Atlas (document-service), pgvector (ai-assistant)
+- Enable Container Insights for ECS services (disabled in dev — ADR-011)
