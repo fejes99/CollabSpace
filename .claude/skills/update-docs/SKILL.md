@@ -64,10 +64,13 @@ Before editing anything, enumerate what is stale, missing, or incorrect per file
 **CLAUDE.md Layer 2**
 - `Current goal` — still accurate?
 - `Next milestone` — has this change completed part of it? Rewrite to show only what remains.
-- `Completed` — append what this change finished
 - `Blocked on` — new blockers or resolved ones?
 - `Recent ADRs` — new ADR number listed?
 - `Layer 3 Pointers` — new file needs a pointer entry?
+
+**docs/CHANGELOG.md** — completed stage milestones live here, not in CLAUDE.md.
+- If this change completes a stage or a named milestone, add an entry at the top of CHANGELOG.md with the date and a one-paragraph summary of what landed.
+- Day-to-day in-progress work does NOT belong here — only completions.
 
 **Root README.md**
 - Status block: stage description and "currently live" sentence match reality?
@@ -107,12 +110,13 @@ Before editing anything, enumerate what is stale, missing, or incorrect per file
 
 Apply all updates from Phase 2 in this order:
 1. `CLAUDE.md`
-2. New READMEs for modules or services with none
-3. Module and service READMEs for changed code
-4. `infrastructure/environments/dev/README.md`
-5. `infrastructure/README.md`
-6. Root `README.md`
-7. `.github/workflows/README.md`
+2. `docs/CHANGELOG.md` (only if a stage milestone landed)
+3. New READMEs for modules or services with none
+4. Module and service READMEs for changed code
+5. `infrastructure/environments/dev/README.md`
+6. `infrastructure/README.md`
+7. Root `README.md`
+8. `.github/workflows/README.md`
 
 **Rules:**
 - `Edit` for existing files — change only what is wrong; do not rewrite correct sections

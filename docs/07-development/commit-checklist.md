@@ -36,7 +36,7 @@ This section is the most important to get right. Documentation debt compounds qu
 
 Update this file whenever the project state changes. It is the source of truth for the current session context.
 
-- [ ] **Completed items**: Did this commit finish something listed under "Next milestone" or complete a task? Move it to the `Completed:` list.
+- [ ] **Completed items**: Did this commit finish something listed under "Next milestone" or complete a stage milestone? Add it to [docs/CHANGELOG.md](../CHANGELOG.md). CLAUDE.md Layer 2 no longer carries the running Completed list — it stays focused on the current stage only.
 - [ ] **Next milestone**: Does the "Next milestone" block still describe what actually comes next, or does it need updating now that this work is done?
 - [ ] **Current goal**: If the stage or goal has shifted, update the `Current goal:` line.
 - [ ] **Out of scope**: If the scope has been redefined, update it.
