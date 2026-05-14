@@ -1,0 +1,144 @@
+# Claude PR Review
+#
+# Posts a single review comment on a PR when:
+#   1. The PR is opened as non-draft or flipped from draft to ready, OR
+#   2. An OWNER comment containing "@claude" is posted on an open PR.
+#
+# Skip conditions (handled by the `gate` step):
+#   - Draft PR
+#   - Fork PR
+#   - PR title starts with "[fast]" (case-insensitive)
+#   - Closed/merged PR for @claude trigger
+#   - Bot-authored comment / self-loop from github-actions[bot]
+#   - Comment author_association != OWNER
+#   - Oversized PR (>100 changed files OR >5000 line changes) — posts a polite skip comment
+#
+# Cost caps:
+#   - timeout-minutes: 10
+#   - max_tokens: 12000 (output cap)
+#
+# See:
+#   - docs/05-cicd/plans/claude-pr-review.md
+#   - docs/06-decisions/adr-024-claude-pr-review.md
+
+name: Claude PR Review
+
+on:
+  pull_request:
+    types: [opened, ready_for_review]
+  issue_comment:
+    types: [created]
+
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - id: gate
+        name: Decide whether to review
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const evt = context.eventName;
+            const payload = context.payload;
+            let pr;
+
+            const skip = (reason, opts = {}) => {
+              core.info(`Skip: ${reason}`);
+              core.setOutput('should-review', 'false');
+              core.setOutput('reason', reason);
+              if (opts.sizeSkip) {
+                core.setOutput('size-skip', 'true');
+                core.setOutput('changed-files', String(opts.changedFiles));
+                core.setOutput('total-lines', String(opts.totalLines));
+              }
+            };
+
+            if (evt === 'pull_request') {
+              pr = payload.pull_request;
+              if (pr.draft) return skip('Draft PR');
+              if (pr.head.repo.fork) return skip('Fork PR');
+            } else if (evt === 'issue_comment') {
+              if (!payload.issue.pull_request) return skip('Not a PR comment');
+              if (!payload.comment.body.includes('@claude')) return skip('No @claude mention');
+              if (payload.comment.author_association !== 'OWNER') {
+                return skip(`Commenter is ${payload.comment.author_association}, not OWNER`);
+              }
+              if (payload.comment.user.type === 'Bot') return skip('Bot author');
+              if (payload.comment.user.login === 'github-actions[bot]') {
+                return skip('Self-loop from github-actions[bot]');
+              }
+              if (payload.issue.state !== 'open') return skip(`PR is ${payload.issue.state}, not open`);
+
+              const { data: prData } = await github.rest.pulls.get({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                pull_number: payload.issue.number,
+              });
+              if (prData.draft) return skip('Draft PR');
+              if (prData.head.repo.fork) return skip('Fork PR');
+              pr = prData;
+            } else {
+              return skip(`Unsupported event: ${evt}`);
+            }
+
+            if ((pr.title || '').toLowerCase().startsWith('[fast]')) {
+              return skip('[fast] PR — review skipped');
+            }
+
+            const totalLines = (pr.additions ?? 0) + (pr.deletions ?? 0);
+            const changedFiles = pr.changed_files ?? 0;
+            if (changedFiles > 100 || totalLines > 5000) {
+              return skip(
+                `Oversized PR (${changedFiles} files, ${totalLines} lines)`,
+                { sizeSkip: true, changedFiles, totalLines },
+              );
+            }
+
+            core.info('Gate passed — review will run');
+            core.setOutput('should-review', 'true');
+            core.setOutput('reason', 'OK');
+            core.setOutput('pr-number', String(pr.number));
+
+      - name: Post oversized-PR skip comment
+        if: steps.gate.outputs.size-skip == 'true'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
+            const changedFiles = '${{ steps.gate.outputs.changed-files }}';
+            const totalLines = '${{ steps.gate.outputs.total-lines }}';
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: prNumber,
+              body:
+                `Claude PR review skipped — diff exceeds the configured size limit ` +
+                `(${changedFiles} files, ${totalLines} line changes; limit is 100 files / 5000 lines). ` +
+                `Split the PR or run the review manually. See ` +
+                `[ADR-024](../blob/main/docs/06-decisions/adr-024-claude-pr-review.md).`,
+            });
+
+      - name: Check out repo
+        if: steps.gate.outputs.should-review == 'true'
+        uses: actions/checkout@v4
+
+      # Tag-pinned to @v1 (not SHA-pinned). Accept upstream v1.x patches
+      # automatically; revisit if anthropics/claude-code-action releases a
+      # breaking v2. Trade-off rationale in ADR-024.
+      - name: Run Claude code review
+        if: steps.gate.outputs.should-review == 'true'
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          model: claude-sonnet-4-6
+          max_tokens: 12000
