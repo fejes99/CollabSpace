@@ -6,7 +6,7 @@ Run `/start-session` at the start of every session.
 
 ### What this is
 
-A learning project: 5-service collaboration platform on AWS. Junior-to-medior developer. The goal is learning, not shipping fast.
+A learning project: 5-service collaboration platform on AWS. Junior-to-medior developer. Free-tier budget ~$0–5/month. Goal: learning, not shipping fast.
 
 ### Services
 
@@ -16,9 +16,7 @@ A learning project: 5-service collaboration platform on AWS. Junior-to-medior de
 - **ai-assistant** — Python 3.14 + FastAPI. Postgres + pgvector. Kafka events.
 - **notification** — Node.js 24 Lambda. Receives SNS/SQS events.
 
-Sync via REST/API Gateway + WebSocket/ALB. Async via SNS+SQS (fan-out) + Kafka (AI events). Compute mix: ECS Fargate + EC2 + Lambda. Everything on a $0–5/month free-tier budget.
-
-For full architecture: [docs/02-architecture/system-overview.md](docs/02-architecture/system-overview.md).
+For architecture, communication, and compute mix: [docs/02-architecture/system-overview.md](docs/02-architecture/system-overview.md).
 
 ### Hard rules
 
@@ -33,17 +31,8 @@ For full architecture: [docs/02-architecture/system-overview.md](docs/02-archite
 
 ### Secrets and config
 
-- Local dev: `.env` files (in `.gitignore`), loaded by the service at startup.
-- Deployed: AWS SSM Parameter Store, *not* Secrets Manager (cost).
-- Reference SSM by path in code; never hardcode the value.
-- Never log secret values, even at DEBUG level. Hash for audit trails (SHA-256 of email, etc.).
-
-### Test and build commands
-
-- Java: `./mvnw test`, `./mvnw package -DskipTests`
-- TypeScript: `pnpm test`, `pnpm build`, `pnpm lint`
-- Python: `pytest`, `ruff check .`, `black --check .`
-- Terraform: `terraform fmt`, `terraform validate`, `terraform plan`
+- Secrets: AWS SSM Parameter Store, path-referenced in code (never hardcoded). `.env` for local only (gitignored).
+- Never log secret values, even at DEBUG. Hash for audit trails (e.g. SHA-256 of email).
 
 ## LAYER 2: CURRENT FOCUS
 
@@ -54,7 +43,6 @@ Current goal: Build out real functionality in each service; starting with auth-w
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-024
 
 Next milestone: Begin Stage 2 — decide which service to implement first and what infrastructure it needs (likely auth-workspace: RDS PostgreSQL, Redis via Upstash, user registration + JWT endpoints).
 
@@ -69,7 +57,6 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Testing strategy: [docs/07-development/testing-strategy.md](docs/07-development/testing-strategy.md) (test types, per-language toolkits, Testcontainers lifecycle, injectable Clock pattern)
 - Pre-commit checklist: [docs/07-development/commit-checklist.md](docs/07-development/commit-checklist.md)
 - Local development setup: [docs/07-development/local-setup.md](docs/07-development/local-setup.md)
-- GitHub PR template: [.github/pull_request_template.md](.github/pull_request_template.md)
 
 **Architecture and decisions**
 
@@ -78,7 +65,6 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Authorization: [docs/02-architecture/authorization.md](docs/02-architecture/authorization.md)
 - API conventions: [docs/02-architecture/api-conventions.md](docs/02-architecture/api-conventions.md)
 - API Gateway trust model: [docs/02-architecture/api-gateway-trust.md](docs/02-architecture/api-gateway-trust.md)
-- Kafka retry policy and DLT: [docs/02-architecture/kafka-retry-policy.md](docs/02-architecture/kafka-retry-policy.md)
 - All ADRs: [docs/06-decisions/](docs/06-decisions/) (conventions in [docs/06-decisions/README.md](docs/06-decisions/README.md))
 
 **Scope and roadmap**
