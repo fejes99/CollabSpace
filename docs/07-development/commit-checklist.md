@@ -2,6 +2,8 @@
 
 Run through this before every commit. Sections are conditional — only apply the ones relevant to what changed. The Always section applies unconditionally.
 
+**Feature workflow:** this checklist governs each *commit*. The per-*feature* procedure (planning, tiers, branching, feature-level Definition of Done) lives in [feature-workflow.md](feature-workflow.md). Start a feature there; this checklist applies to every commit inside it. For test patterns referenced below, see [testing-strategy.md](testing-strategy.md).
+
 ---
 
 ## Always
