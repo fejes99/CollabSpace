@@ -56,13 +56,14 @@ jobs:
 
       # ── Step 4: Verify scoped ECR repository access ──────────────────────────
       # Tests ecr:DescribeImages on a specific repository ARN (not account-wide).
-      # Repositories are empty at this stage — an empty result is a pass.
       # An AccessDenied here means the IAM policy resource scope is wrong.
+      # --output text handles images with multiple tags; --output table breaks
+      # when a single image has more than one tag (jagged row width).
       - name: Verify ECR repository access (auth-workspace)
         run: |
           aws ecr describe-images \
             --repository-name collabspace-auth-workspace \
             --region ${{ env.AWS_REGION }} \
             --query 'imageDetails[*].imageTags' \
-            --output table
-          echo "ECR repository reachable — empty result expected (no images pushed yet)"
+            --output text
+          echo "ECR repository reachable"
