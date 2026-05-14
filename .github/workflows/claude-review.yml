@@ -37,6 +37,7 @@ permissions:
   contents: read
   pull-requests: write
   issues: write
+  id-token: write  # required by anthropics/claude-code-action for OIDC token exchange
 
 jobs:
   review:
@@ -135,10 +136,16 @@ jobs:
       # SHA-pinned (GitHub Actions security best practice — see ADR-024).
       # Resolve a new SHA via: `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1`
       # then take the line ending in `refs/tags/v1^{}`. Rotation cadence in ADR-024.
+      #
+      # Configuration nuance: model / max-turns go through `claude_args` (CLI flags),
+      # not as top-level inputs. The action does not expose an output-token cap;
+      # cost is bounded by `--max-turns` (agent loop) and `timeout-minutes` (wall clock).
+      # See ADR-024 §Decision.
       - name: Run Claude code review
         if: steps.gate.outputs.should-review == 'true'
         uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2  # v1.0.122 (= current @v1)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          model: claude-sonnet-4-6
-          max_tokens: 12000
+          claude_args: |
+            --model claude-sonnet-4-6
+            --max-turns 15
