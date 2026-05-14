@@ -162,11 +162,11 @@ Terraform:
 
 ## LAYER 2: CURRENT FOCUS
 
-Current stage: Stage 1 — Walking Skeleton
-Current service: notification (scaffolded; pending first deploy to AWS)
-Current goal: Deploy all five walking skeleton services to AWS dev; auth-workspace, document-service, realtime-service, and ai-assistant complete; notification scaffolded and pending terraform apply + first CI deploy.
+Current stage: Stage 2 — Service Implementation (starting)
+Current service: to be decided
+Current goal: Build out real functionality in each service; starting with auth-workspace (user registration, login, JWT issuance) and the shared infrastructure it needs (RDS, Redis).
 
-Out of scope: full service implementation, databases, inter-service communication, routing layer. Walking Skeleton = five health endpoints return 200 OK from AWS, deployed by CI. Nothing more.
+Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 Recent ADRs: adr-001 to adr-023
@@ -201,8 +201,17 @@ Completed:
 - .github/workflows/service-notification.yml — CI/CD pipeline: lint → test → typecheck → esbuild bundle → zip → Lambda update-function-code → wait for stability
 - environments/dev/main.tf updated — notification lambda-function module call wired; listener rule at priority 20 (/notifications/*); archive provider added
 - ADR-023 — Lambda ZIP deployment rationale
+- infrastructure/shared/oidc.tf updated — lambda-deploy IAM policy added; CI role can now call lambda:UpdateFunctionCode and GetFunction on dev functions
+- services/notification/ deployed to AWS Lambda ✓; /notifications/health returns 200 OK via ALB
 
-Next milestone: Run terraform apply for dev environment (adds archive provider + Lambda resources), then push to main to trigger first CI deploy; verify /notifications/health returns 200 OK at ALB DNS.
+Stage 1 complete — all five walking skeleton services live:
+  - auth-workspace    → ALB /actuator/health     ✓
+  - document-service  → ALB /documents/health    ✓
+  - realtime-service  → ALB /realtime/health     ✓
+  - ai-assistant      → ALB /assistant/health    ✓
+  - notification      → ALB /notifications/health ✓
+
+Next milestone: Begin Stage 2 — decide which service to implement first and what infrastructure it needs (likely auth-workspace: RDS PostgreSQL, Redis via Upstash, user registration + JWT endpoints).
 
 ## LAYER 3: POINTERS
 
