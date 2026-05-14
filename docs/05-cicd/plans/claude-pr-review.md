@@ -42,17 +42,19 @@ Every PR opened as ready-for-review receives a Claude code review comment.
 - `contents: read`
 - `pull-requests: write`
 - `issues: write`
+- `id-token: write` (required by the action for OIDC token exchange; see ADR-024)
 
 **Cost caps**
 
-- `timeout-minutes: 10`
-- Action input `max_tokens: 12000`
+- `timeout-minutes: 10` (workflow-level wall clock)
+- `--max-turns 15` (passed via `claude_args`; limits the agent loop)
+- The action does not expose an output-token cap — see ADR-024 §Decision
 
 **Action**
 
 - `anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2` (`v1.0.122`) — SHA-pinned; rotation cadence in [ADR-024](../../06-decisions/adr-024-claude-pr-review.md)
 - Resolve a new SHA via `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1` and take the line ending in `refs/tags/v1^{}`
-- Model: `claude-sonnet-4-6`
+- Model: `claude-sonnet-4-6`, passed via `claude_args: --model claude-sonnet-4-6` (not a top-level input)
 - Reads `secrets.ANTHROPIC_API_KEY`
 
 ## 4. Data model changes
@@ -113,5 +115,5 @@ No correlation ID — this is CI, not a service request path.
 
 - The action's behavior on duplicate review comments — does it edit the previous Claude comment or post a new one each time?
 - The action's context-loading scope — how many tokens does it ingest beyond the diff?
-- The action's exact input field names (`anthropic_api_key`, `model`, `max_tokens`) — verify against the action's current README before merge.
+- Action input format learned at first run: `model` and `max_tokens` are NOT top-level inputs (action ignores them with a warning); model goes through `claude_args`, no output-token cap exists. Captured in ADR-024.
 - SHA-pin rotation: scheduled every 3 months (next: 2026-08-14) or sooner on a disclosed CVE in `anthropics/claude-code-action`.

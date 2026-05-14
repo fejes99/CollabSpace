@@ -18,7 +18,14 @@ The cost dimension is real. The project has an explicit ~$5/month operational bu
 
 ## Decision
 
-Add a GitHub Action that invokes `anthropics/claude-code-action` on `pull_request` (`ready_for_review` and `opened` with a draft guard) and on `issue_comment` events containing `@claude` from the repository `OWNER`. Use the `claude-sonnet-4-6` model. Cap per-run output at 12,000 tokens; cap workflow runtime at 10 minutes; skip `[fast]`-prefixed PRs (case-insensitive), fork PRs, and PRs exceeding 100 changed files or 5,000 line changes.
+Add a GitHub Action that invokes `anthropics/claude-code-action` on `pull_request` (`ready_for_review` and `opened` with a draft guard) and on `issue_comment` events containing `@claude` from the repository `OWNER`. Use the `claude-sonnet-4-6` model, configured via `claude_args` (the action does not expose `model` as a top-level input). Skip `[fast]`-prefixed PRs (case-insensitive), fork PRs, and PRs exceeding 100 changed files or 5,000 line changes.
+
+**Cost caps.** The action does not expose an output-token cap. The bounds in force are:
+- `--max-turns 15` on `claude_args` — limits the agent loop iterations (each turn is one model call). Typical reviews complete in 3–5 turns.
+- `timeout-minutes: 10` at the workflow level — wall-clock hard stop.
+- `concurrency: cancel-in-progress: true` — successive triggers on the same PR cancel the previous run.
+
+**Required permissions** include `id-token: write` (the action exchanges an OIDC token internally during setup). This is not currently documented in the action's README but is required by the action's source code.
 
 The action is **SHA-pinned**, following the GitHub Actions security best practice flagged by our action linter. The current pin is `anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2` (`v1.0.122`, which is what `v1` currently dereferences to). Rotation cadence: every 3 months, or sooner if a CVE is disclosed in the upstream action. The workflow comment above the `uses:` line documents how to resolve a new SHA.
 
@@ -44,7 +51,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 **+**
 
 - Every ready-for-review PR receives a fresh, model-driven review without scheduling a human.
-- Per-run cost is bounded; worst case ~$0.50, typical $0.15–$0.25.
+- Per-run cost is bounded by `--max-turns 15` (typical $0.15–$0.35) and `timeout-minutes: 10` (worst case ~$1.00 in a runaway-agent scenario, dominated by output tokens at $15/MTok).
 - The `[fast]` skip, fork skip, and size guard prevent obvious cost-burn vectors.
 - The `OWNER`-only `@claude` guard prevents cost attack via comments on a public repo.
 - The action is SHA-pinned; the workflow's behavior cannot change without an explicit commit to update the pin.
@@ -58,7 +65,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - SHA pinning means upstream patches (security, bug fixes) are NOT picked up automatically. The rotation cadence (every 3 months, or sooner on disclosed CVE) is the mitigation; if forgotten, the workflow runs on an older action than upstream considers current.
 - The size guard (100 files / 5,000 lines) is a hard cutoff. Large legitimate PRs (e.g., a generated SDK update) will be skipped without review.
 - The "any comment containing `@claude`" pattern is permissive — quoted text in a reply triggers a re-review. Accepted as low-frequency, low-cost noise rather than complicating with regex.
-- The 12,000-token output cap could truncate a review of a particularly large PR. The size guard mitigates this in practice.
+- Output is not capped at the model layer (the action does not expose `max_tokens`). The size guard (100 files / 5,000 lines) and `--max-turns 15` jointly bound exposure; an unreviewed-but-not-skipped large PR could in theory hit the timeout-minutes wall (~$1.00 worst case) before completing.
 
 ## Revisit when
 
