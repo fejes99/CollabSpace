@@ -32,6 +32,7 @@ Plan: `docs/03-services/<service>/plans/<slug>.md`
 - [ ] Service README updated
 - [ ] CLAUDE.md Layer 2 `Completed:` list updated
 - [ ] ADR written if a non-obvious decision was made; ADR number added to `Recent ADRs:` line
+- [ ] Claude review addressed or explicitly accepted as-is (auto-runs on `ready_for_review`; see [ADR-024](../docs/06-decisions/adr-024-claude-pr-review.md))
 - [ ] `/retrospect` run
 
 ### Manual smoke

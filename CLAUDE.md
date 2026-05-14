@@ -169,7 +169,7 @@ Current goal: Build out real functionality in each service; starting with auth-w
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
-Recent ADRs: adr-001 to adr-023
+Recent ADRs: adr-001 to adr-024
 
 Completed:
 

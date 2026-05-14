@@ -119,7 +119,7 @@ Run `/pre-commit` to walk the existing checklist. Then:
 
 ### Phase 6 — Deploy and verify
 
-Mark the PR ready for review. CI must be green. Squash-merge to main.
+Mark the PR ready for review. This triggers the Claude PR review workflow (see [ADR-024](../06-decisions/adr-024-claude-pr-review.md)) — wait for the review comment to appear, then address each point or explicitly note "accepted as-is, reason: …" in a reply. Re-trigger with a comment containing `@claude` after revisions if needed. CI must be green. Squash-merge to main.
 
 ```bash
 make dev-up   # if the dev environment is destroyed
