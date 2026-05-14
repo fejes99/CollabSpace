@@ -11,18 +11,18 @@ const albEvent = (method: string, path: string): ALBEvent =>
     body: null,
     isBase64Encoded: false,
     requestContext: { elb: { targetGroupArn: "" } },
-  }) as ALBEvent;
+  });
 
 describe("handler", () => {
-  it("returns 200 for GET /notifications/health", async () => {
-    const result = await handler(albEvent("GET", "/notifications/health"));
+  it("returns 200 for GET /notifications/health", () => {
+    const result = handler(albEvent("GET", "/notifications/health"));
 
     expect(result.statusCode).toBe(200);
     expect(JSON.parse(result.body)).toEqual({ status: "ok" });
   });
 
-  it("returns 404 for unknown routes", async () => {
-    const result = await handler(albEvent("GET", "/notifications/unknown"));
+  it("returns 404 for unknown routes", () => {
+    const result = handler(albEvent("GET", "/notifications/unknown"));
 
     expect(result.statusCode).toBe(404);
   });

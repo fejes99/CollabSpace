@@ -6,7 +6,7 @@ const json = (statusCode: number, body: unknown): ALBResult => ({
   body: JSON.stringify(body),
 });
 
-export const handler = async (event: ALBEvent): Promise<ALBResult> => {
+export const handler = (event: ALBEvent): ALBResult => {
   const { httpMethod, path } = event;
 
   if (httpMethod === "GET" && path === "/notifications/health") {
