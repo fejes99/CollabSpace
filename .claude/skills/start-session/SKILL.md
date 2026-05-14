@@ -31,10 +31,10 @@ Read in parallel:
 Then read 1–3 additional files from **Layer 3 Pointers** in CLAUDE.md — only the ones directly relevant to the **Current service** and **Next milestone** in Layer 2. Do not read everything; relevance beats completeness.
 
 Heuristics:
-- Stage 1 / auth-workspace: always read `infrastructure/environments/dev/README.md`
-- If "Next milestone" mentions a specific module: read that module's README
+- If Layer 2 `Current service` is set: read `services/<service>/README.md`
+- If "Next milestone" mentions a specific Terraform module: read that module's README
 - If "Next milestone" mentions a workflow: read `.github/workflows/README.md`
-- If "Next milestone" mentions a service: read `services/<name>/README.md` if it exists
+- If "Next milestone" mentions a stage transition: read `infrastructure/environments/dev/README.md`
 
 Cap at 3 files beyond `CLAUDE.md` and the checklist.
 
@@ -45,9 +45,8 @@ Cap at 3 files beyond `CLAUDE.md` and the checklist.
 Silently verify each of the following. Record results for Phase 3 output.
 
 **Git ↔ Layer 2 consistency**
-- Does the most recent commit message correspond to something in the "Completed" list in Layer 2?
-- If recent commits exist that are NOT reflected in "Completed" → flag: "Commits ahead of CLAUDE.md — Layer 2 may need updating."
-- If "Completed" claims something that cannot be seen in the last 10 commits → flag: "CLAUDE.md claims completion not visible in recent git history."
+- Does the most recent merge commit correspond to the `Next milestone` or the `Current goal` in Layer 2? If a milestone has clearly been hit but Layer 2 still describes it as pending → flag: "Recent commit may have completed the current milestone — Layer 2 may need updating."
+- CLAUDE.md no longer carries a running `Completed` list (moved to [docs/CHANGELOG.md](docs/CHANGELOG.md) to keep the prompt focused). Do not read CHANGELOG.md during session start — it is not load-bearing for current work.
 
 **In-progress work from a prior session**
 - Any modified or staged files in `git status`? If yes, list them — they may be leftover work.
