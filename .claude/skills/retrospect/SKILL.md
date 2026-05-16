@@ -20,7 +20,7 @@ allowed-tools:
 Optional `<base>` — the base branch or commit to diff against. Defaults to `main` (or `origin/main` if available).
 
 Usage:
-- `/retrospect` — on a feature branch: diff = `merge-base(main, HEAD)..HEAD`. On main: diff = `HEAD~1..HEAD` (the most recent merge).
+- `/retrospect` — on a feature branch: diff = `merge-base(main, HEAD)..HEAD`. On main: diff = from the most recent merge commit's parent to HEAD (see Phase 1 for how the merge commit is identified).
 - `/retrospect <base>` — diff against an explicit base.
 
 ---
@@ -37,7 +37,7 @@ Recent commits: !`git log --oneline -5`
 
 Before any reflection:
 
-1. **Determine the diff range.** If on a feature branch, use `git merge-base main HEAD` as the base. If on main, use the parent of HEAD (assumes the most recent commit is the squash-merge of the feature).
+1. **Determine the diff range.** If on a feature branch, use `git merge-base main HEAD` as the base. If on main, run `git log --oneline -10` and identify the most recent merge commit (subject typically starts with "Merge" or matches a PR squash pattern). Use that commit's parent as the base. If the most recent commit is ambiguous, show the log and ask the user to confirm which commit to diff against.
 2. **Confirm there is something to retrospect.** If the diff is empty or only contains the plan doc, stop and tell the user there is nothing yet to reflect on — the retrospect is for completed features.
 3. **Locate the plan.** Find the plan doc at `docs/03-services/<service>/plans/<slug>.md` (look for one added in the diff). If no plan was committed, note this — retrospecting without the plan limits what can be compared, but is not a hard blocker.
 
@@ -53,7 +53,7 @@ Run:
 
 - `git log <base>..HEAD --oneline` — commit list
 - `git diff --stat <base>..HEAD` — file change summary
-- `git diff <base>..HEAD` — full diff (if not too large; cap at ~2000 lines for context)
+- `git diff <base>..HEAD` — full diff. If the diff exceeds ~2000 lines, do not load it all — instead read only the most significant changed files (service code, migrations, tests) in priority order, and skip generated files, lockfiles, and docs.
 
 Build a mental model of what changed: which files in which services, schema migrations, new tests, new dependencies, new docs.
 
@@ -75,7 +75,7 @@ Ask the user in sequence, one question at a time. Do not bundle.
 
 5. **Hidden constraints.** "Did you discover a constraint or invariant that wasn't documented anywhere? (Behavior of a library, an AWS quirk, a framework convention.)"
 
-6. **Stale docs.** "Which existing docs, READMEs, or CLAUDE.md sections are now out of date because of this change?"
+6. **Architecture drift.** "Did this change reveal anything that the architecture docs (`docs/02-architecture/`) or existing ADRs don't reflect? A design assumption that turned out wrong, a constraint that wasn't documented, a pattern that diverged from the documented approach?"
 
 Capture each answer verbatim — it becomes input for Phase 4.
 
@@ -85,6 +85,8 @@ Capture each answer verbatim — it becomes input for Phase 4.
 
 Classify the user's answers into three output streams. Show each candidate explicitly. Do not write anything yet.
 
+Candidates may be prompted by diff observations from Phase 2 — but the candidate body must incorporate the user's own words from Phase 3. Present diff-derived observations as questions during Phase 3 ("I noticed X in the diff — is there a lesson to capture here?") and use the user's response as the candidate source. Do not write a candidate from diff observation alone.
+
 ### Memory candidates
 
 For each insight that should persist across sessions:
@@ -93,14 +95,9 @@ For each insight that should persist across sessions:
 > **Slug:** `<kebab-case>`
 > **Description:** <one line>
 > **Body:**
-> <proposed content, structured per the auto-memory rules in CLAUDE.md>
->
-> _Save this memory?_ [Yes / Revise / Discard]
+> <proposed content, structured per the auto-memory rules in the system prompt>
 
-Memory types follow the rules in the system prompt's auto-memory section:
-- `feedback` — for "this is how the user wants me to work" rules (with **Why:** and **How to apply:** lines).
-- `project` — for who/what/why/when about ongoing work (with **Why:** and **How to apply:** lines).
-- `reference` — for "where information lives" pointers.
+Memory types and body structure follow the system prompt's auto-memory section.
 
 If a memory updates an existing entry rather than creating a new one, say so explicitly and show the proposed diff to the existing entry.
 
@@ -117,8 +114,6 @@ For each non-trivial decision that emerged during implementation:
 > - + <positive>
 > - − <negative>
 > **Revisit when:** <trigger condition>
->
-> _Draft this ADR for me to review and commit? Or note as 'no ADR needed'?_
 
 Use the next sequential ADR number (read `docs/06-decisions/` to find the highest existing number, then +1).
 
@@ -130,15 +125,14 @@ For each existing document that is now stale:
 > **Section:** <heading>
 > **Current text:** <quote>
 > **Proposed change:** <new text or specific edit>
->
-> _Apply this edit?_ [Yes / Revise / Discard]
 
 Common targets:
-- `CLAUDE.md` Layer 2 (`Completed:` list, `Recent ADRs:` line, `Next milestone:`)
+- `CLAUDE.md` Layer 2 (`Recent ADRs:` line, `Next milestone:`, `Current goal:`)
 - `CLAUDE.md` Layer 3 (new pointers)
-- `services/<service>/README.md`
-- `infrastructure/environments/dev/README.md`
-- Architecture docs in `docs/02-architecture/`
+- Architecture docs in `docs/02-architecture/` — for design assumptions or constraints that turned out wrong
+- ADRs whose `Revisit when` condition has been met
+
+Do not re-audit service READMEs, infrastructure tables, or workflow docs here — that is `/update-docs`' domain. Only propose doc updates for the *why-layer*: things that changed in understanding, not just in code.
 
 ---
 
@@ -181,7 +175,8 @@ Output a final summary block:
 > - Discarded: <count>
 >
 > **Next**
-> - Commit the new memory / ADRs / doc edits if they should be part of this PR's history, or as a follow-up `[fast]` commit.
+> - ADRs and doc edits: commit as part of this PR's history or as a follow-up `[fast]` commit.
+> - Memory files live outside the repo (`~/.claude/projects/...`) — do not commit them.
 
 Stop here. Do not propose further actions.
 

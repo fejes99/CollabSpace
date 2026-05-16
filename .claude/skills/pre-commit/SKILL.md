@@ -25,6 +25,8 @@ Full staged diff:
 
 ## Phase 1 — Classify and load
 
+**Size check first.** If the staged summary shows > 50 changed files or > 2000 lines: tell the user this is a large commit, note that the full diff may exceed review capacity, and restrict Phase 4 code checks to non-generated files only — skip `package-lock.json`, `pnpm-lock.yaml`, `*.snap`, and generated `*.d.ts` files.
+
 From the snapshot above, classify each staged file:
 - Type: `terraform-module` | `terraform-env` | `java` | `typescript` | `python` | `workflow` | `docs` | `config`
 - Change: `new` | `modified` | `deleted`
@@ -47,7 +49,7 @@ Mark each ✅ pass / ⚠️ advisory / ❌ blocking.
 - No unresolved `TODO`/`FIXME` this commit was supposed to close
 
 **Scope**
-- Commit does one logical thing — flag mixed concerns and suggest splitting
+- Commit does one logical thing — if the diff touches files from more than two unrelated concerns (e.g. service code + CI workflow + unrelated config), flag as mixed and suggest splitting
 
 **Branch**
 - Direct commit to `main` is only allowed for infrastructure work during Stage 0 (see CLAUDE.md)
@@ -56,37 +58,16 @@ Mark each ✅ pass / ⚠️ advisory / ❌ blocking.
 
 ## Phase 3 — Documentation audit
 
-For every non-documentation file changed, trace impact to docs. For each gap, write the exact corrected text — not "update the README" but the actual replacement content.
+Before proposing any correction, read each doc you will audit — you cannot write accurate replacement text for a file you have not read.
 
-**CLAUDE.md Layer 2** (always check)
+For each changed file type, apply the relevant sub-section from commit-checklist.md's **Documentation** section (already loaded in Phase 1). For each gap found, write the exact corrected text — not "update the README" but the actual replacement content.
+
+**CLAUDE.md Layer 2** (always check — these fields are the most frequently stale):
 - `Current goal` — still accurate?
 - `Next milestone` — completed by this commit? Rewrite to show only what remains.
-- `Completed` — anything to append?
 - `Blocked on` — new blockers or resolved ones?
 - `Recent ADRs` — new ADR number missing?
 - `Layer 3 Pointers` — new module/service/doc needs a pointer entry?
-
-**Root README.md** — Status block reflects current state?
-
-**infrastructure/README.md** — Module table has a row + README link for every dir in `infrastructure/modules/`?
-
-**Module READMEs** (if any `infrastructure/modules/**/*.tf` changed)
-- "What it creates" matches `main.tf` resources
-- Inputs table matches `variables.tf` (type, default, description)
-- Outputs table matches `outputs.tf`
-- Usage example valid and includes all required variables
-- New module with no README → ❌ blocking
-
-**environments/dev/README.md** (if `infrastructure/environments/dev/` changed)
-- "What it creates" table matches every `module` block in `main.tf`
-- No stale placeholder or future-tense language for things now built
-- "What comes next" reflects the actual next step
-
-**.github/workflows/README.md** (if a workflow changed)
-- New workflow → row in Active table
-- Planned workflow now implemented → moved to Active, status `Live`
-
-**Service READMEs** (if any service code changed) — README reflects the change?
 
 ---
 
@@ -132,6 +113,8 @@ Run only the sections matching file types from Phase 1.
 - ADR has all sections: Status, Date, Context, Decision, Alternatives Considered, Consequences (+ and −), Revisit when
 - Implementing code cites the ADR number in a comment
 
+**Plan alignment** — if the current branch matches `feat/<service>/<slug>`, look for `docs/03-services/<service>/plans/<slug>.md`. If found, read it and verify the staged diff implements what the plan describes — correct endpoint path, method, request/response shape, validation rules. Flag divergences as ⚠️ advisory with the specific plan section and the differing implementation. Do not flag empty methods, TODO bodies, or stub returns — those are mid-feature placeholders, not divergences.
+
 **Code scan** — read each changed non-documentation file. Flag only what is worth fixing *within this commit's scope*; do not propose refactors of untouched code:
 - CLAUDE.md Layer 4 anti-patterns
 - Missing error handling at system boundaries (user input, external APIs, file I/O)
@@ -169,11 +152,10 @@ Use this exact structure. No commentary outside it.
 [or "None"]
 
 ### Suggested commit message
+_Omit this section if any ❌ blocking issues are listed above. Resolve blockers first._
 ```
 <imperative subject line ≤72 chars>
 
 <body: why — omit if subject is self-explanatory>
 ```
 ---
-
-**If ❌ blocking issues exist:** stop. Do not provide a commit message. Wait for resolution.
