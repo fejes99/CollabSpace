@@ -37,7 +37,7 @@ For every authenticated request that passes API Gateway validation, the downstre
 | ------------------- | ------------------------------- | ----------------------------------------- |
 | `X-User-Id`         | The `userId` claim from the JWT | `$context.authorizer.claims.userId`       |
 | `X-User-Workspaces` | JSON-encoded memberships array  | `$context.authorizer.claims.memberships`  |
-| `X-Correlation-Id`  | Request ID for tracing          | `$context.requestId` (or client-supplied) |
+| `X-Correlation-ID`  | Request ID for tracing          | `$context.requestId` (or client-supplied) |
 | `X-Internal-Token`  | Shared secret (see below)       | API Gateway stage variable                |
 
 Downstream services read `X-User-Id` and `X-User-Workspaces` to make authorization decisions. They do not parse or validate the JWT itself.
