@@ -1,15 +1,17 @@
 # docker-compose.yml — CollabSpace local development environment
 #
-# Default profile (make up / make down):
-#   No infrastructure containers needed for the walking skeleton — services are
-#   health-endpoint-only and have no database dependencies yet.
-#   Uncomment postgres/mongo/redis/localstack when the services that use them
-#   are implemented (Stage 2+).
+# Default (no profile): starts infrastructure dependencies only.
+#   `docker compose up -d` — starts postgres and redis for auth-workspace (Stage 2).
+#   Add mongo, localstack, kafka by uncommenting as each service is implemented.
 #
-# Services profile (make up-all / make down-all):
-#   Builds and runs auth-workspace and document-service in Docker — useful for
-#   Dockerfile verification, integration tests, or reproducing CI locally.
+# Services profile:
+#   `docker compose --profile services up` — also builds and starts application
+#   containers. Useful for Dockerfile verification and reproducing CI locally.
 #   Application services are normally run natively (see docs/07-development/local-setup.md).
+#
+# Ports (host:container) — chosen to avoid conflicts with locally installed services:
+#   postgres  15432:5432
+#   redis     16379:6379
 
 networks:
   collabspace:
@@ -19,8 +21,7 @@ services:
 
   # ---------------------------------------------------------------------------
   # auth-workspace — Spring Boot 4 / Java 25
-  # Requires: nothing (walking skeleton — health endpoint only)
-  # Add: postgres, redis depends_on when service implementation begins (Stage 2)
+  # Requires: postgres, redis (Stage 2 — run natively against docker infra above)
   # ---------------------------------------------------------------------------
   auth-workspace:
     profiles: ["services"]
@@ -94,25 +95,24 @@ services:
   # Infrastructure services — uncomment incrementally as services need them
   # ---------------------------------------------------------------------------
 
-  # postgres:
-  #   image: pgvector/pgvector:pg16
-  #   restart: unless-stopped
-  #   environment:
-  #     POSTGRES_USER: ${POSTGRES_USER:-collabspace}
-  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collabspace_dev}
-  #     POSTGRES_DB: collabspace_auth
-  #   ports:
-  #     - "5432:5432"
-  #   volumes:
-  #     - postgres_data:/var/lib/postgresql/data
-  #     - ./infrastructure/local/postgres/init:/docker-entrypoint-initdb.d:ro
-  #   networks:
-  #     - collabspace
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collabspace}"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  postgres:
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-collabspace}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collabspace_dev}
+      POSTGRES_DB: auth_db
+    ports:
+      - "15432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - collabspace
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collabspace}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # mongo:
   #   image: mongo:7
@@ -133,20 +133,20 @@ services:
   #     timeout: 5s
   #     retries: 5
 
-  # redis:
-  #   image: redis:7-alpine
-  #   restart: unless-stopped
-  #   ports:
-  #     - "6379:6379"
-  #   volumes:
-  #     - redis_data:/data
-  #   networks:
-  #     - collabspace
-  #   healthcheck:
-  #     test: ["CMD", "redis-cli", "ping"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "16379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - collabspace
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
 
   # localstack:
   #   image: localstack/localstack:3
@@ -199,8 +199,8 @@ services:
 # ---------------------------------------------------------------------------
 # Named volumes — uncomment each when the corresponding service is activated
 # ---------------------------------------------------------------------------
-# volumes:
-#   postgres_data:
-#   mongo_data:
-#   redis_data:
-#   localstack_data:
+volumes:
+  postgres_data:
+  redis_data:
+  # mongo_data:
+  # localstack_data:
