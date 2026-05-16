@@ -10,6 +10,10 @@ terraform {
       source  = "hashicorp/archive"
       version = "~> 2.0"
     }
+    random = {
+      source  = "hashicorp/random"
+      version = "~> 3.0"
+    }
   }
 
   backend "s3" {
@@ -89,6 +93,121 @@ module "security_groups" {
   project_name = var.project_name
   environment  = var.environment
   vpc_id       = module.vpc.vpc_id
+}
+
+# ── RDS PostgreSQL ───────────────────────────────────────────────────────────────
+# Single db.t3.micro instance shared by auth-workspace (auth_db) and ai-assistant
+# (vector_db). Co-location keeps us within the single 750-hour free-tier allocation.
+# A second instance would cost ~$15/month. → docs/04-infrastructure/cost-strategy.md
+#
+# Private subnets only — no internet route to the database. The RDS security group
+# (already defined in the security-groups module) restricts inbound 5432 to the
+# ECS tasks security group. → ADR-009
+
+resource "random_password" "db_master" {
+  length  = 24
+  special = false # JDBC connection strings can misparse special chars in passwords
+}
+
+resource "aws_db_subnet_group" "main" {
+  name       = "${var.project_name}-${var.environment}"
+  subnet_ids = module.vpc.private_subnet_ids
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-db-subnet-group"
+  }
+}
+
+resource "aws_db_instance" "main" {
+  identifier = "${var.project_name}-${var.environment}"
+
+  engine         = "postgres"
+  engine_version = "16"
+  instance_class = "db.t3.micro"
+
+  allocated_storage = 20
+  storage_type      = "gp2"
+  storage_encrypted = true # always encrypt at rest, even in dev
+
+  db_name  = "auth_db"
+  username = "collabspace"
+  password = random_password.db_master.result
+
+  db_subnet_group_name   = aws_db_subnet_group.main.name
+  vpc_security_group_ids = [module.security_groups.rds_sg_id]
+
+  publicly_accessible = false
+  multi_az            = false # out of scope for dev → roadmap.md
+
+  backup_retention_period = 7   # AWS default; free within free tier storage
+  skip_final_snapshot     = true # dev environment; no value in a final snapshot
+  deletion_protection     = false
+
+  # Paid features — disabled to stay within $0-5/month budget
+  performance_insights_enabled = false
+  monitoring_interval          = 0
+
+  apply_immediately = true # dev: apply changes now, not at the next maintenance window
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-postgres"
+  }
+}
+
+# ── SSM parameters for RDS credentials ───────────────────────────────────────────
+# Stored under /collabspace/{env}/db/ — shared prefix because auth-workspace and
+# ai-assistant both connect to this same instance with these same credentials.
+# The ECS task execution role already has ssm:GetParameter on /collabspace/* so
+# no IAM changes are needed. → modules/iam-ecs/main.tf
+
+resource "aws_ssm_parameter" "db_host" {
+  name  = "/collabspace/${var.environment}/db/host"
+  type  = "String"
+  value = aws_db_instance.main.address
+
+  tags = {
+    Name = "/collabspace/${var.environment}/db/host"
+  }
+}
+
+resource "aws_ssm_parameter" "db_port" {
+  name  = "/collabspace/${var.environment}/db/port"
+  type  = "String"
+  value = "5432"
+
+  tags = {
+    Name = "/collabspace/${var.environment}/db/port"
+  }
+}
+
+resource "aws_ssm_parameter" "db_username" {
+  name  = "/collabspace/${var.environment}/db/username"
+  type  = "String"
+  value = aws_db_instance.main.username
+
+  tags = {
+    Name = "/collabspace/${var.environment}/db/username"
+  }
+}
+
+resource "aws_ssm_parameter" "db_password" {
+  name  = "/collabspace/${var.environment}/db/password"
+  type  = "SecureString"
+  value = random_password.db_master.result
+
+  tags = {
+    Name = "/collabspace/${var.environment}/db/password"
+  }
+}
+
+resource "aws_ssm_parameter" "db_name" {
+  name  = "/collabspace/${var.environment}/db/name"
+  type  = "String"
+  value = "auth_db"
+
+  tags = {
+    Name = "/collabspace/${var.environment}/db/name"
+  }
 }
 
 # ── ECS IAM roles ────────────────────────────────────────────────────────────────

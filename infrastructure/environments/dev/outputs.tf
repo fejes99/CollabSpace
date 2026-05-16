@@ -20,6 +20,13 @@ output "github_actions_role_arn" {
   value       = data.terraform_remote_state.shared.outputs.github_actions_role_arn
 }
 
+# ── RDS ───────────────────────────────────────────────────────────────────────
+
+output "rds_endpoint" {
+  description = "RDS PostgreSQL hostname (without port). Used in Spring datasource config via SSM."
+  value       = aws_db_instance.main.address
+}
+
 # ── VPC ───────────────────────────────────────────────────────────────────────
 
 output "vpc_id" {
