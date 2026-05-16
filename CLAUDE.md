@@ -29,6 +29,14 @@ For architecture, communication, and compute mix: [docs/02-architecture/system-o
 - Cite the relevant ADR when making non-trivial choices. If no ADR exists for a decision you're about to make, say so and offer to write one.
 - Idiomatic per language. Conventions live in [docs/07-development/coding-standards.md](docs/07-development/coding-standards.md).
 
+### Learning approach
+
+This is a tutor relationship, not a pair-programming session. The goal is professional habits and deep understanding, not fast output.
+
+- **Service code (Java, TypeScript, Python):** do not write implementation code unprompted. For each implementation phase, give a high-level sequence — what to think about and in what order, not code. Wait for the user to attempt it. When they share their implementation, review it as a senior engineer would: what is idiomatic, what is a smell, what would fail in production, and why. Reference `docs/07-development/coding-standards.md` for language-specific expectations.
+- **Stuck:** give a nudge — the next concrete step to try — not the solution. A nudge is "try injecting the Clock dependency and using it in the expiry check" not "here is the code." Only write implementation code if the user explicitly asks ("write this for me") or has made multiple failed attempts at the same specific problem.
+- **Infrastructure (Terraform, AWS, CI/CD, GitHub Actions):** full assistance. The user does not yet have the foundation to attempt-first here. Explain decisions as you make them.
+
 ### Secrets and config
 
 - Secrets: AWS SSM Parameter Store, path-referenced in code (never hardcoded). `.env` for local only (gitignored).

@@ -17,12 +17,10 @@ allowed-tools:
 Changed files: !`git diff HEAD --stat`
 Untracked files: !`git status --short`
 
-Full diff:
-!`git diff HEAD`
-
 ---
 
 From the snapshot, classify every changed and untracked file:
+
 - Type: `terraform-module` | `terraform-env` | `service` (note language) | `workflow` | `docs` | `config`
 - Change: `new` | `modified` | `deleted`
 
@@ -30,25 +28,26 @@ This classification drives every step below.
 
 ---
 
-## Phase 1 — Parallel reads
+## Phase 1 — Load
 
-Read all of the following simultaneously before touching any file.
+**Size check first.** If the stat above shows > 50 changed files or > 2000 lines: run `git diff HEAD` for non-generated files only (skip `package-lock.json`, `pnpm-lock.yaml`, `*.snap`, generated `*.d.ts`). Otherwise run `git diff HEAD` for the full diff.
 
 **Always read:**
+
 - `CLAUDE.md`
 - `README.md`
-- `infrastructure/README.md`
-- `infrastructure/environments/dev/README.md`
-- `.github/workflows/README.md`
-- `docs/07-development/commit-checklist.md`
 
-**Per changed file — read its module/service README if it exists:**
+**Conditional on classification:**
+
+- Any `terraform-module` or `terraform-env` changed → read `infrastructure/README.md`, `infrastructure/environments/dev/README.md`
+- Any `workflow` changed → read `.github/workflows/README.md`
 - `infrastructure/modules/<name>/*.tf` changed → read `infrastructure/modules/<name>/README.md`
 - `services/<name>/` changed → read `services/<name>/README.md`
 
 Note any module or service with no README — you will create one in Phase 3.
 
 **Read source files for every README you will audit:**
+
 - Changed Terraform module → `main.tf`, `variables.tf`, `outputs.tf`
 - Changed service → entry point and route/handler definitions
 - Changed workflow → the `.yml` file itself
@@ -59,9 +58,8 @@ Auditing a README without reading its source produces inaccurate output.
 
 ## Phase 2 — Gap analysis
 
-Before editing anything, enumerate what is stale, missing, or incorrect per file.
-
 **CLAUDE.md Layer 2**
+
 - `Current goal` — still accurate?
 - `Next milestone` — has this change completed part of it? Rewrite to show only what remains.
 - `Blocked on` — new blockers or resolved ones?
@@ -69,37 +67,44 @@ Before editing anything, enumerate what is stale, missing, or incorrect per file
 - `Layer 3 Pointers` — new file needs a pointer entry?
 
 **docs/CHANGELOG.md** — completed stage milestones live here, not in CLAUDE.md.
+
 - If this change completes a stage or a named milestone, add an entry at the top of CHANGELOG.md with the date and a one-paragraph summary of what landed.
 - Day-to-day in-progress work does NOT belong here — only completions.
 
 **Root README.md**
+
 - Status block: stage description and "currently live" sentence match reality?
 - Tech Stack table: any technology, version, or service changed?
 - Running the Project: any step now wrong?
 
-**infrastructure/README.md**
+**infrastructure/README.md** _(skip if no `terraform-module` or `terraform-env` files changed)_
+
 - Module table: every dir in `infrastructure/modules/` has a row linking to an existing README
 - Dev environment paragraph: matches actual current state of `environments/dev/`
 
-**infrastructure/environments/dev/README.md** — compare directly against `main.tf`:
+**infrastructure/environments/dev/README.md** _(skip if no `terraform-env` files changed)_ — compare directly against `main.tf`:
+
 - "What it creates": every `module` block has a row; Notes column in present tense — no "placeholder" or "when X is built" for things now built
 - "Not created here": remove things that now exist; add newly deferred items
 - Cost table: reflects current resources
 - "What comes next": actual next step given what this change accomplished
 
-**Module READMEs** (for every changed `infrastructure/modules/*/`)
+**Module READMEs** _(skip if no `terraform-module` files changed)_
+
 - "What it creates": every `resource` block present; removed resources removed
 - Inputs: every variable has a row; Type, Default, Description match `variables.tf`
 - Outputs: every output has a row
 - Usage example: syntactically valid and includes all required variables
 - New non-obvious decision (lifecycle block, specific flag, workaround) → "Why X?" paragraph
 
-**.github/workflows/README.md**
+**.github/workflows/README.md** _(skip if no `workflow` files changed)_
+
 - Every `.yml` in `.github/workflows/` is in the Active table
 - Planned → now implemented: move to Active, status `Live`
 - New planned workflows identified by this change: add to Planned table
 
 **Service READMEs** (for every changed service file)
+
 - README reflects what the service now does
 - New endpoint added → documented
 - First creation → no README yet; create one
@@ -108,17 +113,19 @@ Before editing anything, enumerate what is stale, missing, or incorrect per file
 
 ## Phase 3 — Edit
 
-Apply all updates from Phase 2 in this order:
+Apply only the updates identified in Phase 2, in this order:
+
 1. `CLAUDE.md`
 2. `docs/CHANGELOG.md` (only if a stage milestone landed)
 3. New READMEs for modules or services with none
 4. Module and service READMEs for changed code
-5. `infrastructure/environments/dev/README.md`
-6. `infrastructure/README.md`
+5. `infrastructure/environments/dev/README.md` (only if `terraform-env` changed)
+6. `infrastructure/README.md` (only if `terraform-module` or `terraform-env` changed)
 7. Root `README.md`
-8. `.github/workflows/README.md`
+8. `.github/workflows/README.md` (only if `workflow` changed)
 
 **Rules:**
+
 - `Edit` for existing files — change only what is wrong; do not rewrite correct sections
 - `Write` for new files only
 - No meta-commentary in docs ("Updated by Claude", "as of this change")
@@ -126,47 +133,60 @@ Apply all updates from Phase 2 in this order:
 - Present tense throughout: remove past-tense for done things, remove future-tense for things that now exist
 
 **New Terraform module README structure:**
+
 ```markdown
 # Module: <name>
+
 One-line description.
 
 ## What it creates
+
 | Resource | Purpose |
-|----------|---------|
+| -------- | ------- |
 
 ## Why <decision> (if applicable)
+
 <explanation of non-obvious behaviour>
 
 ## Usage
+
 \`\`\`hcl
 <minimal valid example including all required variables>
 \`\`\`
 
 ## Inputs
+
 | Name | Type | Default | Description |
-|------|------|---------|-------------|
+| ---- | ---- | ------- | ----------- |
 
 ## Outputs
+
 | Name | Description |
-|------|-------------|
+| ---- | ----------- |
 ```
 
 **New service README structure:**
+
 ```markdown
 # <Service Name>
+
 One-paragraph description of what this service does and its role in the system.
 
 ## Running locally
+
 <commands>
 
 ## Environment variables
+
 | Name | Required | Description |
-|------|----------|-------------|
+| ---- | -------- | ----------- |
 
 ## API
+
 <endpoint list or link to OpenAPI spec>
 
 ## Testing
+
 <how to run tests>
 ```
 
@@ -175,31 +195,42 @@ One-paragraph description of what this service does and its role in the system.
 ## Phase 4 — Verify
 
 Run `git diff --stat` and confirm:
+
 - Modified files match the intended edits from Phase 2
 - No source files (`.tf`, `.java`, `.ts`, `.py`, `.yml`) appear in the diff
 
 If a source file appears in the diff: run `git checkout -- <file>` immediately — this skill modifies documentation only.
+
+For each README that was edited, re-read the changed section and verify it is consistent with the source file that drove the change (e.g. the inputs table matches `variables.tf`, the endpoint list matches the route definitions). A doc can be edited incorrectly and the stat check won't catch it.
 
 ---
 
 ## Output
 
 ---
+
 ### Documentation updated
+
 **[filepath]**
+
 - [what was stale or missing]
 - [what was changed]
 
 ### New files created
+
 [filepath — one-line description, or "None"]
 
 ### Checked and already current
+
 [list or "None"]
 
 ### Needs your input
-[Items that cannot be updated without your context — be specific. Or "None."]
+
+[Items that cannot be determined from the code alone — e.g. whether a cost table row should be added for a resource whose pricing depends on usage, whether a milestone counts as "stage complete" for CHANGELOG.md, or whether a deferred item should move to "not created here." Be specific about what decision is needed. Or "None."]
 
 ### Next step
+
 Run `/pre-commit` — documentation is current.
 [Or: Resolve items under "Needs your input" first.]
+
 ---
