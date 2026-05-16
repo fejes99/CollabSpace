@@ -20,7 +20,7 @@ Not all changes carry the same risk. A typo fix should not require a planning do
 | Tier      | When it applies                                                                                      | Plan doc                                                        | Test requirements                     | Retrospect |
 | --------- | ---------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- | ------------------------------------- | ---------- |
 | **Full**  | Schema change, new dependency, >1 endpoint, ADR-worthy decision, anything auth- or security-touching | Full template (9 sections)                                      | Integration test + edge case tests    | Yes        |
-| **Small** | One endpoint, no schema change, no new dependency, no ADR-worthy choice                              | Compressed template (API contract + validation + observability) | Happy-path integration + 2 edge cases | Optional   |
+| **Small** | One endpoint, no schema change, no new dependency, no ADR-worthy choice                              | Six-section template (slice statement + user-visible behavior + API contract + validation + observability + out of scope) | Happy-path integration + 2 edge cases | Optional   |
 | **Fast**  | Typo, dep bump, doc edit, single-line CI tweak, log-level change, README polish                      | None                                                            | Existing CI lint and tests must pass  | None       |
 
 The PR title carries the tier as a prefix: `[full]`, `[small]`, `[fast]`. CI does not enforce it — it is a self-discipline signal and a review hint.
@@ -89,9 +89,9 @@ Why draft early? CI feedback is most valuable when the change is smallest. A typ
 
 ### Phase 3 — Happy path
 
-Wire the happy path end-to-end. One request comes in, hits the controller, goes through the service, talks to the repository, returns a response.
+Write **one integration test** that exercises the happy path against a real database (Testcontainers — see [testing-strategy.md](testing-strategy.md)). Run it — it should fail. Your stubs compile but have no logic yet; a failing test is the correct state.
 
-Write **one integration test** that exercises this path against a real database (Testcontainers — see [testing-strategy.md](testing-strategy.md)). Get it green.
+Wire the happy path end-to-end: one request in, hits the controller, goes through the service, talks to the repository, returns a response. Run the test again — get it green.
 
 Manually smoke-test with curl. Save the curl command — it goes into the PR description as the manual test plan.
 
@@ -148,12 +148,12 @@ It proposes memory entries, ADR drafts, and doc updates. Each one requires expli
 
 For one-endpoint changes with no schema change and no new dependency.
 
-1. **Plan** — compressed template (API contract + validation + observability only). No adversarial review required unless authorization is involved.
+1. **Slice and plan** — run `/plan-feature <service> <slug>`. For Small, the skill walks the slice step plus six plan sections (slice statement + user-visible behavior + API contract + validation + observability + out of scope) and runs adversarial review. Adversarial review is not optional.
 2. **Branch and wire** — branch off main, implement, test happy path + 2 edge cases.
 3. **Polish** — pre-commit checklist; update OpenAPI; update README if needed.
 4. **Deploy and verify** — squash-merge, watch CI, curl AWS.
 
-No Phase 0 (the feature is already small), Phase 7 is optional. One day max. If it grows beyond one day, promote it to Full and write the missing artifacts.
+Phase 7 is optional. One day max. If it grows beyond one day, promote it to Full and write the missing artifacts.
 
 ---
 
@@ -290,12 +290,12 @@ Treat this as a hard gate. If any item is incomplete, the feature is not done �
 | Skill            | Phase         | Purpose                                                     |
 | ---------------- | ------------- | ----------------------------------------------------------- |
 | `/start-session` | Session start | Orient to project state before any work                     |
-| `/plan-feature`  | Phase 1       | Interactive plan drafting + adversarial review              |
+| `/plan-feature`  | Phase 1 / Small step 1 | Interactive plan drafting + adversarial review              |
 | `/pre-commit`    | Phase 5       | Walk the per-commit checklist                               |
 | `/update-docs`   | Phase 5 / 6   | Sync READMEs, CLAUDE.md, ADR list with changes              |
 | `/retrospect`    | Phase 7       | Reflect on what was learned; propose memory and doc updates |
 
-`/start-session` always precedes `/plan-feature`. `/plan-feature` refuses to run if it cannot detect a recent session start.
+`/start-session` always precedes `/plan-feature`.
 
 ---
 
