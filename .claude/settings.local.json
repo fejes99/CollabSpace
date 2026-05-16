@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git check-ignore *)",
+      "WebFetch(domain:api.github.com)",
+      "Bash(terraform init *)",
+      "Bash(terraform plan *)"
+    ]
+  }
+}
