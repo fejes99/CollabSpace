@@ -73,7 +73,7 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Authorization: [docs/02-architecture/authorization.md](docs/02-architecture/authorization.md)
 - API conventions: [docs/02-architecture/api-conventions.md](docs/02-architecture/api-conventions.md)
 - API Gateway trust model: [docs/02-architecture/api-gateway-trust.md](docs/02-architecture/api-gateway-trust.md)
-- All ADRs: [docs/06-decisions/](docs/06-decisions/) (conventions in [docs/06-decisions/README.md](docs/06-decisions/README.md))
+- All ADRs: [docs/06-decisions/](docs/06-decisions/README.md) (conventions in [docs/06-decisions/README.md](docs/06-decisions/README.md))
 
 **Scope and roadmap**
 
