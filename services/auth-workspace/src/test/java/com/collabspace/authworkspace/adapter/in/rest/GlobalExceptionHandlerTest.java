@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace;
+package com.collabspace.authworkspace.adapter.in.rest;
 
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
