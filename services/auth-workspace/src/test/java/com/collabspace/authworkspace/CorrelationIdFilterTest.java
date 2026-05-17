@@ -24,71 +24,68 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @TestPropertySource(properties = "logging.level.com.collabspace.authworkspace=DEBUG")
 class CorrelationIdFilterTest {
 
-    @Autowired
-    MockMvc mvc;
+	private final ListAppender<ILoggingEvent> loggingList = new ListAppender<>();
 
-    private final ListAppender<ILoggingEvent> loggingList = new ListAppender<>();
-    private Logger rootLogger;
+	@Autowired
+	MockMvc mvc;
 
-    @BeforeEach
-    void setUp() {
-        rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
-        loggingList.start();
-        rootLogger.addAppender(loggingList);
-    }
+	private Logger rootLogger;
 
-    @AfterEach
-    void tearDown() {
-        rootLogger.detachAppender(loggingList);
-        loggingList.stop();
-    }
+	@BeforeEach
+	void setUp() {
+		rootLogger = (Logger) LoggerFactory.getLogger(Logger.ROOT_LOGGER_NAME);
+		loggingList.start();
+		rootLogger.addAppender(loggingList);
+	}
 
-    @Test
-    void requestWithoutHeader() throws Exception {
-        var result = mvc.perform(get("/actuator/health"))
-                .andExpect(header().exists("X-Correlation-ID"))
-                .andReturn();
+	@AfterEach
+	void tearDown() {
+		rootLogger.detachAppender(loggingList);
+		loggingList.stop();
+	}
 
-        String correlationId = result.getResponse().getHeader("X-Correlation-ID");
+	@Test
+	void requestWithoutHeader() throws Exception {
+		var result = mvc.perform(get("/actuator/health")).andExpect(header().exists("X-Correlation-ID")).andReturn();
 
-        assertThat(correlationId)
-                .matches("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
-        assertThat(loggingList.list)
-                .anyMatch(e -> Objects.equals(correlationId, e.getMDCPropertyMap().get("correlationId")));
-    }
+		String correlationId = result.getResponse().getHeader("X-Correlation-ID");
 
-    @Test
-    void requestWithHeader() throws Exception {
-        mvc.perform(get("/actuator/health").header("X-Correlation-ID", "test-correlation-id"))
-                .andExpect(header().string("X-Correlation-ID", "test-correlation-id"));
+		assertThat(correlationId).matches("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+		assertThat(loggingList.list)
+			.anyMatch(e -> Objects.equals(correlationId, e.getMDCPropertyMap().get("correlationId")));
+	}
 
-        assertThat(loggingList.list)
-                .anyMatch(e -> "test-correlation-id".equals(e.getMDCPropertyMap().get("correlationId")));
-    }
+	@Test
+	void requestWithHeader() throws Exception {
+		mvc.perform(get("/actuator/health").header("X-Correlation-ID", "test-correlation-id"))
+			.andExpect(header().string("X-Correlation-ID", "test-correlation-id"));
 
-    @Test
-    void requestWithEmptyHeader() throws Exception {
-        var result = mvc.perform(get("/actuator/health").header("X-Correlation-ID", ""))
-                .andExpect(header().exists("X-Correlation-ID"))
-                .andReturn();
+		assertThat(loggingList.list)
+			.anyMatch(e -> "test-correlation-id".equals(e.getMDCPropertyMap().get("correlationId")));
+	}
 
-        String correlationId = result.getResponse().getHeader("X-Correlation-ID");
+	@Test
+	void requestWithEmptyHeader() throws Exception {
+		var result = mvc.perform(get("/actuator/health").header("X-Correlation-ID", ""))
+			.andExpect(header().exists("X-Correlation-ID"))
+			.andReturn();
 
-        assertThat(correlationId)
-                .matches("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
-        assertThat(loggingList.list)
-                .anyMatch(e -> Objects.equals(correlationId, e.getMDCPropertyMap().get("correlationId")));
-    }
+		String correlationId = result.getResponse().getHeader("X-Correlation-ID");
 
-    @Test
-    void requestWithOversizedHeader() throws Exception {
-        String oversizedId = "a".repeat(100);
-        String expectedId = oversizedId.substring(0, 64);
+		assertThat(correlationId).matches("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+		assertThat(loggingList.list)
+			.anyMatch(e -> Objects.equals(correlationId, e.getMDCPropertyMap().get("correlationId")));
+	}
 
-        mvc.perform(get("/actuator/health").header("X-Correlation-ID", oversizedId))
-                .andExpect(header().string("X-Correlation-ID", expectedId));
+	@Test
+	void requestWithOversizedHeader() throws Exception {
+		String oversizedId = "a".repeat(100);
+		String expectedId = oversizedId.substring(0, 64);
 
-        assertThat(loggingList.list)
-                .anyMatch(e -> expectedId.equals(e.getMDCPropertyMap().get("correlationId")));
-    }
+		mvc.perform(get("/actuator/health").header("X-Correlation-ID", oversizedId))
+			.andExpect(header().string("X-Correlation-ID", expectedId));
+
+		assertThat(loggingList.list).anyMatch(e -> expectedId.equals(e.getMDCPropertyMap().get("correlationId")));
+	}
+
 }
