@@ -24,9 +24,17 @@ resource "aws_service_discovery_service" "this" {
   dns_config {
     namespace_id = var.cloud_map_namespace_id
 
+    # A record: registers the task IP for standard DNS resolution.
+    # SRV record: registers IP + container port so API Gateway VPC Link
+    # integration knows which port to connect to (defaults to 80 without it).
     dns_records {
       ttl  = 10
       type = "A"
+    }
+
+    dns_records {
+      ttl  = 10
+      type = "SRV"
     }
 
     routing_policy = "MULTIVALUE"
@@ -134,8 +142,13 @@ resource "aws_ecs_service" "service" {
     assign_public_ip = true
   }
 
+  # container_name and container_port: required when using SRV records.
+  # ECS uses these to register the task's IP:port in Cloud Map so the API
+  # Gateway VPC Link integration can connect to the correct container port.
   service_registries {
-    registry_arn = aws_service_discovery_service.this.arn
+    registry_arn   = aws_service_discovery_service.this.arn
+    container_name = var.service_name
+    container_port = var.container_port
   }
 
   deployment_minimum_healthy_percent = var.deployment_minimum_healthy_percent
