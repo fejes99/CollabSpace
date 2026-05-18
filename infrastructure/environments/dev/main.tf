@@ -39,23 +39,7 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
-# Read outputs published by infrastructure/shared/.
-# See docs/06-decisions/adr-008-cross-root-module-state-sharing.md
-data "terraform_remote_state" "shared" {
-  backend = "s3"
-
-  config = {
-    bucket = "collabspace-terraform-state-440808375671"
-    key    = "shared/terraform.tfstate"
-    region = "eu-central-1"
-  }
-}
-
-# ── Service sets ────────────────────────────────────────────────────────────────
-#
-# ecs_services: the four long-running containers managed by ECS Fargate.
-# all_services: adds the Lambda notification service, which needs a log group
-#               but not an ECS task role.
+# ── Service sets ─────────────────────────────────────────────────────────────
 
 locals {
   ecs_services = toset([
@@ -66,12 +50,16 @@ locals {
   ])
 
   all_services = toset(concat(tolist(local.ecs_services), ["notification"]))
+
+  # JWT configuration — fixed per environment. The issuer is a stable string
+  # that does not change across dev-down/dev-up cycles. See ADR-026.
+  jwt_issuer   = "https://auth.dev.collabspace.io"
+  jwt_audience = "collabspace-api"
 }
 
-# ── VPC ─────────────────────────────────────────────────────────────────────────
-# ADR-009: ECS tasks run in public subnets (no NAT Gateway) for cost reasons.
-# ADR-010: Two AZs in dev; the module accepts a list so a third can be added
-#          by changing only the variable values below.
+# ── VPC ──────────────────────────────────────────────────────────────────────
+# ADR-009: ECS tasks in public subnets (no NAT Gateway).
+# ADR-010: Two AZs in dev.
 
 module "vpc" {
   source = "../../modules/vpc"
@@ -85,7 +73,7 @@ module "vpc" {
   private_subnet_cidrs = ["10.0.11.0/24", "10.0.12.0/24"]
 }
 
-# ── Security groups ──────────────────────────────────────────────────────────────
+# ── Security groups ───────────────────────────────────────────────────────────
 
 module "security_groups" {
   source = "../../modules/security-groups"
@@ -95,18 +83,13 @@ module "security_groups" {
   vpc_id       = module.vpc.vpc_id
 }
 
-# ── RDS PostgreSQL ───────────────────────────────────────────────────────────────
-# Single db.t3.micro instance shared by auth-workspace (auth_db) and ai-assistant
-# (vector_db). Co-location keeps us within the single 750-hour free-tier allocation.
-# A second instance would cost ~$15/month. → docs/04-infrastructure/cost-strategy.md
-#
-# Private subnets only — no internet route to the database. The RDS security group
-# (already defined in the security-groups module) restricts inbound 5432 to the
-# ECS tasks security group. → ADR-009
+# ── RDS PostgreSQL ────────────────────────────────────────────────────────────
+# Single db.t3.micro shared by auth-workspace (auth_db) and ai-assistant
+# (vector_db). See docs/04-infrastructure/cost-strategy.md.
 
 resource "random_password" "db_master" {
   length  = 24
-  special = false # JDBC connection strings can misparse special chars in passwords
+  special = false
 }
 
 resource "aws_db_subnet_group" "main" {
@@ -127,7 +110,7 @@ resource "aws_db_instance" "main" {
 
   allocated_storage = 20
   storage_type      = "gp2"
-  storage_encrypted = true # always encrypt at rest, even in dev
+  storage_encrypted = true
 
   db_name  = "auth_db"
   username = "collabspace"
@@ -137,80 +120,96 @@ resource "aws_db_instance" "main" {
   vpc_security_group_ids = [module.security_groups.rds_sg_id]
 
   publicly_accessible = false
-  multi_az            = false # out of scope for dev → roadmap.md
+  multi_az            = false
 
-  backup_retention_period = 7   # AWS default; free within free tier storage
-  skip_final_snapshot     = true # dev environment; no value in a final snapshot
-  deletion_protection     = false
-
-  # Paid features — disabled to stay within $0-5/month budget
+  backup_retention_period      = 7
+  skip_final_snapshot          = true
+  deletion_protection          = false
   performance_insights_enabled = false
   monitoring_interval          = 0
 
-  apply_immediately = true # dev: apply changes now, not at the next maintenance window
+  apply_immediately = true
 
   tags = {
     Name = "${var.project_name}-${var.environment}-postgres"
   }
 }
 
-# ── SSM parameters for RDS credentials ───────────────────────────────────────────
-# Stored under /collabspace/{env}/db/ — shared prefix because auth-workspace and
-# ai-assistant both connect to this same instance with these same credentials.
-# The ECS task execution role already has ssm:GetParameter on /collabspace/* so
-# no IAM changes are needed. → modules/iam-ecs/main.tf
+# ── SSM parameters — RDS credentials ─────────────────────────────────────────
 
 resource "aws_ssm_parameter" "db_host" {
   name  = "/collabspace/${var.environment}/db/host"
   type  = "String"
   value = aws_db_instance.main.address
-
-  tags = {
-    Name = "/collabspace/${var.environment}/db/host"
-  }
+  tags  = { Name = "/collabspace/${var.environment}/db/host" }
 }
 
 resource "aws_ssm_parameter" "db_port" {
   name  = "/collabspace/${var.environment}/db/port"
   type  = "String"
   value = "5432"
-
-  tags = {
-    Name = "/collabspace/${var.environment}/db/port"
-  }
+  tags  = { Name = "/collabspace/${var.environment}/db/port" }
 }
 
 resource "aws_ssm_parameter" "db_username" {
   name  = "/collabspace/${var.environment}/db/username"
   type  = "String"
   value = aws_db_instance.main.username
-
-  tags = {
-    Name = "/collabspace/${var.environment}/db/username"
-  }
+  tags  = { Name = "/collabspace/${var.environment}/db/username" }
 }
 
 resource "aws_ssm_parameter" "db_password" {
   name  = "/collabspace/${var.environment}/db/password"
   type  = "SecureString"
   value = random_password.db_master.result
-
-  tags = {
-    Name = "/collabspace/${var.environment}/db/password"
-  }
+  tags  = { Name = "/collabspace/${var.environment}/db/password" }
 }
 
 resource "aws_ssm_parameter" "db_name" {
   name  = "/collabspace/${var.environment}/db/name"
   type  = "String"
   value = "auth_db"
-
-  tags = {
-    Name = "/collabspace/${var.environment}/db/name"
-  }
+  tags  = { Name = "/collabspace/${var.environment}/db/name" }
 }
 
-# ── ECS IAM roles ────────────────────────────────────────────────────────────────
+# ── SSM parameters — API Gateway auth ────────────────────────────────────────
+#
+# jwt_issuer: auth-workspace reads this at startup and sets it as the `iss`
+# claim in every JWT it issues. The value matches the JWT Authorizer config on
+# API Gateway so tokens round-trip correctly.
+#
+# internal_token: the shared secret API Gateway injects as X-Internal-Token on
+# every forwarded request. Services read this at startup and validate the header
+# on every request. random_password generates a 32-char alphanumeric value —
+# no special characters so it is safe as an HTTP header value.
+
+resource "random_password" "internal_token" {
+  length  = 32
+  special = false
+}
+
+resource "aws_ssm_parameter" "jwt_issuer" {
+  name  = "/collabspace/${var.environment}/jwt/issuer"
+  type  = "String"
+  value = local.jwt_issuer
+  tags  = { Name = "/collabspace/${var.environment}/jwt/issuer" }
+}
+
+resource "aws_ssm_parameter" "jwt_audience" {
+  name  = "/collabspace/${var.environment}/jwt/audience"
+  type  = "String"
+  value = local.jwt_audience
+  tags  = { Name = "/collabspace/${var.environment}/jwt/audience" }
+}
+
+resource "aws_ssm_parameter" "internal_token" {
+  name  = "/collabspace/${var.environment}/api/internal-token"
+  type  = "SecureString"
+  value = random_password.internal_token.result
+  tags  = { Name = "/collabspace/${var.environment}/api/internal-token" }
+}
+
+# ── ECS IAM roles ─────────────────────────────────────────────────────────────
 
 module "iam_ecs" {
   source = "../../modules/iam-ecs"
@@ -222,7 +221,7 @@ module "iam_ecs" {
   aws_account_id = data.aws_caller_identity.current.account_id
 }
 
-# ── CloudWatch log groups ────────────────────────────────────────────────────────
+# ── CloudWatch log groups ──────────────────────────────────────────────────────
 
 module "cloudwatch" {
   source = "../../modules/cloudwatch"
@@ -233,9 +232,8 @@ module "cloudwatch" {
   log_retention_days = var.log_retention_days
 }
 
-# ── ECS cluster ──────────────────────────────────────────────────────────────────
-# ADR-011: Container Insights is disabled in dev to stay within the $0-5/month
-# budget. Enable in staging/prod where per-task metrics have operational value.
+# ── ECS cluster ───────────────────────────────────────────────────────────────
+# ADR-011: Container Insights disabled in dev.
 
 module "ecs_cluster" {
   source = "../../modules/ecs-cluster"
@@ -245,27 +243,57 @@ module "ecs_cluster" {
   enable_container_insights = false
 }
 
-# ── Application Load Balancer ────────────────────────────────────────────────────
-# The ALB is shared across all services. Each service attaches its own target
-# group and listener rule via the ecs-service module. The ALB module itself has
-# no knowledge of which services exist. See ADR-012.
+# ── Cloud Map namespace ───────────────────────────────────────────────────────
+#
+# A private DNS namespace scoped to this VPC. Each ECS service registers a
+# Cloud Map service under this namespace. API Gateway resolves live task IPs
+# via the VPC Link by querying these Cloud Map services.
+#
+# "collabspace.local" is a private DNS name — it does not resolve from the
+# public internet and requires no Route 53 hosted zone purchase.
 
-module "alb" {
-  source = "../../modules/alb"
+resource "aws_service_discovery_private_dns_namespace" "main" {
+  name = "collabspace.local"
+  vpc  = module.vpc.vpc_id
 
-  project_name      = var.project_name
-  environment       = var.environment
-  vpc_id            = module.vpc.vpc_id
-  public_subnet_ids = module.vpc.public_subnet_ids
-  alb_sg_id         = module.security_groups.alb_sg_id
+  tags = {
+    Name = "${var.project_name}-${var.environment}-namespace"
+  }
 }
 
-# ── auth-workspace ECS service ───────────────────────────────────────────────────
-# Walking skeleton: one task, minimum CPU/memory, catches all traffic (/*).
-# The image tag :skeleton is a placeholder. The CI/CD pipeline will push the
-# real image and register a new task definition revision on first deploy.
-# ECR tags are immutable — :skeleton is used instead of :latest so that the
-# pipeline can push a proper SHA-tagged image without tag collisions.
+# ── API Gateway HTTP API ──────────────────────────────────────────────────────
+# ADR-026: Replaces the walking-skeleton ALB as the REST entry point.
+# The module creates the HTTP API, VPC Link, JWT Authorizer, and default stage.
+# Integrations and routes are defined per-service below.
+
+module "api_gateway" {
+  source = "../../modules/api-gateway"
+
+  project_name   = var.project_name
+  environment    = var.environment
+  vpc_link_sg_id = module.security_groups.vpc_link_sg_id
+  subnet_ids     = module.vpc.public_subnet_ids
+  internal_token = random_password.internal_token.result
+}
+
+# ── SSM parameter — JWKS URI ──────────────────────────────────────────────────
+#
+# auth-workspace serves GET /.well-known/jwks.json. The JWT Authorizer on API
+# Gateway fetches signing keys from this URL. The URL is derived from the API
+# Gateway endpoint — it changes on each dev-down/dev-up, but Terraform always
+# writes the current value here after API Gateway is created.
+#
+# auth-workspace reads this parameter at startup so it can populate the `iss`
+# field correctly in OpenAPI docs and any internal JWKS references.
+
+resource "aws_ssm_parameter" "jwks_uri" {
+  name  = "/collabspace/${var.environment}/jwt/jwks-uri"
+  type  = "String"
+  value = module.api_gateway.jwks_uri
+  tags  = { Name = "/collabspace/${var.environment}/jwt/jwks-uri" }
+}
+
+# ── auth-workspace ────────────────────────────────────────────────────────────
 
 module "auth_workspace" {
   source = "../../modules/ecs-service"
@@ -285,28 +313,90 @@ module "auth_workspace" {
   task_execution_role_arn = module.iam_ecs.task_execution_role_arn
   task_role_arn           = module.iam_ecs.task_role_arns["auth-workspace"]
 
-  vpc_id             = module.vpc.vpc_id
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.security_groups.ecs_tasks_sg_id]
+  subnet_ids             = module.vpc.public_subnet_ids
+  security_group_ids     = [module.security_groups.ecs_tasks_sg_id]
+  cloud_map_namespace_id = aws_service_discovery_private_dns_namespace.main.id
 
-  listener_arn           = module.alb.listener_arn
-  path_patterns          = ["/*"]
-  listener_rule_priority = 100
-
-  health_check_path = "/actuator/health"
-  log_group_name    = module.cloudwatch.log_group_names["auth-workspace"]
-  aws_region        = var.aws_region
+  log_group_name = module.cloudwatch.log_group_names["auth-workspace"]
+  aws_region     = var.aws_region
 
   environment_variables = {
     SPRING_PROFILES_ACTIVE = var.environment
   }
 }
 
-# ── realtime-service ECS service ─────────────────────────────────────────────
-# Walking skeleton: one task, minimum CPU/memory, reachable at /realtime/*.
-# Priority 40 — more specific than document-service's /documents/* at 50.
-# The image tag :skeleton is a one-time bootstrap placeholder. CI/CD manages
-# image updates via service-realtime.yml after the first deploy.
+# auth-workspace API Gateway integration
+# VPC_LINK + Cloud Map: API Gateway routes through the VPC Link to live task
+# IPs registered in Cloud Map. integration_uri is the Cloud Map service ARN.
+#
+# request_parameters:
+#   X-Internal-Token: injected from the stage variable so services can verify
+#     the request arrived through API Gateway. See api-gateway-trust.md.
+#   X-Correlation-ID: injected from $context.requestId — a unique ID API
+#     Gateway assigns to every request. The CorrelationIdFilter in Spring picks
+#     this up and adds it to MDC for structured log correlation.
+
+resource "aws_apigatewayv2_integration" "auth_workspace" {
+  api_id             = module.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.auth_workspace.cloud_map_service_arn
+  connection_type    = "VPC_LINK"
+  connection_id      = module.api_gateway.vpc_link_id
+
+  request_parameters = {
+    "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id" = "$context.requestId"
+  }
+}
+
+# Public routes — no JWT Authorizer. These must be reachable without a token:
+#   /auth/register, /auth/login: the client does not have a JWT yet.
+#   /.well-known/jwks.json: the JWT Authorizer itself fetches from this URL.
+#   /actuator/health: ALB and monitoring probes; must not require auth.
+
+resource "aws_apigatewayv2_route" "auth_register" {
+  api_id    = module.api_gateway.api_id
+  route_key = "POST /auth/register"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_login" {
+  api_id    = module.api_gateway.api_id
+  route_key = "POST /auth/login"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_jwks" {
+  api_id    = module.api_gateway.api_id
+  route_key = "GET /.well-known/jwks.json"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_health" {
+  api_id    = module.api_gateway.api_id
+  route_key = "GET /actuator/health"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+# Protected routes — JWT required. Any request without a valid token is
+# rejected by the JWT Authorizer with 401 before reaching the service.
+
+resource "aws_apigatewayv2_route" "auth_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /auth/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+resource "aws_apigatewayv2_route" "workspaces_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /workspaces/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+# ── realtime-service ──────────────────────────────────────────────────────────
+# Walking skeleton on ECS Fargate. Will migrate to EC2 + WebSocket ALB when
+# realtime-service development begins. See ADR-020 and ADR-026.
 
 module "realtime_service" {
   source = "../../modules/ecs-service"
@@ -326,17 +416,12 @@ module "realtime_service" {
   task_execution_role_arn = module.iam_ecs.task_execution_role_arn
   task_role_arn           = module.iam_ecs.task_role_arns["realtime-service"]
 
-  vpc_id             = module.vpc.vpc_id
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.security_groups.ecs_tasks_sg_id]
+  subnet_ids             = module.vpc.public_subnet_ids
+  security_group_ids     = [module.security_groups.ecs_tasks_sg_id]
+  cloud_map_namespace_id = aws_service_discovery_private_dns_namespace.main.id
 
-  listener_arn           = module.alb.listener_arn
-  path_patterns          = ["/realtime", "/realtime/*"]
-  listener_rule_priority = 40
-
-  health_check_path = "/health"
-  log_group_name    = module.cloudwatch.log_group_names["realtime-service"]
-  aws_region        = var.aws_region
+  log_group_name = module.cloudwatch.log_group_names["realtime-service"]
+  aws_region     = var.aws_region
 
   environment_variables = {
     NODE_ENV  = "production"
@@ -344,11 +429,27 @@ module "realtime_service" {
   }
 }
 
-# ── ai-assistant ECS service ─────────────────────────────────────────────────
-# Walking skeleton: one task, minimum CPU/memory, reachable at /assistant/*.
-# Priority 30 — more specific than realtime-service's /realtime/* at 40.
-# The image tag :skeleton is a one-time bootstrap placeholder. CI/CD manages
-# image updates via service-ai.yml after the first deploy.
+resource "aws_apigatewayv2_integration" "realtime_service" {
+  api_id             = module.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.realtime_service.cloud_map_service_arn
+  connection_type    = "VPC_LINK"
+  connection_id      = module.api_gateway.vpc_link_id
+
+  request_parameters = {
+    "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id" = "$context.requestId"
+  }
+}
+
+resource "aws_apigatewayv2_route" "realtime_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /realtime/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
+}
+
+# ── ai-assistant ──────────────────────────────────────────────────────────────
 
 module "ai_assistant" {
   source = "../../modules/ecs-service"
@@ -368,17 +469,12 @@ module "ai_assistant" {
   task_execution_role_arn = module.iam_ecs.task_execution_role_arn
   task_role_arn           = module.iam_ecs.task_role_arns["ai-assistant"]
 
-  vpc_id             = module.vpc.vpc_id
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.security_groups.ecs_tasks_sg_id]
+  subnet_ids             = module.vpc.public_subnet_ids
+  security_group_ids     = [module.security_groups.ecs_tasks_sg_id]
+  cloud_map_namespace_id = aws_service_discovery_private_dns_namespace.main.id
 
-  listener_arn           = module.alb.listener_arn
-  path_patterns          = ["/assistant", "/assistant/*"]
-  listener_rule_priority = 30
-
-  health_check_path = "/health"
-  log_group_name    = module.cloudwatch.log_group_names["ai-assistant"]
-  aws_region        = var.aws_region
+  log_group_name = module.cloudwatch.log_group_names["ai-assistant"]
+  aws_region     = var.aws_region
 
   environment_variables = {
     ENVIRONMENT = "production"
@@ -386,13 +482,31 @@ module "ai_assistant" {
   }
 }
 
-# ── notification Lambda ───────────────────────────────────────────────────────
-# Walking skeleton: one Lambda function reachable at /notifications/health via
-# ALB. Priority 20 — more specific than realtime-service's /realtime/* at 40.
-# On first apply, Terraform creates the function with a bootstrap placeholder
-# ZIP. The CI/CD pipeline (service-notification.yml) replaces it on first deploy.
-# Subsequent Terraform applies will not revert CI-deployed code (ignore_changes
-# on filename and source_code_hash — see lambda-function module README).
+resource "aws_apigatewayv2_integration" "ai_assistant" {
+  api_id             = module.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.ai_assistant.cloud_map_service_arn
+  connection_type    = "VPC_LINK"
+  connection_id      = module.api_gateway.vpc_link_id
+
+  request_parameters = {
+    "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id" = "$context.requestId"
+  }
+}
+
+resource "aws_apigatewayv2_route" "assistant_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /assistant/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
+}
+
+# ── notification Lambda ────────────────────────────────────────────────────────
+# Lambda functions are invoked directly by API Gateway — no VPC Link needed.
+# integration_type = "AWS_PROXY" passes the full HTTP event to the function.
+# payload_format_version = "2.0" is the modern format; it populates the Lambda
+# event with headers, queryStringParameters, and body in a structured object.
 
 module "notification" {
   source = "../../modules/lambda-function"
@@ -401,19 +515,47 @@ module "notification" {
   environment  = var.environment
   service_name = "notification"
 
-  listener_arn           = module.alb.listener_arn
-  path_patterns          = ["/notifications", "/notifications/*"]
-  listener_rule_priority = 20
-
-  health_check_path = "/notifications/health"
-  log_group_name    = module.cloudwatch.log_group_names["notification"]
+  log_group_name = module.cloudwatch.log_group_names["notification"]
 }
 
-# ── document-service ECS service ─────────────────────────────────────────────
-# Walking skeleton: one task, minimum CPU/memory, reachable at /documents/*.
-# Priority 50 — more specific than auth-workspace's /* catch-all at 100.
-# The image tag :skeleton is a one-time bootstrap placeholder. CI/CD manages
-# image updates via service-document.yml after the first deploy.
+# API Gateway must be granted permission to invoke the Lambda. source_arn
+# scopes the permission to this specific API — no other API Gateway in the
+# account can invoke this function.
+
+resource "aws_lambda_permission" "api_gateway_notification" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = module.notification.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_gateway.api_execution_arn}/*/*"
+}
+
+resource "aws_apigatewayv2_integration" "notification" {
+  api_id                 = module.api_gateway.api_id
+  integration_type       = "AWS_PROXY"
+  integration_uri        = module.notification.invoke_arn
+  integration_method     = "POST"
+  payload_format_version = "2.0"
+
+  request_parameters = {
+    "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id" = "$context.requestId"
+  }
+}
+
+resource "aws_apigatewayv2_route" "notifications_health" {
+  api_id    = module.api_gateway.api_id
+  route_key = "GET /notifications/health"
+  target    = "integrations/${aws_apigatewayv2_integration.notification.id}"
+}
+
+resource "aws_apigatewayv2_route" "notifications_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /notifications/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
+}
+
+# ── document-service ──────────────────────────────────────────────────────────
 
 module "document_service" {
   source = "../../modules/ecs-service"
@@ -433,20 +575,48 @@ module "document_service" {
   task_execution_role_arn = module.iam_ecs.task_execution_role_arn
   task_role_arn           = module.iam_ecs.task_role_arns["document-service"]
 
-  vpc_id             = module.vpc.vpc_id
-  subnet_ids         = module.vpc.public_subnet_ids
-  security_group_ids = [module.security_groups.ecs_tasks_sg_id]
+  subnet_ids             = module.vpc.public_subnet_ids
+  security_group_ids     = [module.security_groups.ecs_tasks_sg_id]
+  cloud_map_namespace_id = aws_service_discovery_private_dns_namespace.main.id
 
-  listener_arn           = module.alb.listener_arn
-  path_patterns          = ["/documents", "/documents/*"]
-  listener_rule_priority = 50
-
-  health_check_path = "/health"
-  log_group_name    = module.cloudwatch.log_group_names["document-service"]
-  aws_region        = var.aws_region
+  log_group_name = module.cloudwatch.log_group_names["document-service"]
+  aws_region     = var.aws_region
 
   environment_variables = {
     NODE_ENV  = "production"
     LOG_LEVEL = "info"
+  }
+}
+
+resource "aws_apigatewayv2_integration" "document_service" {
+  api_id             = module.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.document_service.cloud_map_service_arn
+  connection_type    = "VPC_LINK"
+  connection_id      = module.api_gateway.vpc_link_id
+
+  request_parameters = {
+    "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id" = "$context.requestId"
+  }
+}
+
+resource "aws_apigatewayv2_route" "documents_proxy" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /documents/{proxy+}"
+  target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
+}
+
+# ── Remote state from shared ──────────────────────────────────────────────────
+# See docs/06-decisions/adr-008-cross-root-module-state-sharing.md
+
+data "terraform_remote_state" "shared" {
+  backend = "s3"
+
+  config = {
+    bucket = "collabspace-terraform-state-440808375671"
+    key    = "shared/terraform.tfstate"
+    region = "eu-central-1"
   }
 }

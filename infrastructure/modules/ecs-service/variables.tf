@@ -29,7 +29,7 @@ variable "container_port" {
 }
 
 variable "cpu" {
-  description = "CPU units for the Fargate task (256 = 0.25 vCPU). Valid Fargate combinations: 256/512-2048, 512/1024-4096, 1024/2048-8192. Smallest valid option is 256 CPU / 512 MB."
+  description = "CPU units for the Fargate task (256 = 0.25 vCPU). Valid Fargate combinations: 256/512-2048, 512/1024-4096, 1024/2048-8192."
   type        = number
   default     = 256
 }
@@ -41,57 +41,34 @@ variable "memory" {
 }
 
 variable "desired_count" {
-  description = "Number of task instances to keep running. Set to 1 for the walking skeleton. Scale up when adding load balancing requirements."
+  description = "Number of task instances to keep running. Use make dev-start/dev-stop to scale individual services without changing this value."
   type        = number
   default     = 1
 }
 
 variable "task_execution_role_arn" {
-  description = "ARN of the ECS task execution role. Used by the ECS agent to pull images from ECR and write logs to CloudWatch. Created in the iam-ecs module."
+  description = "ARN of the ECS task execution role. Used by the ECS agent to pull images from ECR and write logs to CloudWatch."
   type        = string
 }
 
 variable "task_role_arn" {
-  description = "ARN of the ECS task role. Used by application code running inside the container. Created per-service in the iam-ecs module."
-  type        = string
-}
-
-variable "vpc_id" {
-  description = "VPC ID. Required by the target group."
+  description = "ARN of the ECS task role. Used by application code running inside the container."
   type        = string
 }
 
 variable "subnet_ids" {
-  description = "Subnet IDs where ECS tasks will run. Must be public subnets in the walking skeleton (ADR-009: no NAT Gateway)."
+  description = "Subnet IDs where ECS tasks will run. Must be public subnets (ADR-009: no NAT Gateway)."
   type        = list(string)
 }
 
 variable "security_group_ids" {
-  description = "Security group IDs applied to ECS tasks. The ECS tasks security group should allow inbound from the ALB security group only."
+  description = "Security group IDs applied to ECS tasks. Should allow inbound only from the VPC Link security group."
   type        = list(string)
 }
 
-variable "listener_arn" {
-  description = "ARN of the ALB HTTP listener. The service attaches its listener rule here."
+variable "cloud_map_namespace_id" {
+  description = "Cloud Map private DNS namespace ID. Each task registers its IP here at startup so API Gateway can route requests to it via the VPC Link."
   type        = string
-}
-
-variable "path_patterns" {
-  description = "List of path patterns this service handles (e.g. ['/api/auth/*']). During the walking skeleton phase, use ['/*'] to catch all traffic."
-  type        = list(string)
-  default     = ["/*"]
-}
-
-variable "listener_rule_priority" {
-  description = "Listener rule priority. Lower numbers take precedence. Leave gaps between services (10, 20, 30) so more specific rules can be inserted. Use 100 as the default catch-all for the first service."
-  type        = number
-  default     = 100
-}
-
-variable "health_check_path" {
-  description = "HTTP path the ALB uses for health checks. Must return 200 when the service is healthy. Spring Boot Actuator exposes this at /actuator/health."
-  type        = string
-  default     = "/actuator/health"
 }
 
 variable "log_group_name" {
@@ -111,19 +88,13 @@ variable "environment_variables" {
 }
 
 variable "deployment_minimum_healthy_percent" {
-  description = "Minimum percentage of tasks that must remain healthy during a deployment. Set to 0 for a single-task service so a new task can start before the old one stops."
+  description = "Minimum percentage of tasks that must remain healthy during a deployment. 0 allows a new task to start before the old one stops on a single-task service."
   type        = number
   default     = 0
 }
 
 variable "deployment_maximum_percent" {
-  description = "Maximum percentage of tasks allowed during a deployment (relative to desired_count). 200 means ECS can temporarily run twice the desired count while rolling."
+  description = "Maximum percentage of tasks allowed during a deployment relative to desired_count. 200 means ECS can temporarily run twice the desired count while rolling."
   type        = number
   default     = 200
-}
-
-variable "health_check_grace_period_seconds" {
-  description = "Seconds ECS waits after a task starts before the ALB begins health checks. Prevents premature task replacement during slow application startup. 60s is conservative for Spring Boot."
-  type        = number
-  default     = 60
 }

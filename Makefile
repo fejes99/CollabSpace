@@ -8,6 +8,7 @@
 
 .PHONY: up down reset up-all down-all setup-local logs \
         dev-plan dev-up dev-down dev-pause dev-resume dev-status \
+        dev-start dev-stop \
         help
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -124,6 +125,26 @@ dev-status: ## Show running/desired task counts for all ECS services
 			--query 'services[0].{Service:serviceName,Running:runningCount,Desired:desiredCount,Status:status}' \
 			--output table; \
 	done
+
+dev-start: ## Start a single ECS service — make dev-start s=auth-workspace
+	@test -n "$(s)" || (echo "ERROR: specify a service: make dev-start s=<service-name>" && exit 1)
+	aws ecs update-service \
+		--cluster $(DEV_CLUSTER) \
+		--service $(DEV_CLUSTER)-$(s) \
+		--desired-count 1 \
+		--region $(DEV_REGION) \
+		--no-cli-pager > /dev/null
+	@echo "==> $(s) starting. Run 'make dev-status' to confirm."
+
+dev-stop: ## Stop a single ECS service — make dev-stop s=auth-workspace
+	@test -n "$(s)" || (echo "ERROR: specify a service: make dev-stop s=<service-name>" && exit 1)
+	aws ecs update-service \
+		--cluster $(DEV_CLUSTER) \
+		--service $(DEV_CLUSTER)-$(s) \
+		--desired-count 0 \
+		--region $(DEV_REGION) \
+		--no-cli-pager > /dev/null
+	@echo "==> $(s) stopped."
 
 # ── Help ──────────────────────────────────────────────────────────────────────
 
