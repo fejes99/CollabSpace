@@ -32,9 +32,8 @@ resource "aws_service_discovery_service" "this" {
     routing_policy = "MULTIVALUE"
   }
 
-  health_check_custom_config {
-    failure_threshold = 1
-  }
+  health_check_custom_config {}
+
 
   tags = {
     Name    = "${var.project_name}-${var.environment}-${var.service_name}"
