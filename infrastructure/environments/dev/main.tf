@@ -273,8 +273,6 @@ module "api_gateway" {
   environment    = var.environment
   vpc_link_sg_id = module.security_groups.vpc_link_sg_id
   subnet_ids     = module.vpc.public_subnet_ids
-  jwt_issuer     = local.jwt_issuer
-  jwt_audience   = local.jwt_audience
   internal_token = random_password.internal_token.result
 }
 
@@ -388,16 +386,12 @@ resource "aws_apigatewayv2_route" "auth_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /auth/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 resource "aws_apigatewayv2_route" "workspaces_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /workspaces/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 # ── realtime-service ──────────────────────────────────────────────────────────
@@ -453,8 +447,6 @@ resource "aws_apigatewayv2_route" "realtime_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /realtime/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 # ── ai-assistant ──────────────────────────────────────────────────────────────
@@ -508,8 +500,6 @@ resource "aws_apigatewayv2_route" "assistant_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /assistant/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 # ── notification Lambda ────────────────────────────────────────────────────────
@@ -563,8 +553,6 @@ resource "aws_apigatewayv2_route" "notifications_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /notifications/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 # ── document-service ──────────────────────────────────────────────────────────
@@ -618,8 +606,6 @@ resource "aws_apigatewayv2_route" "documents_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /documents/{proxy+}"
   target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
-  authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
 }
 
 # ── Remote state from shared ──────────────────────────────────────────────────

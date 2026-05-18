@@ -58,32 +58,14 @@ resource "aws_apigatewayv2_vpc_link" "main" {
 
 # ── JWT Authorizer ────────────────────────────────────────────────────────────
 #
-# Runs on every request that references this authorizer. The authorizer:
-#   1. Reads Authorization: Bearer <token> from the request.
-#   2. Fetches the JWKS from jwks_uri (cached; refreshes on cache miss or TTL).
-#   3. Validates: signature (RS256), exp, iss, aud.
-#   4. On success: extracts claims into $context.authorizer.claims.* and
-#      forwards the request with X-User-Id and X-User-Workspaces headers.
-#   5. On failure: returns 401 — request never reaches a downstream service.
+# Deferred: AWS requires the issuer to be a live OIDC provider that serves a
+# discovery document at {issuer}/.well-known/openid-configuration at authorizer
+# creation time. auth-workspace must implement this endpoint (as part of the
+# login/JWT issuance feature) before the authorizer can be provisioned.
 #
-# jwks_uri points to auth-workspace's JWKS endpoint via this same API Gateway.
-# That route is configured WITHOUT this authorizer (public route) so the
-# authorizer can fetch signing keys without a circular dependency.
-#
-# issuer: a fixed per-environment string. See ADR-026 for why this must not
-# be the API Gateway URL itself (it changes on each dev-down/dev-up).
-
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.main.id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "jwt"
-
-  jwt_configuration {
-    audience = [var.jwt_audience]
-    issuer   = var.jwt_issuer
-  }
-}
+# Add aws_apigatewayv2_authorizer here once auth-workspace serves
+# GET /.well-known/openid-configuration and issues JWTs. Use this module's
+# api_endpoint as the issuer value.
 
 # ── Default stage ─────────────────────────────────────────────────────────────
 #

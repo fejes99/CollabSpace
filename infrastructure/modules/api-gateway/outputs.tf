@@ -18,12 +18,7 @@ output "vpc_link_id" {
   value       = aws_apigatewayv2_vpc_link.main.id
 }
 
-output "authorizer_id" {
-  description = "JWT Authorizer ID. Set as authorizer_id on any aws_apigatewayv2_route that requires authentication."
-  value       = aws_apigatewayv2_authorizer.jwt.id
-}
-
 output "jwks_uri" {
-  description = "JWKS URI constructed from the API Gateway endpoint. Pass this to auth-workspace via SSM so the service knows where to publish its JWKS document."
+  description = "JWKS URI constructed from the API Gateway endpoint. Written to SSM so auth-workspace knows the URL where it must serve its public keys."
   value       = "${aws_apigatewayv2_api.main.api_endpoint}/.well-known/jwks.json"
 }

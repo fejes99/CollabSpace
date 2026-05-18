@@ -42,7 +42,7 @@ resource "aws_vpc_security_group_egress_rule" "vpc_link_to_ecs" {
 
 resource "aws_security_group" "alb" {
   name        = "${var.project_name}-${var.environment}-alb"
-  description = "For the realtime-service WebSocket ALB (not yet provisioned — see ADR-026)."
+  description = "For the realtime-service WebSocket ALB (not yet provisioned - see ADR-026)."
   vpc_id      = var.vpc_id
 
   tags = {
