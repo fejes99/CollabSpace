@@ -1,5 +1,10 @@
+output "vpc_link_sg_id" {
+  description = "Security group ID for the API Gateway VPC Link ENIs. Pass to the api-gateway module as vpc_link_sg_id."
+  value       = aws_security_group.vpc_link.id
+}
+
 output "alb_sg_id" {
-  description = "Security group ID for the Application Load Balancer."
+  description = "Security group ID for the ALB. Reserved for the realtime-service WebSocket ALB — not currently attached to any load balancer (see ADR-026)."
   value       = aws_security_group.alb.id
 }
 

@@ -1,5 +1,5 @@
 output "function_name" {
-  description = "Lambda function name. Used in CI/CD workflows (aws lambda update-function-code --function-name <name>)."
+  description = "Lambda function name. Used in CI/CD workflows (aws lambda update-function-code --function-name <name>) and in the API Gateway Lambda permission resource."
   value       = aws_lambda_function.function.function_name
 }
 
@@ -9,13 +9,8 @@ output "function_arn" {
 }
 
 output "invoke_arn" {
-  description = "Lambda invocation ARN. Used as the integration URI when wiring API Gateway → Lambda in Stage 2+."
+  description = "Lambda invocation ARN. Used as integration_uri in aws_apigatewayv2_integration when wiring API Gateway → Lambda."
   value       = aws_lambda_function.function.invoke_arn
-}
-
-output "target_group_arn" {
-  description = "ALB target group ARN. Referenced when creating CloudWatch alarms on Lambda error rates or response times."
-  value       = aws_lb_target_group.lambda.arn
 }
 
 output "execution_role_arn" {
