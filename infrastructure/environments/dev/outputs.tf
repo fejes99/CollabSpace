@@ -11,7 +11,7 @@ output "aws_account_id" {
 # ── Passed through from shared state ─────────────────────────────────────────
 
 output "ecr_repository_urls" {
-  description = "ECR repository URLs from shared state. Used in ECS task definitions in Stage 1."
+  description = "ECR repository URLs from shared state. Used in ECS task definitions."
   value       = data.terraform_remote_state.shared.outputs.ecr_repository_urls
 }
 
@@ -20,34 +20,46 @@ output "github_actions_role_arn" {
   value       = data.terraform_remote_state.shared.outputs.github_actions_role_arn
 }
 
+# ── API Gateway ───────────────────────────────────────────────────────────────
+
+output "api_gateway_endpoint" {
+  description = "Public HTTPS endpoint for all REST services (e.g. https://{id}.execute-api.eu-central-1.amazonaws.com). Use this URL for curl smoke tests and as the base URL in the frontend."
+  value       = module.api_gateway.api_endpoint
+}
+
+output "jwks_uri" {
+  description = "JWKS URI served by auth-workspace via API Gateway. The JWT Authorizer fetches signing keys from this URL. Changes on each dev-down/dev-up."
+  value       = module.api_gateway.jwks_uri
+}
+
 # ── RDS ───────────────────────────────────────────────────────────────────────
 
 output "rds_endpoint" {
-  description = "RDS PostgreSQL hostname (without port). Used in Spring datasource config via SSM."
+  description = "RDS PostgreSQL hostname (without port). Referenced via SSM in application config."
   value       = aws_db_instance.main.address
 }
 
 # ── VPC ───────────────────────────────────────────────────────────────────────
 
 output "vpc_id" {
-  description = "VPC ID. Referenced by ECS services and any future module that needs the VPC boundary."
+  description = "VPC ID."
   value       = module.vpc.vpc_id
 }
 
 output "public_subnet_ids" {
-  description = "Public subnet IDs (one per AZ). Used by the ALB and ECS services."
+  description = "Public subnet IDs (one per AZ). Used by ECS services and the VPC Link."
   value       = module.vpc.public_subnet_ids
 }
 
 output "private_subnet_ids" {
-  description = "Private subnet IDs (one per AZ). Used by RDS and ElastiCache."
+  description = "Private subnet IDs (one per AZ). Used by RDS."
   value       = module.vpc.private_subnet_ids
 }
 
 # ── Security groups ───────────────────────────────────────────────────────────
 
 output "alb_sg_id" {
-  description = "Security group ID for the ALB."
+  description = "ALB security group ID. Reserved for the realtime-service WebSocket ALB — not currently in use. See ADR-026."
   value       = module.security_groups.alb_sg_id
 }
 
@@ -59,7 +71,7 @@ output "ecs_tasks_sg_id" {
 # ── IAM ───────────────────────────────────────────────────────────────────────
 
 output "task_execution_role_arn" {
-  description = "Shared ECS task execution role ARN. Every ECS task definition references this."
+  description = "Shared ECS task execution role ARN."
   value       = module.iam_ecs.task_execution_role_arn
 }
 
@@ -71,30 +83,16 @@ output "task_role_arns" {
 # ── CloudWatch ────────────────────────────────────────────────────────────────
 
 output "log_group_names" {
-  description = "Map of service name → CloudWatch log group name. Referenced in ECS task definitions."
+  description = "Map of service name → CloudWatch log group name."
   value       = module.cloudwatch.log_group_names
 }
 
-# ── ECS cluster ───────────────────────────────────────────────────────────────
+# ── ECS ───────────────────────────────────────────────────────────────────────
 
 output "ecs_cluster_name" {
-  description = "ECS cluster name. Used in CI/CD workflows (aws ecs update-service --cluster <name>)."
+  description = "ECS cluster name. Used in CI/CD workflows and make dev-start/dev-stop/dev-status."
   value       = module.ecs_cluster.cluster_name
 }
-
-# ── ALB ───────────────────────────────────────────────────────────────────────
-
-output "alb_dns_name" {
-  description = "Public DNS name of the ALB. Use this URL to test the walking skeleton: http://<alb_dns_name>/actuator/health"
-  value       = module.alb.alb_dns_name
-}
-
-output "alb_listener_arn" {
-  description = "HTTP listener ARN. Referenced by additional services that add their own listener rules."
-  value       = module.alb.listener_arn
-}
-
-# ── ECS services ──────────────────────────────────────────────────────────────
 
 output "auth_workspace_service_name" {
   description = "ECS service name for auth-workspace. Used in CI/CD: aws ecs update-service --service <name>."

@@ -6,11 +6,31 @@ Authentication and workspace management service. Handles user registration, logi
 
 ## What it does
 
-- `GET /actuator/health` — returns `{"status":"UP"}`. Used by the ALB health check.
+- `GET /actuator/health` — returns `{"status":"UP"}`. Public route — no JWT required.
+- `GET /.well-known/jwks.json` — RS256 public key set. **Must remain a public route** — the API Gateway JWT Authorizer fetches signing keys from this URL. See ADR-026.
+- `POST /auth/register` — public route. No JWT required.
+- `POST /auth/login` — public route. No JWT required.
 - `GET /v3/api-docs` — OpenAPI 3.x JSON spec (internal tooling only, not routed through API Gateway).
 - `GET /swagger-ui.html` — interactive Swagger UI for local development.
 
 All responses include `X-Correlation-ID`. All errors return RFC 9457 Problem Details (`Content-Type: application/problem+json`).
+
+### Trust model
+
+Requests arriving from API Gateway carry three injected headers:
+
+| Header | Source | Purpose |
+|---|---|---|
+| `X-Internal-Token` | API Gateway stage variable | Validate on every request — reject 401 if missing or wrong |
+| `X-User-Id` | JWT `userId` claim | Authenticated user identity |
+| `X-User-Workspaces` | JWT `memberships` claim | Workspace memberships for authorization |
+| `X-Correlation-ID` | API Gateway `$context.requestId` | Overwritten by `CorrelationIdFilter` into MDC |
+
+The service must **not** re-validate the JWT signature. See [api-gateway-trust.md](../../docs/02-architecture/api-gateway-trust.md).
+
+The JWT issuer (`iss`) and audience (`aud`) the service sets in issued tokens are read from SSM at startup:
+- `/collabspace/dev/jwt/issuer` → `https://auth.dev.collabspace.io`
+- `/collabspace/dev/jwt/audience` → `collabspace-api`
 
 ## Project structure
 
