@@ -89,9 +89,9 @@ Why draft early? CI feedback is most valuable when the change is smallest. A typ
 
 ### Phase 3 — Happy path
 
-Write **one integration test** that exercises the happy path against a real database (Testcontainers — see [testing-strategy.md](testing-strategy.md)). Run it — it should fail. Your stubs compile but have no logic yet; a failing test is the correct state.
+Write **one integration test** that exercises the happy path against a real database (Testcontainers — see [testing-strategy.md](testing-strategy.md)). Run it — it should fail. Your stubs compile but have no logic yet; a failing test is the correct state. Commit the test file with a `[red]` prefix — e.g., `[red] Add failing integration test for happy-path registration`. No implementation code in this commit.
 
-Wire the happy path end-to-end: one request in, hits the controller, goes through the service, talks to the repository, returns a response. Run the test again — get it green.
+Wire the happy path end-to-end: one request in, hits the controller, goes through the service, talks to the repository, returns a response. Run the test again — get it green. `./mvnw test` must pass before you commit the implementation.
 
 Manually smoke-test with curl. Save the curl command — it goes into the PR description as the manual test plan.
 

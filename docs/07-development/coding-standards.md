@@ -25,6 +25,7 @@ For `auth-workspace`.
 - Bean Validation (`jakarta.validation`) at the controller boundary.
 - No direct database access from controllers — go through the service layer.
 - Constructor-inject `java.time.Clock` for any time-sensitive code. Test fixtures supply a `Clock.fixed(...)` so JWT expiry, token TTLs, and blocklist windows are deterministic. See [testing-strategy.md](testing-strategy.md) §7.
+- Format with Spring Java Format (`spring-javaformat-maven-plugin` in `pom.xml` enforces it in CI; IntelliJ plugin installed from GitHub releases applies it on save). Run `./mvnw spring-javaformat:apply` to fix all files at once.
 
 ---
 

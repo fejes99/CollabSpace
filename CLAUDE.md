@@ -44,15 +44,15 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 ## LAYER 2: CURRENT FOCUS
 
-Current stage: Stage 2 — Service Implementation (starting)
-Current service: to be decided
-Current goal: Build out real functionality in each service; starting with auth-workspace (user registration, login, JWT issuance) and the shared infrastructure it needs (RDS, Redis).
+Current stage: Stage 2 — Service Implementation (in progress)
+Current service: auth-workspace
+Current goal: Build out real functionality in auth-workspace; completing service baseline (structured logging, correlation ID filter, global exception handler) then moving to user registration, login, and JWT issuance.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Begin Stage 2 — decide which service to implement first and what infrastructure it needs (likely auth-workspace: RDS PostgreSQL, Redis via Upstash, user registration + JWT endpoints).
+Next milestone: Finish and merge service-baseline PR — implement CorrelationIdFilter (MDC, response header, Access-Control-Expose-Headers), wire GlobalExceptionHandler (RFC 9457), confirm Logback JSON config — then begin user registration endpoint.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
@@ -73,7 +73,7 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Authorization: [docs/02-architecture/authorization.md](docs/02-architecture/authorization.md)
 - API conventions: [docs/02-architecture/api-conventions.md](docs/02-architecture/api-conventions.md)
 - API Gateway trust model: [docs/02-architecture/api-gateway-trust.md](docs/02-architecture/api-gateway-trust.md)
-- All ADRs: [docs/06-decisions/](docs/06-decisions/) (conventions in [docs/06-decisions/README.md](docs/06-decisions/README.md))
+- All ADRs: [docs/06-decisions/](docs/06-decisions/README.md) (conventions in [docs/06-decisions/README.md](docs/06-decisions/README.md))
 
 **Scope and roadmap**
 

@@ -120,7 +120,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 
 ## If Java (Spring Boot) changed
 
-- [ ] `./mvnw test` passes.
+- [ ] `./mvnw test` passes — **unless this is a TDD red commit.** A red commit adds test code only (no implementation changes) and its message is prefixed `[red]`. The immediately following commit must make all tests green.
 - [ ] No `@Autowired` on fields. Constructor injection only.
 - [ ] DTOs use records, not classes with getters/setters.
 - [ ] `Optional<T>` used instead of returning `null`.
@@ -135,7 +135,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 
 - [ ] `npm run lint` passes (zero errors, zero warnings).
 - [ ] `npm run build` passes with `strict: true` in `tsconfig.json`.
-- [ ] `npm run test` passes.
+- [ ] `npm run test` passes — **unless this is a TDD red commit.** A red commit adds test code only (no implementation changes) and its message is prefixed `[red]`. The immediately following commit must make all tests green.
 - [ ] No `any` types without an inline comment explaining why it is unavoidable.
 - [ ] No default exports. Named exports only.
 - [ ] No `console.log`. Use `pino` logger.
@@ -146,7 +146,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 
 ## If Python (FastAPI) changed
 
-- [ ] `pytest` passes.
+- [ ] `pytest` passes — **unless this is a TDD red commit.** A red commit adds test code only (no implementation changes) and its message is prefixed `[red]`. The immediately following commit must make all tests green.
 - [ ] `ruff check .` passes (zero errors).
 - [ ] `black --check .` passes (no formatting diffs).
 - [ ] Type hints on every public function signature (parameters and return type).
