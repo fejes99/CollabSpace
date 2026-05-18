@@ -6,6 +6,18 @@ New entries go at the top. Each entry names the stage, the date completed, and b
 
 ---
 
+## Stage 2 — Service Implementation (in progress, 2026-05)
+
+### auth-workspace: service baseline (2026-05)
+
+- `CorrelationIdFilter` — reads or generates `X-Correlation-ID`, stores in MDC, echoes in response headers (`X-Correlation-ID`, `Access-Control-Expose-Headers`). MDC cleared in `finally` to prevent thread-pool leakage.
+- `GlobalExceptionHandler` — `@RestControllerAdvice` mapping all unhandled exceptions to RFC 9457 Problem Details (`type=about:blank`, `status=500`). Internal exception messages never forwarded to caller.
+- Logback JSON config — human-readable pattern on `local` profile; `LogstashEncoder` JSON on all other environments. `correlationId` from MDC appears automatically in every log line.
+- Spring Java Format — `spring-javaformat-maven-plugin` bound to `validate` phase; IntelliJ plugin applies on save.
+- 9 tests: 4 × `CorrelationIdFilterTest`, 4 × `GlobalExceptionHandlerTest`, 1 × context load. Test packages mirror hexagonal structure (`adapter/in/rest`).
+
+---
+
 ## Stage 1 — Walking Skeleton (complete, 2026-05)
 
 All five services deployed to AWS dev environment and reachable via the ALB.

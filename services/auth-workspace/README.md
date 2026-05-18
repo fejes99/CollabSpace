@@ -2,7 +2,7 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Service baseline in progress — structured JSON logging, correlation ID filter, and global exception handler are being wired. Database connection and full auth endpoints are not yet implemented.
+**Current state:** Service baseline complete — structured JSON logging, correlation ID filter, and global exception handler are wired and tested. Database connection and full auth endpoints are not yet implemented (next: `feat/auth/db-connection`).
 
 ## What it does
 
@@ -82,6 +82,20 @@ The service starts on port 8080.
 ```bash
 ./mvnw test
 ```
+
+## Code formatting
+
+This service uses [Spring Java Format](https://github.com/spring-io/spring-javaformat). The Maven plugin enforces it in CI — `./mvnw validate` fails if any file is incorrectly formatted.
+
+```bash
+# Check formatting (runs automatically in CI via the validate phase)
+./mvnw validate
+
+# Apply formatting to all files
+./mvnw spring-javaformat:apply
+```
+
+The IntelliJ plugin applies formatting on save. Install from the [GitHub releases page](https://github.com/spring-io/spring-javaformat/releases) via *Settings → Plugins → Install Plugin from Disk*.
 
 ## Building the Docker image
 
