@@ -26,3 +26,26 @@ variable "log_retention_days" {
   type        = number
   default     = 7
 }
+
+variable "neon_host" {
+  description = "Neon PostgreSQL host. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+  sensitive   = true
+}
+
+variable "neon_username" {
+  description = "Neon PostgreSQL username. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+  sensitive   = true
+}
+
+variable "neon_password" {
+  description = "Neon PostgreSQL password. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+  sensitive   = true
+}
+
+variable "neon_dbname" {
+  description = "Neon PostgreSQL database name. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+}

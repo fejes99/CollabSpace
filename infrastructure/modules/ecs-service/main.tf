@@ -42,6 +42,12 @@ resource "aws_service_discovery_service" "this" {
 
   health_check_custom_config {}
 
+  # AWS does not return health_check_custom_config in the GET response after
+  # creation, so the provider perpetually plans a replacement. Ignore it after
+  # the initial create — the config is set once and ECS manages it from there.
+  lifecycle {
+    ignore_changes = [health_check_custom_config]
+  }
 
   tags = {
     Name    = "${var.project_name}-${var.environment}-${var.service_name}"
