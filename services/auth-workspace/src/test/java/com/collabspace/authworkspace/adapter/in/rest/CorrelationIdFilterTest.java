@@ -10,7 +10,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.TestPropertySource;
+
+import com.collabspace.authworkspace.TestContainersConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 
 import java.util.Objects;
@@ -22,6 +25,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "logging.level.com.collabspace.authworkspace=DEBUG")
+@Import(TestContainersConfiguration.class)
 class CorrelationIdFilterTest {
 
 	private final ListAppender<ILoggingEvent> loggingList = new ListAppender<>();

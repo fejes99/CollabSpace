@@ -8,6 +8,16 @@ New entries go at the top. Each entry names the stage, the date completed, and b
 
 ## Stage 2 — Service Implementation (in progress, 2026-05)
 
+### auth-workspace: db-connection (2026-05)
+
+- `spring-boot-starter-jdbc` + `postgresql` driver added; datasource config reads `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD` from environment. Neon PostgreSQL (SSL required: `sslmode=require`).
+- HikariCP `initialization-fail-timeout=10000` — service refuses to start if DB is unreachable at boot.
+- `DbHealthIndicator` — custom `HealthIndicator` replacing Spring Boot auto-configured `db` component. Stateful: logs `event=db.health.down` / `event=db.health.recovered` on transitions only; no log noise on every poll. Validates connections with `isValid(1)`. Host extracted at construction time — full JDBC URL never logged.
+- `management.endpoint.health.show-components=always` — `/actuator/health` now returns per-component status (`components.db.status`).
+- `TestContainersConfiguration` — shared `@TestConfiguration` with `@Bean @ServiceConnection PostgreSQLContainer` using Spring Boot 4 + Testcontainers 2.0 native integration.
+- `GlobalExceptionHandlerTest` converted from `@SpringBootTest` to `@WebMvcTest` (web layer only — no datasource needed).
+- 2 new integration tests: `HealthCheckIntegrationTest` (UP + component key), `HealthCheckDownIntegrationTest` (503 via invalid URL + fast HikariCP timeout).
+
 ### auth-workspace: service baseline (2026-05)
 
 - `CorrelationIdFilter` — reads or generates `X-Correlation-ID`, stores in MDC, echoes in response headers (`X-Correlation-ID`, `Access-Control-Expose-Headers`). MDC cleared in `finally` to prevent thread-pool leakage.

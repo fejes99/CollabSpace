@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Build out real functionality in auth-workspace; completing service baseline (structured logging, correlation ID filter, global exception handler) then moving to user registration, login, and JWT issuance.
+Current goal: Build out real functionality in auth-workspace — database connection and health check done; next: Flyway migration, UserJpaAdapter, user registration, login, and JWT issuance.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Finish and merge service-baseline PR — implement CorrelationIdFilter (MDC, response header, Access-Control-Expose-Headers), wire GlobalExceptionHandler (RFC 9457), confirm Logback JSON config — then begin user registration endpoint.
+Next milestone: Add Flyway migration for the users table and implement UserJpaAdapter — then begin user registration endpoint (POST /auth/register).
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

@@ -91,12 +91,15 @@ implementation.
 
 Testcontainers must be fully started before the Spring context initializes — because
 `initialization-fail-timeout=10000` means a 10-second wait before context failure if the DB URL
-is not yet available. Use `@ServiceConnection` (Spring Boot 3.1+) or `DynamicPropertySource` to
-wire the container's JDBC URL into Spring before context startup.
+is not yet available. Use Spring Boot 4 + Testcontainers 2.0 native integration: declare the
+container as a `@Bean @ServiceConnection` in a shared `@TestConfiguration` class and `@Import` it
+into each `@SpringBootTest` that needs a real datasource.
 
-**Simulating DB unreachable:** stop the Testcontainers container mid-test (or before context
-startup for the failure case). Do not point at an invalid host — Testcontainers container stop
-is the reliable, repeatable mechanism.
+**Simulating DB unreachable:** configure a separate `@SpringBootTest` with an invalid JDBC URL
+(`jdbc:postgresql://localhost:1/invalid`), `initialization-fail-timeout=0` (skip startup
+connection check so the context loads), and `connection-timeout=500` (health check fails quickly).
+No container needed for the DOWN test — this avoids Docker container lifecycle side effects and
+keeps the test fast and reliable.
 
 ## 7. Local development
 

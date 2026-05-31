@@ -2,11 +2,11 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Service baseline complete — structured JSON logging, correlation ID filter, and global exception handler are wired and tested. Database connection and full auth endpoints are not yet implemented (next: `feat/auth/db-connection`).
+**Current state:** Service baseline and database connection complete — structured JSON logging, correlation ID filter, global exception handler, and Neon PostgreSQL datasource are wired and tested. `/actuator/health` reflects live DB status. Full auth endpoints (register, login, JWT) are not yet implemented.
 
 ## What it does
 
-- `GET /actuator/health` — returns `{"status":"UP"}`. Public route — no JWT required.
+- `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},...}}`. Public route — no JWT required. Returns `503` with `status=DOWN` if the database is unreachable.
 - `GET /.well-known/jwks.json` — RS256 public key set. **Must remain a public route** — the API Gateway JWT Authorizer fetches signing keys from this URL. See ADR-026.
 - `POST /auth/register` — public route. No JWT required.
 - `POST /auth/login` — public route. No JWT required.
@@ -134,7 +134,7 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_PRIVATE_KEY_SSM_PATH` | Stage 2+ | SSM path to RS256 private key |
 | `REDIS_URL` | Stage 2+ | Upstash TLS URL, injected from SSM |
 
-For local development, set these in a `.env` file (gitignored). None are required for the service-baseline PR.
+For local development, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` via IntelliJ run configuration (Run → Edit Configurations → Environment variables) or an `.env` file (gitignored). The datasource URL must use the `jdbc:postgresql://` scheme with `sslmode=require` for Neon. The remaining variables are not yet required.
 
 ## Deployment
 
