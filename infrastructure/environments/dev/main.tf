@@ -83,64 +83,14 @@ module "security_groups" {
   vpc_id       = module.vpc.vpc_id
 }
 
-# ── RDS PostgreSQL ────────────────────────────────────────────────────────────
-# Single db.t3.micro shared by auth-workspace (auth_db) and ai-assistant
-# (vector_db). See docs/04-infrastructure/cost-strategy.md.
-
-resource "random_password" "db_master" {
-  length  = 24
-  special = false
-}
-
-resource "aws_db_subnet_group" "main" {
-  name       = "${var.project_name}-${var.environment}"
-  subnet_ids = module.vpc.private_subnet_ids
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-db-subnet-group"
-  }
-}
-
-resource "aws_db_instance" "main" {
-  identifier = "${var.project_name}-${var.environment}"
-
-  engine         = "postgres"
-  engine_version = "16"
-  instance_class = "db.t3.micro"
-
-  allocated_storage = 20
-  storage_type      = "gp2"
-  storage_encrypted = true
-
-  db_name  = "auth_db"
-  username = "collabspace"
-  password = random_password.db_master.result
-
-  db_subnet_group_name   = aws_db_subnet_group.main.name
-  vpc_security_group_ids = [module.security_groups.rds_sg_id]
-
-  publicly_accessible = false
-  multi_az            = false
-
-  backup_retention_period      = 7
-  skip_final_snapshot          = true
-  deletion_protection          = false
-  performance_insights_enabled = false
-  monitoring_interval          = 0
-
-  apply_immediately = true
-
-  tags = {
-    Name = "${var.project_name}-${var.environment}-postgres"
-  }
-}
-
-# ── SSM parameters — RDS credentials ─────────────────────────────────────────
+# ── SSM parameters — Neon PostgreSQL credentials ──────────────────────────────
+# Values sourced from secrets.auto.tfvars (gitignored). SSM paths are unchanged
+# from the previous RDS setup so application config in PR 2 needs no adjustment.
 
 resource "aws_ssm_parameter" "db_host" {
   name  = "/collabspace/${var.environment}/db/host"
   type  = "String"
-  value = aws_db_instance.main.address
+  value = var.neon_host
   tags  = { Name = "/collabspace/${var.environment}/db/host" }
 }
 
@@ -154,21 +104,21 @@ resource "aws_ssm_parameter" "db_port" {
 resource "aws_ssm_parameter" "db_username" {
   name  = "/collabspace/${var.environment}/db/username"
   type  = "String"
-  value = aws_db_instance.main.username
+  value = var.neon_username
   tags  = { Name = "/collabspace/${var.environment}/db/username" }
 }
 
 resource "aws_ssm_parameter" "db_password" {
   name  = "/collabspace/${var.environment}/db/password"
   type  = "SecureString"
-  value = random_password.db_master.result
+  value = var.neon_password
   tags  = { Name = "/collabspace/${var.environment}/db/password" }
 }
 
 resource "aws_ssm_parameter" "db_name" {
   name  = "/collabspace/${var.environment}/db/name"
   type  = "String"
-  value = "auth_db"
+  value = var.neon_dbname
   tags  = { Name = "/collabspace/${var.environment}/db/name" }
 }
 
@@ -269,11 +219,12 @@ resource "aws_service_discovery_private_dns_namespace" "main" {
 module "api_gateway" {
   source = "../../modules/api-gateway"
 
-  project_name   = var.project_name
-  environment    = var.environment
-  vpc_link_sg_id = module.security_groups.vpc_link_sg_id
-  subnet_ids     = module.vpc.public_subnet_ids
-  internal_token = random_password.internal_token.result
+  project_name       = var.project_name
+  environment        = var.environment
+  vpc_link_sg_id     = module.security_groups.vpc_link_sg_id
+  subnet_ids         = module.vpc.public_subnet_ids
+  internal_token     = random_password.internal_token.result
+  log_retention_days = var.log_retention_days
 }
 
 # ── SSM parameter — JWKS URI ──────────────────────────────────────────────────

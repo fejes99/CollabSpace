@@ -67,6 +67,17 @@ resource "aws_apigatewayv2_vpc_link" "main" {
 # GET /.well-known/openid-configuration and issues JWTs. Use this module's
 # api_endpoint as the issuer value.
 
+# ── Access logs ───────────────────────────────────────────────────────────────
+
+resource "aws_cloudwatch_log_group" "access_logs" {
+  name              = "/aws/apigateway/${var.project_name}-${var.environment}"
+  retention_in_days = var.log_retention_days
+
+  tags = {
+    Name = "${var.project_name}-${var.environment}-apigw-access-logs"
+  }
+}
+
 # ── Default stage ─────────────────────────────────────────────────────────────
 #
 # name = "$default": a special stage name that means requests go directly to
@@ -88,6 +99,21 @@ resource "aws_apigatewayv2_stage" "default" {
   api_id      = aws_apigatewayv2_api.main.id
   name        = "$default"
   auto_deploy = true
+
+  access_log_settings {
+    destination_arn = aws_cloudwatch_log_group.access_logs.arn
+    format = jsonencode({
+      requestId          = "$context.requestId"
+      ip                 = "$context.identity.sourceIp"
+      requestTime        = "$context.requestTime"
+      httpMethod         = "$context.httpMethod"
+      routeKey           = "$context.routeKey"
+      status             = "$context.status"
+      protocol           = "$context.protocol"
+      responseLength     = "$context.responseLength"
+      integrationLatency = "$context.integrationLatency"
+    })
+  }
 
   stage_variables = {
     internalToken = var.internal_token

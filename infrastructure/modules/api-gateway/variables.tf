@@ -23,3 +23,9 @@ variable "internal_token" {
   type        = string
   sensitive   = true
 }
+
+variable "log_retention_days" {
+  description = "CloudWatch log retention in days for API Gateway access logs."
+  type        = number
+  default     = 7
+}

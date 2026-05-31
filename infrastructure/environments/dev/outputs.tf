@@ -32,13 +32,6 @@ output "jwks_uri" {
   value       = module.api_gateway.jwks_uri
 }
 
-# ── RDS ───────────────────────────────────────────────────────────────────────
-
-output "rds_endpoint" {
-  description = "RDS PostgreSQL hostname (without port). Referenced via SSM in application config."
-  value       = aws_db_instance.main.address
-}
-
 # ── VPC ───────────────────────────────────────────────────────────────────────
 
 output "vpc_id" {
@@ -52,7 +45,7 @@ output "public_subnet_ids" {
 }
 
 output "private_subnet_ids" {
-  description = "Private subnet IDs (one per AZ). Used by RDS."
+  description = "Private subnet IDs (one per AZ)."
   value       = module.vpc.private_subnet_ids
 }
 
