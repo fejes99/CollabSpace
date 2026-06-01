@@ -2,7 +2,7 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Service baseline and database connection complete — structured JSON logging, correlation ID filter, global exception handler, and Neon PostgreSQL datasource are wired and tested. `/actuator/health` reflects live DB status. Full auth endpoints (register, login, JWT) are not yet implemented.
+**Current state:** Service baseline and database connection complete. Flyway is wired — `V1__create_users.sql` has been applied and the `users` table exists in the database. Full auth endpoints (register, login, JWT) are not yet implemented.
 
 ## What it does
 

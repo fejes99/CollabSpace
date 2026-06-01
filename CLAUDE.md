@@ -52,7 +52,7 @@ Out of scope: frontend, full inter-service event flows, production hardening, mo
 
 Blocked on: nothing
 
-Next milestone: Add Flyway migration for the users table and implement UserJpaAdapter — then begin user registration endpoint (POST /auth/register).
+Next milestone: Implement UserJpaAdapter and user registration endpoint (POST /auth/register).
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
