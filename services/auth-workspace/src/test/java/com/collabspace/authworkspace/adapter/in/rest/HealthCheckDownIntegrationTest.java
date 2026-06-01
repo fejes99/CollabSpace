@@ -13,7 +13,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK,
 		properties = { "spring.datasource.url=jdbc:postgresql://localhost:1/invalid",
 				"spring.datasource.hikari.initialization-fail-timeout=0",
-				"spring.datasource.hikari.connection-timeout=500" })
+				"spring.datasource.hikari.connection-timeout=500", "spring.flyway.enabled=false" })
 @AutoConfigureMockMvc
 class HealthCheckDownIntegrationTest {
 
