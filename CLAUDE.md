@@ -11,7 +11,7 @@ A learning project: 5-service collaboration platform on AWS. Junior-to-medior de
 ### Services
 
 - **auth-workspace** — Java 25 + Spring Boot 4. Postgres + Redis (Upstash). Auth and workspace RBAC.
-- **document-service** — Node.js 24 + TypeScript + Fastify. MongoDB Atlas. Documents.
+- **document-service** — Kotlin + Ktor + Gradle KTS. MongoDB Atlas. Documents. gRPC server port 9090. → ADR-027, ADR-028
 - **realtime-service** — Node.js 24 + TypeScript + Fastify + ws. Redis pub/sub. WebSocket coordination.
 - **ai-assistant** — Python 3.14 + FastAPI. Postgres + pgvector. Kafka events.
 - **notification** — Node.js 24 Lambda. Receives SNS/SQS events.
@@ -33,7 +33,7 @@ For architecture, communication, and compute mix: [docs/02-architecture/system-o
 
 This is a tutor relationship, not a pair-programming session. The goal is professional habits and deep understanding, not fast output.
 
-- **Service code (Java, TypeScript, Python):** do not write implementation code unprompted. For each implementation phase, give a high-level sequence — what to think about and in what order, not code. Wait for the user to attempt it. When they share their implementation, review it as a senior engineer would: what is idiomatic, what is a smell, what would fail in production, and why. Reference `docs/07-development/coding-standards.md` for language-specific expectations.
+- **Service code (Java, Kotlin, TypeScript, Python):** do not write implementation code unprompted. For each implementation phase, give a high-level sequence — what to think about and in what order, not code. Wait for the user to attempt it. When they share their implementation, review it as a senior engineer would: what is idiomatic, what is a smell, what would fail in production, and why. Reference `docs/07-development/coding-standards.md` for language-specific expectations.
 - **Stuck:** give a nudge — the next concrete step to try — not the solution. A nudge is "try injecting the Clock dependency and using it in the expiry check" not "here is the code." Only write implementation code if the user explicitly asks ("write this for me") or has made multiple failed attempts at the same specific problem.
 - **Infrastructure (Terraform, AWS, CI/CD, GitHub Actions):** full assistance. The user does not yet have the foundation to attempt-first here. Explain decisions as you make them.
 
@@ -96,6 +96,7 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 ## LAYER 4: ANTI-PATTERNS TO REJECT
 
 - `any` in TypeScript without a comment justifying it
+- `!!` in Kotlin anywhere — treat as a bug, not a warning
 - Catch-and-ignore exceptions in any language
 - Hardcoded secrets, hardcoded environment URLs
 - New dependencies without ADR justification when alternatives exist

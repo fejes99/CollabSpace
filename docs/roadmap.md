@@ -67,10 +67,10 @@ These concerns are real but are deferred because implementing them before the sy
 
 These items are excluded from both MVP and v1.5. They represent real production engineering concerns, but none of them is appropriate at this stage. Where the exclusion carries a meaningful learning note, it is included.
 
-- **RDS Multi-AZ.** Multi-AZ failover is a high-availability concern. In a development environment running at minimum viable cost, a single-AZ RDS instance is appropriate. Multi-AZ belongs in a production environment with an SLA.
+- **Database high availability.** Neon handles availability internally on the free tier. Multi-AZ failover configuration belongs in a production environment with an explicit SLA — not appropriate at development scale.
 - **Autoscaling.** ECS service autoscaling requires understanding the relationship between load and resource consumption. That relationship cannot be known before the service has processed real traffic under realistic conditions. Configuring autoscaling before then is guesswork.
 - **Blue/green and canary deployments.** Relevant once multiple clients depend on the service and zero-downtime deploys become a contractual requirement. At this scale, a rolling restart is sufficient.
-- **Disaster recovery.** RDS automated backups are enabled by default. A formal DR strategy — RPO/RTO targets, documented recovery procedures, tested restore processes — belongs in a production operations runbook, not a walking skeleton.
+- **Disaster recovery.** Neon provides point-in-time restore on the free tier; MongoDB Atlas M0 provides daily snapshots. A formal DR strategy — RPO/RTO targets, documented recovery procedures, tested restore processes — belongs in a production operations runbook, not a walking skeleton.
 - **ABAC (attribute-based access control).** Workspace-scoped RBAC with two roles covers all v1 use cases. ABAC — per-document permissions, row-level policies, conditional access — adds significant authorization complexity and is not required by any feature described in this version of the product. → See [authorization.md](02-architecture/authorization.md).
 - **OAuth2 social login (Google, GitHub, etc.).** Implementing JWT-based auth manually is an explicit learning goal of this project. Social login would delegate the most instructive parts of the auth flow to a third party. → See [ADR-002](06-decisions/adr-002-auth-workspace-combined.md).
 - **SAML and enterprise SSO.** Not in the product scope.

@@ -16,7 +16,7 @@ This document is loaded on demand — `CLAUDE.md` points to it but does not dupl
 
 ## Java (Spring Boot)
 
-For `auth-workspace`.
+For `auth-workspace`. Build tool: **Maven** (`pom.xml`). Maven applies only to this service — Kotlin uses Gradle KTS.
 
 - Constructor injection only — no `@Autowired` on fields.
 - Records for DTOs. Skip Lombok (records cover most cases).
@@ -29,9 +29,25 @@ For `auth-workspace`.
 
 ---
 
+## Kotlin (Ktor)
+
+For `document-service`. Build tool: **Gradle with Kotlin DSL** (`build.gradle.kts`).
+
+- Data classes for all models and DTOs — no Lombok, no separate builder pattern.
+- Per-operation sealed classes for service return types. Each operation defines exactly the outcomes that can happen; `when` on a sealed class is exhaustive. Never use a generic `Result<T, E>` wrapper across operations — the compiler cannot enforce per-operation error sets. Define a shared `interface DocumentServiceError` so `StatusPages.kt` can map any error to HTTP without coupling to individual operations.
+- Never use `!!` (non-null assertion). Treat its presence as a compile-time bug. Use `?.`, `?:`, `let`, `also`, `copy()`, and explicit null checks.
+- `suspend` functions throughout — no blocking I/O on the default dispatcher. Use `withContext(Dispatchers.IO)` only when wrapping a blocking library that has no async alternative.
+- Official MongoDB Kotlin coroutine driver (`mongodb-driver-kotlin-coroutine`) — do not wrap the Java driver in `runBlocking`.
+- **Koin** for dependency injection. Declare modules in `plugins/DI.kt`; inject with `inject<T>()` in route handlers and services. No annotation scanning.
+- `kotlinx.serialization` for JSON. Annotate all DTOs with `@Serializable`. Do not mix with Gson or Jackson.
+- Feature-based package structure — group by domain concept (e.g. `document/`, `workspace/`), not by layer. Cross-cutting concerns (auth, serialization, error handling) live in `plugins/`.
+- `!!` anywhere in the codebase is a code review failure, not a warning.
+
+---
+
 ## TypeScript (Fastify)
 
-For `document-service`, `realtime-service`, `notification`.
+For `realtime-service`, `notification`.
 
 - `strict: true` in `tsconfig.json`. No `any` without an inline comment justifying it.
 - Named exports only — no default exports.

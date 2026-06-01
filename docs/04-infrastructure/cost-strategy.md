@@ -34,8 +34,8 @@ Always-free tiers that remain active:
 | ALB (fixed hourly) | $0.0225/hr | $0.023/hr | $0.023/hr |
 | Public IPv4 — ALB (2 nodes) | $0.005/IP/hr | $0.010/hr | $0.010/hr |
 | Public IPv4 — ECS tasks | $0.005/IP/hr | $0.005/hr | $0.020/hr |
-| RDS db.t3.micro | $0.018/hr | $0.018/hr | $0.018/hr |
-| **Total** | | **~$0.068/hr** | **~$0.120/hr** |
+| Neon PostgreSQL | $0 (free tier) | $0 | $0 |
+| **Total** | | **~$0.050/hr** | **~$0.102/hr** |
 
 ### Monthly estimate at typical pace (72 active hours/month)
 
@@ -46,7 +46,7 @@ Always-free tiers that remain active:
 | 4 services running (pre-optimization) | ~$8.60 | was current |
 | 1 service running — Option 1 | ~$4.90 | **done** |
 | 1 service + API Gateway instead of ALB — Option 2 | ~$2.60 | **done** |
-| 1 service + API Gateway + Neon instead of RDS — Option 3 | ~$1.30 | planned |
+| 1 service + API Gateway + Neon instead of RDS — Option 3 | ~$1.30 | **done — current** |
 
 ---
 
@@ -58,7 +58,6 @@ A small number of things are worth spending real money on if they unblock the le
 | --- | --- | --- |
 | Route 53 hosted zone | $0.50/month | A real domain makes HTTPS, OIDC, and CORS configuration realistic rather than localhost-only |
 | AWS Budgets alert | Free (first 2 budgets) | Peace of mind; no surprise bill |
-| RDS snapshot before a risky migration | ~$0.02/GB | Cheap insurance during schema changes |
 
 Everything else — larger instance types, multi-AZ, ElastiCache, Secrets Manager — is out of scope for v1 and would blow the budget immediately.
 
@@ -79,7 +78,7 @@ make dev-pause                           # scale all ECS services to 0
 make dev-start s=<service-being-built>   # start only the service you need
 
 # Mid-session break (under ~1 hour)
-make dev-pause                           # stops Fargate billing; ALB and RDS still run
+make dev-pause                           # stops Fargate billing; ALB still runs (Neon is external — unaffected)
 
 # End of session
 make dev-down                            # terraform destroy — stops all billing
@@ -113,20 +112,18 @@ Two infrastructure changes are planned to reduce costs further once auth-workspa
 
 ---
 
-### Option 3 — Replace RDS with Neon (serverless Postgres, permanent free tier)
+### Option 3 — Neon (serverless Postgres, permanent free tier) ✓ Done
 
-**Why:** RDS db.t3.micro costs $0.018/hr while running. At 72 session hours/month that is ~$1.30/month in compute alone. More critically, `terraform destroy` at session end **drops the database** — all data is lost on every `make dev-down`. This is acceptable now (no real data yet), but breaks the workflow the moment user registration is implemented and rows start accumulating.
+**Why it was done:** RDS db.t3.micro cost $0.018/hr while running. More critically, `terraform destroy` at session end **dropped the database** — all data was lost on every `make dev-down`. This would break the workflow the moment user registration wrote persistent rows.
 
-**How:** Create a Neon project (neon.tech). Store the JDBC connection string in SSM under `/collabspace/dev/db/url`. Remove `aws_db_instance.main` from Terraform and replace it with an `aws_ssm_parameter` pointing to Neon. Flyway/Liquibase runs migrations on application startup, bringing the schema up automatically from a cold database each time.
+**What was done:** Created a Neon project (neon.tech). The JDBC connection string is stored in SSM under `/collabspace/dev/db/url`. `aws_db_instance.main` was removed from Terraform; an `aws_ssm_parameter` pointing to Neon replaced it. Flyway runs migrations on application startup, bringing the schema up automatically.
 
-**Benefits beyond cost:**
-- Database persists between sessions — no data loss on `make dev-down`
+**Benefits realised:**
+- Database persists between sessions — `make dev-down` no longer drops data
 - Neon scales to zero when idle — no charge between sessions
 - Schema branching available for testing risky migrations
 
-**Expected savings:** ~$1.30/month. Brings the monthly estimate from ~$2.60 to ~$1.30 (after Option 2).
-
-**Prerequisite:** Do this before implementing user registration — that is the first feature that writes persistent rows.
+**Savings:** ~$1.30/month — current monthly estimate at 72 active hours is ~$1.30.
 
 ---
 
@@ -136,5 +133,5 @@ The $0–5/month target is valid while CollabSpace is in active development with
 
 - ~~The 12-month free tier windows begin to expire~~ — **triggered May 2026; see Actual Costs section above**
 - A second developer joins and doubles the active session time
-- The AI Assistant's pgvector queries create measurable RDS load (see ADR-005 co-location revisit criteria)
+- The AI Assistant's pgvector queries create measurable Neon load (see ADR-005 co-location revisit criteria)
 - Atlas M0's 512 MB limit is approached (export metrics periodically)
