@@ -51,9 +51,10 @@ locals {
 
   all_services = toset(concat(tolist(local.ecs_services), ["notification"]))
 
-  # JWT configuration — fixed per environment. The issuer is a stable string
-  # that does not change across dev-down/dev-up cycles. See ADR-026.
-  jwt_issuer   = "https://auth.dev.collabspace.io"
+  # JWT audience — fixed per environment.
+  # The issuer is the API Gateway endpoint (set inside the api-gateway module)
+  # so it is not declared here. Tokens are invalidated on dev-down/dev-up
+  # because the endpoint URL changes each cycle; acceptable in dev.
   jwt_audience = "collabspace-api"
 }
 
@@ -141,7 +142,7 @@ resource "random_password" "internal_token" {
 resource "aws_ssm_parameter" "jwt_issuer" {
   name  = "/collabspace/${var.environment}/jwt/issuer"
   type  = "String"
-  value = local.jwt_issuer
+  value = module.api_gateway.api_endpoint
   tags  = { Name = "/collabspace/${var.environment}/jwt/issuer" }
 }
 
@@ -225,6 +226,7 @@ module "api_gateway" {
   subnet_ids         = module.vpc.public_subnet_ids
   internal_token     = random_password.internal_token.result
   log_retention_days = var.log_retention_days
+  jwt_audience       = local.jwt_audience
 }
 
 # ── SSM parameter — JWKS URI ──────────────────────────────────────────────────
@@ -324,6 +326,12 @@ resource "aws_apigatewayv2_route" "auth_jwks" {
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
+resource "aws_apigatewayv2_route" "auth_oidc_discovery" {
+  api_id    = module.api_gateway.api_id
+  route_key = "GET /.well-known/openid-configuration"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
 resource "aws_apigatewayv2_route" "auth_health" {
   api_id    = module.api_gateway.api_id
   route_key = "GET /actuator/health"
@@ -336,12 +344,16 @@ resource "aws_apigatewayv2_route" "auth_health" {
 resource "aws_apigatewayv2_route" "auth_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /auth/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
 resource "aws_apigatewayv2_route" "workspaces_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /workspaces/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
@@ -397,6 +409,8 @@ resource "aws_apigatewayv2_integration" "realtime_service" {
 resource "aws_apigatewayv2_route" "realtime_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /realtime/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
 }
 
@@ -450,6 +464,8 @@ resource "aws_apigatewayv2_integration" "ai_assistant" {
 resource "aws_apigatewayv2_route" "assistant_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /assistant/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
 }
 
@@ -503,6 +519,8 @@ resource "aws_apigatewayv2_route" "notifications_health" {
 resource "aws_apigatewayv2_route" "notifications_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /notifications/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
 }
 
@@ -556,6 +574,8 @@ resource "aws_apigatewayv2_integration" "document_service" {
 resource "aws_apigatewayv2_route" "documents_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /documents/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
 }
 

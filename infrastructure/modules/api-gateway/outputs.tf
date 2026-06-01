@@ -22,3 +22,8 @@ output "jwks_uri" {
   description = "JWKS URI constructed from the API Gateway endpoint. Written to SSM so auth-workspace knows the URL where it must serve its public keys."
   value       = "${aws_apigatewayv2_api.main.api_endpoint}/.well-known/jwks.json"
 }
+
+output "authorizer_id" {
+  description = "JWT Authorizer ID. Add authorization_type = \"JWT\" and authorizer_id = this value to every protected aws_apigatewayv2_route."
+  value       = aws_apigatewayv2_authorizer.jwt.id
+}
