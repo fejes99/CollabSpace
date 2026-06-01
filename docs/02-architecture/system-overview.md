@@ -17,7 +17,7 @@ flowchart TD
 
     subgraph services["Services"]
         AW["Auth & Workspace\nJava · Spring Boot · Fargate"]
-        DS["Document Service\nTypeScript · Fastify · Fargate"]
+        DS["Document Service\nKotlin · Ktor · Fargate"]
         RS["Realtime Service\nTypeScript · Fastify · EC2"]
         AI["AI Assistant\nPython · FastAPI · Fargate"]
         NL["Notification\nNode.js · Lambda"]
@@ -31,7 +31,8 @@ flowchart TD
     end
 
     subgraph data["Data Stores"]
-        RDS[("PostgreSQL RDS\nauth_db · vector_db")]
+        NeonAuth[("Neon PostgreSQL\nauth_db")]
+        NeonVec[("Neon PostgreSQL\nvector_db · pgvector")]
         Mongo[("MongoDB Atlas")]
         Redis[("Redis · Upstash")]
     end
@@ -44,7 +45,7 @@ flowchart TD
     APIGW --> AI
     ALB --> RS
 
-    AW --> RDS
+    AW --> NeonAuth
     AW --> Redis
     AW -->|member.invited| SNS
 
@@ -59,9 +60,9 @@ flowchart TD
 
     RS --> Redis
 
-    AI --> RDS
+    AI --> NeonVec
     AI -->|consume| Kafka
-    AI -.->|"GET /documents/:id"| DS
+    AI -.->|"gRPC GetDocument\n(port 9090)"| DS
 ```
 
 ---
@@ -74,7 +75,7 @@ Owns the identity and access layer for the entire platform. Handles user registr
 
 ### Document Service
 
-Owns the creation, retrieval, editing, and deletion of documents within a workspace. Persists documents in MongoDB Atlas; the flexible document model avoids schema migrations as the content structure evolves. On every save, publishes a `document.updated` event to both SNS (triggering the notification and realtime fan-out) and Kafka (triggering AI re-indexing). Also exposes `GET /documents/:id` as an internal endpoint consumed by the AI Assistant during indexing. → ADR-004
+Owns the creation, retrieval, editing, and deletion of documents within a workspace. Persists documents in MongoDB Atlas; the flexible document model avoids schema migrations as the content structure evolves. On every save, publishes a `document.updated` event to both SNS (triggering the notification and realtime fan-out) and Kafka (triggering AI re-indexing). Also exposes a gRPC API (`GetDocument`, `ListDocuments`) on port 9090 consumed by the AI Assistant during indexing — see ADR-028. → ADR-004, ADR-027, ADR-028
 
 ### Realtime Service
 
@@ -82,7 +83,7 @@ Owns the WebSocket layer: presence indicators (who is viewing a document right n
 
 ### AI Assistant
 
-Owns the workspace knowledge layer: background document indexing (embeddings stored in PostgreSQL with pgvector) and the conversational query interface (RAG with citations). Consumes `document.updated` events from Kafka and fetches document content via the Document Service REST API to generate embeddings — it does not read MongoDB directly. Exposes `POST /ai/ask` (RAG query) and `POST /ai/search` (semantic search) to clients via API Gateway. Uses the Claude API as its LLM backend. → ADR-003, ADR-005
+Owns the workspace knowledge layer: background document indexing (embeddings stored in Neon PostgreSQL with pgvector) and the conversational query interface (RAG with citations). Consumes `document.updated` events from Kafka and fetches document content via the Document Service gRPC API to generate embeddings — it does not read MongoDB directly. Exposes `POST /ai/ask` (RAG query) and `POST /ai/search` (semantic search) to clients via API Gateway. Uses the Claude API as its LLM backend. → ADR-003, ADR-005, ADR-028
 
 ### Notification Service
 
@@ -94,7 +95,7 @@ A stateless AWS Lambda function triggered by SQS. Delivers notifications to work
 
 ### Authentication
 
-All client-facing requests carry a JWT issued by the Auth & Workspace service. API Gateway validates the token signature before routing to any downstream service; services can trust the decoded claims without re-validating. Internal service-to-service calls (currently only AI Assistant → Document Service) use a separate trust model — the mechanism is an open design question tracked in [service-communication.md](service-communication.md).
+All client-facing requests carry a JWT issued by the Auth & Workspace service. API Gateway validates the token signature before routing to any downstream service; services can trust the decoded claims without re-validating. Internal service-to-service calls (currently only AI Assistant → Document Service) use internal service JWTs signed with RS256 — the full model is documented in ADR-021. For the gRPC call specifically, the JWT is passed via gRPC metadata key `authorization` rather than an HTTP header — see ADR-028.
 
 ### Structured Logging
 
