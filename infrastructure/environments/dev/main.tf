@@ -140,17 +140,19 @@ resource "random_password" "internal_token" {
 }
 
 resource "aws_ssm_parameter" "jwt_issuer" {
-  name  = "/collabspace/${var.environment}/jwt/issuer"
-  type  = "String"
-  value = module.api_gateway.api_endpoint
-  tags  = { Name = "/collabspace/${var.environment}/jwt/issuer" }
+  name      = "/collabspace/${var.environment}/jwt/issuer"
+  type      = "String"
+  value     = module.api_gateway.api_endpoint
+  overwrite = true
+  tags      = { Name = "/collabspace/${var.environment}/jwt/issuer" }
 }
 
 resource "aws_ssm_parameter" "jwt_audience" {
-  name  = "/collabspace/${var.environment}/jwt/audience"
-  type  = "String"
-  value = local.jwt_audience
-  tags  = { Name = "/collabspace/${var.environment}/jwt/audience" }
+  name      = "/collabspace/${var.environment}/jwt/audience"
+  type      = "String"
+  value     = local.jwt_audience
+  overwrite = true
+  tags      = { Name = "/collabspace/${var.environment}/jwt/audience" }
 }
 
 resource "aws_ssm_parameter" "internal_token" {
