@@ -50,7 +50,7 @@ Current goal: Build out real functionality in auth-workspace — database connec
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
-Blocked on: SSM parameter `/collabspace/dev/auth/jwt-private-key` must exist before the service can start locally or on ECS.
+Blocked on: nothing
 
 Next milestone: Implement UserJpaAdapter and user registration endpoint (POST /auth/register).
 

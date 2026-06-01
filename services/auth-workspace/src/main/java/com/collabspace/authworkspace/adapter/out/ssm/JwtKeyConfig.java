@@ -63,8 +63,10 @@ public class JwtKeyConfig {
 	@Bean
 	@ConditionalOnMissingBean
 	public JwtProperties jwtProperties() {
+		String jwksUri = StringUtils.hasText(this.jwksUriSsmPath) ? this.ssm.getParameter(this.jwksUriSsmPath)
+				: "http://localhost:8080/.well-known/jwks.json";
 		return new JwtProperties(this.ssm.getParameter(this.issuerSsmPath), this.ssm.getParameter(this.audienceSsmPath),
-				this.ssm.getParameter(this.jwksUriSsmPath));
+				jwksUri);
 	}
 
 	private RSAPrivateKey parsePrivateKey(String pem) throws NoSuchAlgorithmException, InvalidKeySpecException {
