@@ -87,6 +87,12 @@ variable "environment_variables" {
   default     = {}
 }
 
+variable "secrets" {
+  description = "Map of environment variable name → SSM parameter ARN. ECS injects each value at task startup via the execution role. Use for passwords, keys, and other values that must not appear in plain text in the task definition."
+  type        = map(string)
+  default     = {}
+}
+
 variable "deployment_minimum_healthy_percent" {
   description = "Minimum percentage of tasks that must remain healthy during a deployment. 0 allows a new task to start before the old one stops on a single-task service."
   type        = number

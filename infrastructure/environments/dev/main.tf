@@ -249,6 +249,35 @@ resource "aws_ssm_parameter" "jwks_uri" {
 }
 
 # ── auth-workspace ────────────────────────────────────────────────────────────
+#
+# Task role SSM policy: auth-workspace calls SsmConfigLoader at startup to read
+# JWT config (private key, issuer, audience, jwks-uri). These are application-
+# level SSM calls that use the task role, not the execution role.
+
+resource "aws_iam_role_policy" "auth_workspace_ssm" {
+  name = "ssm-read"
+  role = "${var.project_name}-${var.environment}-auth-workspace-task"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "SSMRead"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter", "ssm:GetParameters"]
+        Resource = ["arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/collabspace/*"]
+      },
+      {
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = ["arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/alias/aws/ssm"]
+      }
+    ]
+  })
+
+  depends_on = [module.iam_ecs]
+}
 
 module "auth_workspace" {
   source = "../../modules/ecs-service"
@@ -276,7 +305,17 @@ module "auth_workspace" {
   aws_region     = var.aws_region
 
   environment_variables = {
-    SPRING_PROFILES_ACTIVE = var.environment
+    SPRING_PROFILES_ACTIVE    = var.environment
+    SPRING_DATASOURCE_URL     = "jdbc:postgresql://${var.neon_host}/${var.neon_dbname}?sslmode=require&channel_binding=require"
+    SPRING_DATASOURCE_USERNAME = var.neon_username
+    JWT_PRIVATE_KEY_SSM_PATH  = "/collabspace/${var.environment}/auth/jwt-private-key"
+    JWT_ISSUER_SSM_PATH       = "/collabspace/${var.environment}/jwt/issuer"
+    JWT_AUDIENCE_SSM_PATH     = "/collabspace/${var.environment}/jwt/audience"
+    JWT_JWKS_URI_SSM_PATH     = "/collabspace/${var.environment}/jwt/jwks-uri"
+  }
+
+  secrets = {
+    SPRING_DATASOURCE_PASSWORD = aws_ssm_parameter.db_password.arn
   }
 }
 
