@@ -44,12 +44,14 @@ class GlobalExceptionHandlerTest {
 	@RestController
 	static class ThrowingController {
 
-		@GetMapping("/test/boom")
+		@GetMapping(GlobalExceptionHandlerTest.BOOM_PATH)
 		String boom() {
-			throw new RuntimeException("internal details that must not leak");
+			throw new IllegalStateException("internal details that must not leak");
 		}
 
 	}
+
+	private static final String BOOM_PATH = "/test/boom";
 
 	private final ListAppender<ILoggingEvent> logCapture = new ListAppender<>();
 
@@ -72,7 +74,7 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void returnsRfc9457ProblemDetail() throws Exception {
-		mvc.perform(get("/test/boom"))
+		mvc.perform(get(BOOM_PATH))
 			.andExpect(status().isInternalServerError())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("about:blank"))
@@ -83,7 +85,7 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void logsExceptionAtErrorLevel() throws Exception {
-		mvc.perform(get("/test/boom")).andReturn();
+		mvc.perform(get(BOOM_PATH)).andReturn();
 
 		assertThat(logCapture.list)
 			.anyMatch(e -> e.getLevel() == Level.ERROR && e.getMessage().contains("Unhandled exception"));
@@ -91,13 +93,13 @@ class GlobalExceptionHandlerTest {
 
 	@Test
 	void internalExceptionMessageDoesNotLeakToResponse() throws Exception {
-		mvc.perform(get("/test/boom"))
+		mvc.perform(get(BOOM_PATH))
 			.andExpect(content().string(not(containsString("internal details that must not leak"))));
 	}
 
 	@Test
 	void correlationIdAppearsInErrorLog() throws Exception {
-		mvc.perform(get("/test/boom").header("X-Correlation-ID", "trace-123")).andReturn();
+		mvc.perform(get(BOOM_PATH).header("X-Correlation-ID", "trace-123")).andReturn();
 
 		assertThat(logCapture.list).anyMatch(
 				e -> e.getLevel() == Level.ERROR && "trace-123".equals(e.getMDCPropertyMap().get("correlationId")));

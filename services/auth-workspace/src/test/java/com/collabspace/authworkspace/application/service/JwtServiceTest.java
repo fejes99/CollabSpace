@@ -40,7 +40,7 @@ class JwtServiceTest {
 	}
 
 	@Test
-	void issueAccessToken_claimsAreCorrect() throws Exception {
+	void issueAccessTokenClaimsAreCorrect() throws Exception {
 		List<WorkspaceMembership> memberships = List.of(new WorkspaceMembership("ws-1", "admin"));
 
 		String token = jwtService.issueAccessToken("user-123", memberships);
@@ -59,7 +59,7 @@ class JwtServiceTest {
 	}
 
 	@Test
-	void issueRefreshToken_plaintextDecodesToThirtyTwoBytes() {
+	void issueRefreshTokenPlaintextDecodesToThirtyTwoBytes() {
 		RefreshTokenPair pair = jwtService.issueRefreshToken();
 
 		byte[] decoded = Base64.getUrlDecoder().decode(pair.plaintext());
@@ -67,7 +67,7 @@ class JwtServiceTest {
 	}
 
 	@Test
-	void issueRefreshToken_hashMatchesSha256OfPlaintext() throws Exception {
+	void issueRefreshTokenHashMatchesSha256OfPlaintext() throws Exception {
 		RefreshTokenPair pair = jwtService.issueRefreshToken();
 
 		byte[] decoded = Base64.getUrlDecoder().decode(pair.plaintext());
@@ -76,7 +76,7 @@ class JwtServiceTest {
 	}
 
 	@Test
-	void issueRefreshToken_twoCallsProduceDifferentTokens() {
+	void issueRefreshTokenTwoCallsProduceDifferentTokens() {
 		RefreshTokenPair first = jwtService.issueRefreshToken();
 		RefreshTokenPair second = jwtService.issueRefreshToken();
 

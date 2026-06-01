@@ -51,9 +51,10 @@ locals {
 
   all_services = toset(concat(tolist(local.ecs_services), ["notification"]))
 
-  # JWT configuration — fixed per environment. The issuer is a stable string
-  # that does not change across dev-down/dev-up cycles. See ADR-026.
-  jwt_issuer   = "https://auth.dev.collabspace.io"
+  # JWT audience — fixed per environment.
+  # The issuer is the API Gateway endpoint (set inside the api-gateway module)
+  # so it is not declared here. Tokens are invalidated on dev-down/dev-up
+  # because the endpoint URL changes each cycle; acceptable in dev.
   jwt_audience = "collabspace-api"
 }
 
@@ -139,17 +140,19 @@ resource "random_password" "internal_token" {
 }
 
 resource "aws_ssm_parameter" "jwt_issuer" {
-  name  = "/collabspace/${var.environment}/jwt/issuer"
-  type  = "String"
-  value = local.jwt_issuer
-  tags  = { Name = "/collabspace/${var.environment}/jwt/issuer" }
+  name      = "/collabspace/${var.environment}/jwt/issuer"
+  type      = "String"
+  value     = module.api_gateway.api_endpoint
+  overwrite = true
+  tags      = { Name = "/collabspace/${var.environment}/jwt/issuer" }
 }
 
 resource "aws_ssm_parameter" "jwt_audience" {
-  name  = "/collabspace/${var.environment}/jwt/audience"
-  type  = "String"
-  value = local.jwt_audience
-  tags  = { Name = "/collabspace/${var.environment}/jwt/audience" }
+  name      = "/collabspace/${var.environment}/jwt/audience"
+  type      = "String"
+  value     = local.jwt_audience
+  overwrite = true
+  tags      = { Name = "/collabspace/${var.environment}/jwt/audience" }
 }
 
 resource "aws_ssm_parameter" "internal_token" {
@@ -225,6 +228,7 @@ module "api_gateway" {
   subnet_ids         = module.vpc.public_subnet_ids
   internal_token     = random_password.internal_token.result
   log_retention_days = var.log_retention_days
+  jwt_audience       = local.jwt_audience
 }
 
 # ── SSM parameter — JWKS URI ──────────────────────────────────────────────────
@@ -245,6 +249,35 @@ resource "aws_ssm_parameter" "jwks_uri" {
 }
 
 # ── auth-workspace ────────────────────────────────────────────────────────────
+#
+# Task role SSM policy: auth-workspace calls SsmConfigLoader at startup to read
+# JWT config (private key, issuer, audience, jwks-uri). These are application-
+# level SSM calls that use the task role, not the execution role.
+
+resource "aws_iam_role_policy" "auth_workspace_ssm" {
+  name = "ssm-read"
+  role = "${var.project_name}-${var.environment}-auth-workspace-task"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "SSMRead"
+        Effect   = "Allow"
+        Action   = ["ssm:GetParameter", "ssm:GetParameters"]
+        Resource = ["arn:aws:ssm:${var.aws_region}:${data.aws_caller_identity.current.account_id}:parameter/collabspace/*"]
+      },
+      {
+        Sid      = "KMSDecrypt"
+        Effect   = "Allow"
+        Action   = ["kms:Decrypt"]
+        Resource = ["arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/alias/aws/ssm"]
+      }
+    ]
+  })
+
+  depends_on = [module.iam_ecs]
+}
 
 module "auth_workspace" {
   source = "../../modules/ecs-service"
@@ -272,7 +305,17 @@ module "auth_workspace" {
   aws_region     = var.aws_region
 
   environment_variables = {
-    SPRING_PROFILES_ACTIVE = var.environment
+    SPRING_PROFILES_ACTIVE    = var.environment
+    SPRING_DATASOURCE_URL     = "jdbc:postgresql://${var.neon_host}/${var.neon_dbname}?sslmode=require&channel_binding=require"
+    SPRING_DATASOURCE_USERNAME = var.neon_username
+    JWT_PRIVATE_KEY_SSM_PATH  = "/collabspace/${var.environment}/auth/jwt-private-key"
+    JWT_ISSUER_SSM_PATH       = "/collabspace/${var.environment}/jwt/issuer"
+    JWT_AUDIENCE_SSM_PATH     = "/collabspace/${var.environment}/jwt/audience"
+    JWT_JWKS_URI_SSM_PATH     = "/collabspace/${var.environment}/jwt/jwks-uri"
+  }
+
+  secrets = {
+    SPRING_DATASOURCE_PASSWORD = aws_ssm_parameter.db_password.arn
   }
 }
 
@@ -324,6 +367,12 @@ resource "aws_apigatewayv2_route" "auth_jwks" {
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
+resource "aws_apigatewayv2_route" "auth_oidc_discovery" {
+  api_id    = module.api_gateway.api_id
+  route_key = "GET /.well-known/openid-configuration"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
 resource "aws_apigatewayv2_route" "auth_health" {
   api_id    = module.api_gateway.api_id
   route_key = "GET /actuator/health"
@@ -336,12 +385,16 @@ resource "aws_apigatewayv2_route" "auth_health" {
 resource "aws_apigatewayv2_route" "auth_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /auth/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
 resource "aws_apigatewayv2_route" "workspaces_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /workspaces/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
@@ -397,6 +450,8 @@ resource "aws_apigatewayv2_integration" "realtime_service" {
 resource "aws_apigatewayv2_route" "realtime_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /realtime/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
 }
 
@@ -450,6 +505,8 @@ resource "aws_apigatewayv2_integration" "ai_assistant" {
 resource "aws_apigatewayv2_route" "assistant_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /assistant/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
 }
 
@@ -503,6 +560,8 @@ resource "aws_apigatewayv2_route" "notifications_health" {
 resource "aws_apigatewayv2_route" "notifications_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /notifications/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
 }
 
@@ -556,6 +615,8 @@ resource "aws_apigatewayv2_integration" "document_service" {
 resource "aws_apigatewayv2_route" "documents_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /documents/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = module.api_gateway.authorizer_id
   target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
 }
 
