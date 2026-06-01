@@ -1,9 +1,11 @@
 package com.collabspace.authworkspace.adapter.in.rest;
 
+import com.collabspace.authworkspace.JwtTestConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -15,6 +17,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 				"spring.datasource.hikari.initialization-fail-timeout=0",
 				"spring.datasource.hikari.connection-timeout=500", "spring.flyway.enabled=false" })
 @AutoConfigureMockMvc
+@Import(JwtTestConfiguration.class)
 class HealthCheckDownIntegrationTest {
 
 	@Autowired
