@@ -131,10 +131,13 @@ docker run -p 8080:8080 auth-workspace:local
 | `SPRING_DATASOURCE_URL` | Stage 2+ | Injected from SSM at ECS task start |
 | `SPRING_DATASOURCE_USERNAME` | Stage 2+ | Injected from SSM |
 | `SPRING_DATASOURCE_PASSWORD` | Stage 2+ | Injected from SSM |
-| `JWT_PRIVATE_KEY_SSM_PATH` | Stage 2+ | SSM path to RS256 private key |
+| `JWT_PRIVATE_KEY_SSM_PATH` | Stage 2+ | SSM path to RS256 private key (`/collabspace/dev/auth/jwt-private-key`) |
+| `JWT_ISSUER_SSM_PATH` | Stage 2+ | SSM path for JWT issuer string (`/collabspace/dev/jwt/issuer`) |
+| `JWT_AUDIENCE_SSM_PATH` | Stage 2+ | SSM path for JWT audience string (`/collabspace/dev/jwt/audience`) |
+| `JWT_JWKS_URI_SSM_PATH` | Stage 2+ | SSM path for JWKS URI (`/collabspace/dev/jwt/jwks-uri`) — changes on each dev-up |
 | `REDIS_URL` | Stage 2+ | Upstash TLS URL, injected from SSM |
 
-For local development, set `SPRING_DATASOURCE_URL`, `SPRING_DATASOURCE_USERNAME`, and `SPRING_DATASOURCE_PASSWORD` via IntelliJ run configuration (Run → Edit Configurations → Environment variables) or an `.env` file (gitignored). The datasource URL must use the `jdbc:postgresql://` scheme with `sslmode=require` for Neon. The remaining variables are not yet required.
+For local development, set all variables via IntelliJ run configuration (Run → Edit Configurations → Environment variables) or an `.env` file (gitignored). The datasource URL must use the `jdbc:postgresql://` scheme with `sslmode=require` for Neon. The four `*_SSM_PATH` variables hold SSM parameter paths, not secret values — the service calls SSM at startup to resolve the actual values using your local AWS credentials.
 
 ## Deployment
 

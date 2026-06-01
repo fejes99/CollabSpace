@@ -46,7 +46,7 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Build out real functionality in auth-workspace — database connection and health check done; next: Flyway migration, UserJpaAdapter, user registration, login, and JWT issuance.
+Current goal: Build out real functionality in auth-workspace — database connection, Flyway migration, and JWT infrastructure done; next: UserJpaAdapter, user registration, login, and workspace endpoints.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
