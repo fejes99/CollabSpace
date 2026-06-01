@@ -25,7 +25,7 @@ class WellKnownControllerTest {
 	MockMvc mockMvc;
 
 	@Test
-	void jwks_returnsPublicKeyOnly() throws Exception {
+	void jwksReturnsPublicKeyOnly() throws Exception {
 		mockMvc.perform(get("/.well-known/jwks.json"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.keys").isArray())
@@ -35,7 +35,7 @@ class WellKnownControllerTest {
 	}
 
 	@Test
-	void oidcDiscovery_returnsRequiredFields() throws Exception {
+	void oidcDiscoveryReturnsRequiredFields() throws Exception {
 		mockMvc.perform(get("/.well-known/openid-configuration"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.issuer").value("https://test.issuer"))
