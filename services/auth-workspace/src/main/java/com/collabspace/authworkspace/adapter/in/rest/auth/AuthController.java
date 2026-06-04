@@ -1,0 +1,49 @@
+package com.collabspace.authworkspace.adapter.in.rest.auth;
+
+import com.collabspace.authworkspace.application.port.in.auth.RegisterUserCommand;
+import com.collabspace.authworkspace.application.port.in.auth.RegisterUserUseCase;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.Schema;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ProblemDetail;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
+
+@RestController
+@RequestMapping("/v1/auth")
+@Tag(name = "Auth", description = "User registration and authentication")
+public class AuthController {
+
+	private final RegisterUserUseCase registerUserUseCase;
+
+	public AuthController(RegisterUserUseCase registerUserUseCase) {
+		this.registerUserUseCase = registerUserUseCase;
+	}
+
+	@Operation(summary = "Register a new user",
+			description = "Creates a user account and returns a JWT access token. The user is logged in immediately after registration.")
+	@ApiResponse(responseCode = "201", description = "Registration successful",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = RegisterResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Validation failed",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "409", description = "Email already registered",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@PostMapping("/register")
+	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
+		var command = new RegisterUserCommand(request.name(), request.email(), request.password());
+		return ResponseEntity.status(HttpStatus.CREATED)
+			.body(RegisterResponse.from(registerUserUseCase.register(command)));
+	}
+
+}

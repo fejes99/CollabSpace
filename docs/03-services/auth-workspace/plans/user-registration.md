@@ -172,34 +172,49 @@ Already present — do not add:
 - Testcontainers
 
 ### Package reorganization
-Adopt feature sub-packages within layers. One physical file move this PR:
+Feature sub-packages are applied consistently across all layers using two domain areas:
+`auth` and `workspace`. One physical file move this PR:
 `WellKnownController.java` → `adapter/in/rest/auth/`. Update `WellKnownControllerTest`
 to reflect the new package path — it will not compile after the move otherwise.
 
+**Full target structure (current PR scope marked ← this PR; future marked ← future):**
+
 ```
 adapter/in/rest/
-  auth/                          ← WellKnownController moves here; AuthController lands here
-  CorrelationIdFilter.java       ← stays (cross-cutting)
-  DbHealthIndicator.java         ← stays (cross-cutting)
-  GlobalExceptionHandler.java    ← stays (cross-cutting)
-  SecurityConfig.java            ← stays (cross-cutting)
+  auth/                              ← WellKnownController (moved), AuthController (this PR)
+  workspace/                         ← WorkspaceController (future)
+  CorrelationIdFilter.java           ← stays (cross-cutting)
+  DbHealthIndicator.java             ← stays (cross-cutting)
+  GlobalExceptionHandler.java        ← stays (cross-cutting)
+  SecurityConfig.java                ← stays (cross-cutting)
 
 adapter/out/
   persistence/
-    entity/UserEntity.java
-    repository/UserJpaRepository.java
-    UserJpaAdapter.java
-  ssm/                           ← stays as-is
+    auth/
+      entity/UserEntity.java         ← this PR
+      repository/UserJpaRepository.java ← this PR
+      UserJpaAdapter.java            ← this PR
+    workspace/                       ← future
+  redis/
+    auth/                            ← RedisTokenBlocklistAdapter (login PR)
+  ssm/                               ← stays as-is
 
 application/
-  port/in/RegisterUserUseCase.java
-  port/out/UserRepository.java
-  service/                       ← stays flat (existing + AuthApplicationService)
+  port/in/
+    auth/                            ← RegisterUserUseCase, LoginUseCase, etc. (this PR +)
+    workspace/                       ← CreateWorkspaceUseCase, etc. (future)
+  port/out/
+    auth/                            ← UserRepository, TokenBlocklistPort (this PR +)
+    workspace/                       ← WorkspaceRepository (future)
+  service/
+    auth/                            ← AuthApplicationService (this PR)
+    workspace/                       ← WorkspaceApplicationService (future)
 
 domain/
-  exception/                     ← new sub-package
-  model/User.java                ← new
-  model/WorkspaceMembership.java ← stays
+  exception/                         ← stays flat (cross-cutting)
+  model/
+    auth/                            ← User (this PR); WorkspaceMembership moves here
+    workspace/                       ← Workspace, etc. (future)
 ```
 
 ### ApplicationConfig (new @Configuration class)

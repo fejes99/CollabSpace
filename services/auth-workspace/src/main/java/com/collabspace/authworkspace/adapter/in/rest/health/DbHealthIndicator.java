@@ -1,16 +1,15 @@
-package com.collabspace.authworkspace.adapter.in.rest;
+package com.collabspace.authworkspace.adapter.in.rest.health;
 
+import java.sql.Connection;
+import java.sql.SQLException;
+import java.util.concurrent.atomic.AtomicReference;
+import javax.sql.DataSource;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.health.contributor.Health;
 import org.springframework.boot.health.contributor.HealthIndicator;
 import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties;
 import org.springframework.stereotype.Component;
-
-import javax.sql.DataSource;
-import java.sql.Connection;
-import java.sql.SQLException;
-import java.util.concurrent.atomic.AtomicReference;
 
 @Component
 class DbHealthIndicator implements HealthIndicator {

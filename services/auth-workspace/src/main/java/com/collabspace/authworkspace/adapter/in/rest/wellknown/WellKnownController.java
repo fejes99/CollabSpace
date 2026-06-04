@@ -1,8 +1,9 @@
-package com.collabspace.authworkspace.adapter.in.rest;
+package com.collabspace.authworkspace.adapter.in.rest.wellknown;
 
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.JWKSet;
 import com.nimbusds.jose.jwk.RSAKey;
+import io.swagger.v3.oas.annotations.Hidden;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -11,6 +12,7 @@ import org.springframework.web.bind.annotation.RestController;
 import java.util.List;
 import java.util.Map;
 
+@Hidden
 @RestController
 public class WellKnownController {
 

@@ -1,21 +1,21 @@
 package com.collabspace.authworkspace.application.service;
 
+import static org.assertj.core.api.Assertions.assertThat;
+
+import com.collabspace.authworkspace.application.util.CryptoUtils;
 import com.collabspace.authworkspace.domain.model.WorkspaceMembership;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
-import java.security.MessageDigest;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Clock;
 import java.util.Base64;
-import java.util.HexFormat;
 import java.util.List;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-
-import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
 
@@ -34,9 +34,9 @@ class JwtServiceTest {
 	}
 
 	@BeforeEach
-	void setUp() {
+	void setup() {
 		jwtService = new JwtService(testKey,
-				new JwtProperties("https://test.issuer", "test-audience", "https://test/jwks"));
+				new JwtProperties("https://test.issuer", "test-audience", "https://test/jwks"), Clock.systemUTC());
 	}
 
 	@Test
@@ -67,12 +67,10 @@ class JwtServiceTest {
 	}
 
 	@Test
-	void issueRefreshTokenHashMatchesSha256OfPlaintext() throws Exception {
+	void issueRefreshTokenHashMatchesSha256OfPlaintext() {
 		RefreshTokenPair pair = jwtService.issueRefreshToken();
 
-		byte[] decoded = Base64.getUrlDecoder().decode(pair.plaintext());
-		byte[] digest = MessageDigest.getInstance("SHA-256").digest(decoded);
-		assertThat(pair.hash()).isEqualTo(HexFormat.of().formatHex(digest));
+		assertThat(pair.hash()).isEqualTo(CryptoUtils.sha256Hex(pair.plaintext()));
 	}
 
 	@Test
