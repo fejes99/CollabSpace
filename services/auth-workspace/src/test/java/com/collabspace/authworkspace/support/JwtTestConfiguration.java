@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace;
+package com.collabspace.authworkspace.support;
 
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.RSAKey;

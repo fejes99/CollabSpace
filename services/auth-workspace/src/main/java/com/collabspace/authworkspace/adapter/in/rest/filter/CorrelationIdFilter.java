@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.adapter.in.rest;
+package com.collabspace.authworkspace.adapter.in.rest.filter;
 
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;

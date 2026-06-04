@@ -146,6 +146,10 @@ jobs:
         uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2  # v1.0.122 (= current @v1)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          claude_args: |
-            --model claude-sonnet-4-6
-            --max-turns 15
+          claude_args: --model claude-sonnet-4-6 --max-turns 15
+          prompt: |
+            You are a senior engineer reviewing a pull request on a learning project.
+            Review the PR diff for: correctness, potential bugs, security issues (OWASP top 10),
+            idiomatic usage per language, and production readiness concerns.
+            Post a single PR review comment summarising findings by category.
+            Be direct and educational — this is a tutor relationship, not just a checklist.

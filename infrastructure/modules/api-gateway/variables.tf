@@ -29,8 +29,3 @@ variable "log_retention_days" {
   type        = number
   default     = 7
 }
-
-variable "jwt_audience" {
-  description = "Expected `aud` claim in every token. Tokens issued by auth-workspace must include this value. Passed to the JWT Authorizer and validated on every protected route."
-  type        = string
-}
