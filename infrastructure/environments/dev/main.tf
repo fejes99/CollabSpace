@@ -39,6 +39,16 @@ provider "aws" {
 
 data "aws_caller_identity" "current" {}
 
+# auth-workspace has real CI/CD-built images (commit-SHA tags); no :skeleton
+# image was ever pushed for it. This data source resolves the most recently
+# pushed image so fresh dev-up always boots the current build. Every
+# terraform plan queries ECR — if CI/CD pushed a new image since last apply,
+# Terraform will show a task definition replacement on the next dev-up.
+data "aws_ecr_image" "auth_workspace_latest" {
+  repository_name = "collabspace-auth-workspace"
+  most_recent     = true
+}
+
 # ── Service sets ─────────────────────────────────────────────────────────────
 
 locals {
@@ -216,7 +226,10 @@ resource "aws_service_discovery_private_dns_namespace" "main" {
 
 # ── API Gateway HTTP API ──────────────────────────────────────────────────────
 # ADR-026: Replaces the walking-skeleton ALB as the REST entry point.
-# The module creates the HTTP API, VPC Link, JWT Authorizer, and default stage.
+# The module creates the HTTP API, VPC Link, and default stage.
+# The JWT Authorizer is defined separately below to avoid a cold-start
+# bootstrapping problem: AWS validates the OIDC discovery endpoint at
+# authorizer creation time, which requires auth-workspace to be running.
 # Integrations and routes are defined per-service below.
 
 module "api_gateway" {
@@ -228,7 +241,6 @@ module "api_gateway" {
   subnet_ids         = module.vpc.public_subnet_ids
   internal_token     = random_password.internal_token.result
   log_retention_days = var.log_retention_days
-  jwt_audience       = local.jwt_audience
 }
 
 # ── SSM parameter — JWKS URI ──────────────────────────────────────────────────
@@ -287,7 +299,7 @@ module "auth_workspace" {
   service_name = "auth-workspace"
 
   cluster_id = module.ecs_cluster.cluster_id
-  image_url  = "${data.terraform_remote_state.shared.outputs.ecr_repository_urls["auth-workspace"]}:skeleton"
+  image_url  = "${data.terraform_remote_state.shared.outputs.ecr_repository_urls["auth-workspace"]}@${data.aws_ecr_image.auth_workspace_latest.image_digest}"
 
   container_port = 8080
   cpu            = 256
@@ -345,19 +357,19 @@ resource "aws_apigatewayv2_integration" "auth_workspace" {
 }
 
 # Public routes — no JWT Authorizer. These must be reachable without a token:
-#   /auth/register, /auth/login: the client does not have a JWT yet.
+#   /v1/auth/register, /v1/auth/login: the client does not have a JWT yet.
 #   /.well-known/jwks.json: the JWT Authorizer itself fetches from this URL.
 #   /actuator/health: ALB and monitoring probes; must not require auth.
 
 resource "aws_apigatewayv2_route" "auth_register" {
   api_id    = module.api_gateway.api_id
-  route_key = "POST /auth/register"
+  route_key = "POST /v1/auth/register"
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
 resource "aws_apigatewayv2_route" "auth_login" {
   api_id    = module.api_gateway.api_id
-  route_key = "POST /auth/login"
+  route_key = "POST /v1/auth/login"
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
@@ -373,6 +385,59 @@ resource "aws_apigatewayv2_route" "auth_oidc_discovery" {
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
+# ── JWT Authorizer ────────────────────────────────────────────────────────────
+#
+# Defined here rather than inside the api-gateway module to solve a cold-start
+# bootstrapping problem: AWS validates the OIDC discovery endpoint
+# ({api_endpoint}/.well-known/openid-configuration) at authorizer creation time.
+# That route must exist AND auth-workspace must be serving it. By depending on
+# the OIDC route and the auth-workspace module, and polling until auth-workspace
+# responds, we guarantee AWS can reach the endpoint when the authorizer is made.
+#
+# issuer = api_endpoint: tokens are invalidated on dev-down/dev-up because the
+# API Gateway endpoint (and therefore the issuer URL) changes each cycle. This
+# is acceptable in dev. Staging/prod should use a stable custom domain.
+
+resource "terraform_data" "wait_for_oidc" {
+  depends_on = [
+    aws_apigatewayv2_route.auth_oidc_discovery,
+    module.auth_workspace,
+  ]
+
+  triggers_replace = [module.api_gateway.api_endpoint]
+
+  provisioner "local-exec" {
+    command = <<-EOT
+      echo "==> Waiting for auth-workspace OIDC discovery endpoint..."
+      ENDPOINT="${module.api_gateway.api_endpoint}/.well-known/openid-configuration"
+      for i in $(seq 1 30); do
+        if curl -sf "$ENDPOINT" > /dev/null 2>&1; then
+          echo "==> OIDC endpoint ready after $i attempt(s)"
+          exit 0
+        fi
+        echo "==> Attempt $i/30: not ready, retrying in 10s..."
+        sleep 10
+      done
+      echo "==> Timeout: OIDC discovery endpoint did not become ready in 5 minutes"
+      exit 1
+    EOT
+  }
+}
+
+resource "aws_apigatewayv2_authorizer" "jwt" {
+  depends_on = [terraform_data.wait_for_oidc]
+
+  api_id           = module.api_gateway.api_id
+  authorizer_type  = "JWT"
+  identity_sources = ["$request.header.Authorization"]
+  name             = "${var.project_name}-${var.environment}-jwt"
+
+  jwt_configuration {
+    issuer   = module.api_gateway.api_endpoint
+    audience = [local.jwt_audience]
+  }
+}
+
 resource "aws_apigatewayv2_route" "auth_health" {
   api_id    = module.api_gateway.api_id
   route_key = "GET /actuator/health"
@@ -384,17 +449,17 @@ resource "aws_apigatewayv2_route" "auth_health" {
 
 resource "aws_apigatewayv2_route" "auth_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /auth/{proxy+}"
+  route_key          = "ANY /v1/auth/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
 resource "aws_apigatewayv2_route" "workspaces_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /workspaces/{proxy+}"
+  route_key          = "ANY /v1/workspaces/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
@@ -449,9 +514,9 @@ resource "aws_apigatewayv2_integration" "realtime_service" {
 
 resource "aws_apigatewayv2_route" "realtime_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /realtime/{proxy+}"
+  route_key          = "ANY /v1/realtime/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
 }
 
@@ -504,9 +569,9 @@ resource "aws_apigatewayv2_integration" "ai_assistant" {
 
 resource "aws_apigatewayv2_route" "assistant_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /assistant/{proxy+}"
+  route_key          = "ANY /v1/assistant/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
 }
 
@@ -559,9 +624,9 @@ resource "aws_apigatewayv2_route" "notifications_health" {
 
 resource "aws_apigatewayv2_route" "notifications_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /notifications/{proxy+}"
+  route_key          = "ANY /v1/notifications/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
 }
 
@@ -614,9 +679,9 @@ resource "aws_apigatewayv2_integration" "document_service" {
 
 resource "aws_apigatewayv2_route" "documents_proxy" {
   api_id             = module.api_gateway.api_id
-  route_key          = "ANY /documents/{proxy+}"
+  route_key          = "ANY /v1/documents/{proxy+}"
   authorization_type = "JWT"
-  authorizer_id      = module.api_gateway.authorizer_id
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
 }
 

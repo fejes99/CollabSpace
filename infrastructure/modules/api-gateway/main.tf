@@ -56,32 +56,6 @@ resource "aws_apigatewayv2_vpc_link" "main" {
   }
 }
 
-# ── JWT Authorizer ────────────────────────────────────────────────────────────
-#
-# issuer = api_endpoint: the API Gateway URL is both the issuer and the OIDC
-# provider. AWS fetches {api_endpoint}/.well-known/openid-configuration at
-# authorizer creation to discover the JWKS URI, then validates every token
-# signature against the auth-workspace public key. No custom domain required.
-#
-# Trade-off: tokens are invalidated on dev-down/dev-up because the API Gateway
-# endpoint (and therefore the issuer URL) changes each cycle. This is acceptable
-# in dev. Staging/prod should use a stable custom domain.
-#
-# identity_sources: bearer token read from the Authorization header. Tokens are
-# validated by API Gateway — no Lambda logic needed.
-
-resource "aws_apigatewayv2_authorizer" "jwt" {
-  api_id           = aws_apigatewayv2_api.main.id
-  authorizer_type  = "JWT"
-  identity_sources = ["$request.header.Authorization"]
-  name             = "${var.project_name}-${var.environment}-jwt"
-
-  jwt_configuration {
-    issuer   = aws_apigatewayv2_api.main.api_endpoint
-    audience = [var.jwt_audience]
-  }
-}
-
 # ── Access logs ───────────────────────────────────────────────────────────────
 
 resource "aws_cloudwatch_log_group" "access_logs" {
