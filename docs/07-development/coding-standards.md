@@ -26,6 +26,8 @@ For `auth-workspace`. Build tool: **Maven** (`pom.xml`). Maven applies only to t
 - No direct database access from controllers — go through the service layer.
 - Constructor-inject `java.time.Clock` for any time-sensitive code. Test fixtures supply a `Clock.fixed(...)` so JWT expiry, token TTLs, and blocklist windows are deterministic. See [testing-strategy.md](testing-strategy.md) §7.
 - Format with Spring Java Format (`spring-javaformat-maven-plugin` in `pom.xml` enforces it in CI; IntelliJ plugin installed from GitHub releases applies it on save). Run `./mvnw spring-javaformat:apply` to fix all files at once.
+- **Flyway migrations: always name constraints explicitly.** Use `CONSTRAINT <name> UNIQUE (col)` / `CONSTRAINT <name> FOREIGN KEY ...` — never rely on Postgres auto-generated constraint names (e.g. `users_email_key`). Application code that catches `DataIntegrityViolationException` must check the constraint name string; auto-generated names change if the table is recreated, breaking the check silently.
+- **Uniqueness enforcement: optimistic insert over check-then-act.** INSERT directly, catch `DataIntegrityViolationException`, inspect the named constraint, re-throw as a domain exception. Never SELECT first to check uniqueness — there is a race window between the check and the insert, and the DB constraint is the only atomic guard.
 
 ---
 

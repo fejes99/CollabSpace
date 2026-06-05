@@ -194,6 +194,8 @@ API Gateway validates: **signature correctness, token expiry, issuer, audience.*
 
 The JWKS endpoint must be publicly accessible — API Gateway calls it from within AWS infrastructure. It must return only the public key, never the private key. The private key lives in SSM Parameter Store at a path like `/collabspace/dev/auth/jwt-private-key` and is loaded by the Auth service at startup.
 
+**Provisioning order dependency.** When Terraform creates the JWT Authorizer, AWS immediately fetches `{issuer}/.well-known/openid-configuration` to validate the issuer. This means the Auth service must be deployed and healthy before `aws_apigatewayv2_authorizer` can be applied. On a fresh environment (`make dev-up` from scratch), a `terraform_data` resource polls the OIDC discovery endpoint and blocks authorizer creation until the endpoint responds. See ADR-029.
+
 ---
 
 ## Audit events
