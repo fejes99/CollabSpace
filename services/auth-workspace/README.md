@@ -74,9 +74,10 @@ src/main/java/com/collabspace/authworkspace/
     │       ├── auth/       Auth controllers and DTOs.
     │       │   ├── AuthController.java
     │       │   ├── RegisterRequest.java
-    │       │   ├── RegisterResponse.java
-    │       │   └── WellKnownController.java
+    │       │   └── RegisterResponse.java
     │       ├── error/      RFC 9457 global exception handler.
+    │       ├── wellknown/
+    │       │   └── WellKnownController.java
     │       │   └── GlobalExceptionHandler.java
     │       ├── filter/
     │       │   └── CorrelationIdFilter.java
@@ -172,6 +173,15 @@ docker run -p 8080:8080 auth-workspace:local
 | `REDIS_URL` | Yes | Upstash TLS URL, injected from SSM |
 
 Set variables via IntelliJ run configuration or an `.env` file (gitignored). See `.env.example` for a template.
+
+## Database schema
+
+Flyway runs migrations automatically on startup. Migration files live in `src/main/resources/db/migration/`.
+
+| Version | File | What it does |
+|---|---|---|
+| V1 | `V1__create_users.sql` | Creates `users` table: `id UUID PK`, `name VARCHAR(255)`, `email VARCHAR(320)`, `password_hash TEXT` (nullable), `created_at`/`updated_at TIMESTAMPTZ` |
+| V2 | `V2__name_email_constraint.sql` | Renames the email unique constraint from the Postgres auto-generated `users_email_key` to the explicit `users_email_unique` |
 
 ## Deployment
 
