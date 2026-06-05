@@ -34,7 +34,7 @@ class GlobalExceptionHandler {
 		problem.setDetail("The request body contains invalid fields.");
 		problem.setInstance(URI.create(request.getRequestURI()));
 		problem.setProperty("errors", errors);
-		log.warn("event=validation_failed fields={}", fieldNames(ex));
+		log.warn("event=validation_failed uri={} fields={}", request.getRequestURI(), fieldNames(ex));
 		return problem;
 	}
 

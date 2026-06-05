@@ -25,11 +25,10 @@ public class UserJpaAdapter implements UserRepository {
 			return toDomain(jpaRepository.save(toEntity(user)));
 		}
 		catch (DataIntegrityViolationException ex) {
-			// users_email_key is the Postgres auto-generated name for the unnamed UNIQUE
-			// constraint on users.email (see V1__create_users.sql). If a different
-			// constraint fires, rethrow so it surfaces as an unexpected server error.
+			// users_email_unique is defined in V2__name_email_constraint.sql. If a
+			// different constraint fires, rethrow so it surfaces as an unexpected server error.
 			if (ex.getCause() instanceof ConstraintViolationException cve
-					&& "users_email_key".equals(cve.getConstraintName())) {
+					&& "users_email_unique".equals(cve.getConstraintName())) {
 				throw new EmailAlreadyTakenException();
 			}
 			throw ex;
