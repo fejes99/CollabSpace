@@ -4,9 +4,6 @@ import com.collabspace.authworkspace.domain.exception.ConflictException;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
@@ -15,6 +12,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 
 @RestControllerAdvice
 class GlobalExceptionHandler {

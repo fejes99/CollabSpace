@@ -1,7 +1,7 @@
 package com.collabspace.authworkspace.application.service;
 
 import com.collabspace.authworkspace.application.util.CryptoUtils;
-import com.collabspace.authworkspace.domain.model.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.auth.WorkspaceMembership;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -9,6 +9,8 @@ import com.nimbusds.jose.crypto.RSASSASigner;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
+import org.springframework.stereotype.Service;
+
 import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
@@ -17,7 +19,6 @@ import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.stereotype.Service;
 
 @Service
 public class JwtService {
@@ -40,6 +41,8 @@ public class JwtService {
 		this.clock = clock;
 	}
 
+	@SuppressWarnings("java:S2143") // Date.from(Instant) is required by the Nimbus
+									// JWTClaimsSet API
 	public String issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
 		Instant now = clock.instant();
 		List<Map<String, String>> membershipClaims = memberships.stream()

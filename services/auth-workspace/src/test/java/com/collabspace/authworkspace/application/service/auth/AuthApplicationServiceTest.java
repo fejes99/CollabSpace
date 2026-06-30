@@ -1,23 +1,11 @@
 package com.collabspace.authworkspace.application.service.auth;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
-import static org.mockito.ArgumentMatchers.argThat;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
-
+import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterResult;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserCommand;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.model.auth.User;
-import java.time.Clock;
-import java.time.Instant;
-import java.time.ZoneOffset;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -25,6 +13,16 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.crypto.password.PasswordEncoder;
+
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneOffset;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
 @DisplayName("AuthApplicationService")
@@ -52,7 +50,7 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("returns user and access token for a valid command")
 	void registerValidCommandReturnsUserAndToken() {
-		RegisterUserCommand command = new RegisterUserCommand("Alice", "alice@example.com", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123");
 		when(passwordEncoder.encode("password123")).thenReturn("hashed_pw");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("jwt.token");
@@ -70,7 +68,7 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("normalises email to lowercase before persisting")
 	void registerEmailIsNormalisedStoredAsLowercase() {
-		RegisterUserCommand command = new RegisterUserCommand("Alice", "Alice@EXAMPLE.COM", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "Alice@EXAMPLE.COM", "password123");
 		when(passwordEncoder.encode(anyString())).thenReturn("hashed");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("token");
@@ -84,7 +82,7 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("throws EmailAlreadyTakenException when repository rejects duplicate email")
 	void registerDuplicateEmailThrowsWhenRepositoryRejects() {
-		RegisterUserCommand command = new RegisterUserCommand("Alice", "alice@example.com", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123");
 		when(passwordEncoder.encode("password123")).thenReturn("hashed_pw");
 		when(userRepository.save(any(User.class))).thenThrow(new EmailAlreadyTakenException());
 

@@ -1,26 +1,16 @@
 package com.collabspace.authworkspace.adapter.in.rest.error;
 
-import static org.assertj.core.api.Assertions.assertThat;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.not;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
-import java.net.URI;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -37,6 +27,15 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.net.URI;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+import static org.hamcrest.Matchers.not;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest
 @Import(JwtTestConfiguration.class)
@@ -111,7 +110,7 @@ class GlobalExceptionHandlerTest {
 	MockMvc mvc;
 
 	@MockitoBean
-	RegisterUserUseCase registerUserUseCase;
+	RegisterUseCase registerUseCase;
 
 	@BeforeEach
 	void attachLogger() {

@@ -1,11 +1,13 @@
 package com.collabspace.authworkspace.application.service;
 
-import static org.assertj.core.api.Assertions.assertThat;
-
 import com.collabspace.authworkspace.application.util.CryptoUtils;
-import com.collabspace.authworkspace.domain.model.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.auth.WorkspaceMembership;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
+import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
@@ -13,9 +15,8 @@ import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
 import java.util.Base64;
 import java.util.List;
-import org.junit.jupiter.api.BeforeAll;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
 
 class JwtServiceTest {
 

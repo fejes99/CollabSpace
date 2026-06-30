@@ -1,8 +1,8 @@
 package com.collabspace.authworkspace;
 
+import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
-import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.springframework.context.annotation.Import;
 
 @SpringBootTest

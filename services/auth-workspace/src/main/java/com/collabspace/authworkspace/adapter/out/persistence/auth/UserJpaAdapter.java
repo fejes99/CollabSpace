@@ -5,10 +5,11 @@ import com.collabspace.authworkspace.adapter.out.persistence.auth.repository.Use
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.model.auth.User;
-import java.util.Optional;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
+
+import java.util.Optional;
 
 @Component
 public class UserJpaAdapter implements UserRepository {
@@ -26,7 +27,8 @@ public class UserJpaAdapter implements UserRepository {
 		}
 		catch (DataIntegrityViolationException ex) {
 			// users_email_unique is defined in V2__name_email_constraint.sql. If a
-			// different constraint fires, rethrow so it surfaces as an unexpected server error.
+			// different constraint fires, rethrow so it surfaces as an unexpected server
+			// error.
 			if (ex.getCause() instanceof ConstraintViolationException cve
 					&& "users_email_unique".equals(cve.getConstraintName())) {
 				throw new EmailAlreadyTakenException();

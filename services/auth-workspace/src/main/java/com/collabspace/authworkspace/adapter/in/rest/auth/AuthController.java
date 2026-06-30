@@ -1,7 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.auth;
 
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserCommand;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
+import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -22,10 +22,10 @@ import org.springframework.web.bind.annotation.RestController;
 @Tag(name = "Auth", description = "User registration and authentication")
 public class AuthController {
 
-	private final RegisterUserUseCase registerUserUseCase;
+	private final RegisterUseCase registerUseCase;
 
-	public AuthController(RegisterUserUseCase registerUserUseCase) {
-		this.registerUserUseCase = registerUserUseCase;
+	public AuthController(RegisterUseCase registerUseCase) {
+		this.registerUseCase = registerUseCase;
 	}
 
 	@Operation(summary = "Register a new user",
@@ -41,9 +41,8 @@ public class AuthController {
 					schema = @Schema(implementation = ProblemDetail.class)))
 	@PostMapping("/register")
 	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
-		var command = new RegisterUserCommand(request.name(), request.email(), request.password());
-		return ResponseEntity.status(HttpStatus.CREATED)
-			.body(RegisterResponse.from(registerUserUseCase.register(command)));
+		var command = new RegisterCommand(request.name(), request.email(), request.password());
+		return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse.from(registerUseCase.register(command)));
 	}
 
 }

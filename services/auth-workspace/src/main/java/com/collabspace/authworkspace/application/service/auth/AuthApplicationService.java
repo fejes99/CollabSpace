@@ -1,26 +1,27 @@
 package com.collabspace.authworkspace.application.service.auth;
 
+import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterResult;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserCommand;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUserUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.model.auth.User;
-import java.time.Clock;
-import java.time.Instant;
-import java.util.List;
-import java.util.Optional;
-import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Clock;
+import java.time.Instant;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
 @Service
-public class AuthApplicationService implements RegisterUserUseCase {
+public class AuthApplicationService implements RegisterUseCase {
 
 	private static final Logger log = LoggerFactory.getLogger(AuthApplicationService.class);
 
@@ -42,7 +43,7 @@ public class AuthApplicationService implements RegisterUserUseCase {
 
 	@Override
 	@Transactional
-	public RegisterResult register(RegisterUserCommand command) {
+	public RegisterResult register(RegisterCommand command) {
 		String normalisedEmail = command.email().toLowerCase();
 		Instant now = clock.instant();
 		User user = new User(UUID.randomUUID(), command.name(), normalisedEmail,
