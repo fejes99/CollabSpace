@@ -149,7 +149,7 @@ The blocklist check is a per-service responsibility. API Gateway validates signa
 1. Client sends `POST /v1/auth/login` with `{ email, password }`.
 2. User is looked up by email. If not found, return `401 Unauthorized`. Do not reveal whether the email exists — the error message must be identical whether the email is absent or the password is wrong.
 3. Password is verified with bcrypt comparison. If it does not match, return `401`.
-4. A JWT access token is generated: claims `{ sub, userId, memberships, iat, exp, jti }`. Signed with the private RSA key (RS256). `jti` is a ULIDv2 or UUID.
+4. A JWT access token is generated: claims `{ sub, userId, memberships, iat, exp, jti }`. Signed with the private RSA key (RS256). `jti` is a UUID (`UUID.randomUUID()`).
 5. A 32-byte cryptographically random refresh token is generated.
 6. The refresh token is hashed with SHA-256. The hash is inserted into `refresh_tokens` with `expires_at = now() + 7 days`, along with the request's `User-Agent` and IP address.
 7. The plaintext refresh token is set as the response cookie: `Set-Cookie: refresh_token=<value>; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=604800`.
