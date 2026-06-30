@@ -37,6 +37,7 @@ A registered user can log in with their email and password.
 > a pre-existing gap, not introduced by this slice.
 
 ### Request body
+
 ```json
 {
   "email": "alice@example.com",
@@ -45,6 +46,7 @@ A registered user can log in with their email and password.
 ```
 
 ### Response — 200 OK
+
 ```json
 {
   "accessToken": "<jwt>",
@@ -61,6 +63,7 @@ A registered user can log in with their email and password.
 directly from the DB record, not from the submitted input.
 
 Set-Cookie on success:
+
 ```
 Set-Cookie: refresh_token=<plaintext>; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=604800
 ```
@@ -87,10 +90,10 @@ design change needed then — the method signature already accepts a
 
 ### Non-happy path status codes
 
-| Scenario | Status |
-|---|---|
-| Invalid credentials (any reason) | 401 |
-| Validation failure | 400 |
+| Scenario                         | Status |
+| -------------------------------- | ------ |
+| Invalid credentials (any reason) | 401    |
+| Validation failure               | 400    |
 
 ---
 
@@ -130,10 +133,10 @@ leaking account policy.
 Registration stores emails lowercased; a login with `ALICE@EXAMPLE.COM` would fail
 a case-sensitive query against the stored `alice@example.com` without this step.
 
-| Field | Annotations | Error |
-|---|---|---|
-| `email` | `@NotBlank`, `@Email`, `@Size(max = 254)` | 400 + `errors` array |
-| `password` | `@NotBlank`, `@Size(max = 128)` | 400 (max prevents bcrypt DoS) |
+| Field      | Annotations                               | Error                         |
+| ---------- | ----------------------------------------- | ----------------------------- |
+| `email`    | `@NotBlank`, `@Email`, `@Size(max = 254)` | 400 + `errors` array          |
+| `password` | `@NotBlank`, `@Size(max = 128)`           | 400 (max prevents bcrypt DoS) |
 
 Unknown fields are ignored silently (Jackson default).
 
@@ -141,19 +144,19 @@ Unknown fields are ignored silently (Jackson default).
 
 ## 6. Edge cases
 
-| Scenario | Status | Notes |
-|---|---|---|
-| Valid email, correct password | 200 | Access token + refresh cookie issued |
-| Valid email, wrong password | 401 | Identical body to "email not found" |
-| Email not found | 401 | Identical body to "wrong password" |
-| User found, `password_hash` is null | 401 | Future OAuth user — never attempt bcrypt on null |
-| `email` missing | 400 | `@NotBlank` |
-| `password` missing | 400 | `@NotBlank` |
-| `email` blank (`""` or whitespace) | 400 | `@NotBlank` |
-| `password` blank (`""` or whitespace) | 400 | `@NotBlank` |
-| `email` malformed | 400 | `@Email` |
-| `password` > 128 chars | 400 | `@Size(max = 128)` |
-| Missing request body entirely | 400 | `HttpMessageNotReadableException` — already handled by `GlobalExceptionHandler` (PR 1); no new handler needed |
+| Scenario                              | Status | Notes                                                                                                         |
+| ------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------- |
+| Valid email, correct password         | 200    | Access token + refresh cookie issued                                                                          |
+| Valid email, wrong password           | 401    | Identical body to "email not found"                                                                           |
+| Email not found                       | 401    | Identical body to "wrong password"                                                                            |
+| User found, `password_hash` is null   | 401    | Future OAuth user — never attempt bcrypt on null                                                              |
+| `email` missing                       | 400    | `@NotBlank`                                                                                                   |
+| `password` missing                    | 400    | `@NotBlank`                                                                                                   |
+| `email` blank (`""` or whitespace)    | 400    | `@NotBlank`                                                                                                   |
+| `password` blank (`""` or whitespace) | 400    | `@NotBlank`                                                                                                   |
+| `email` malformed                     | 400    | `@Email`                                                                                                      |
+| `password` > 128 chars                | 400    | `@Size(max = 128)`                                                                                            |
+| Missing request body entirely         | 400    | `HttpMessageNotReadableException` — already handled by `GlobalExceptionHandler` (PR 1); no new handler needed |
 
 ---
 
@@ -170,13 +173,14 @@ improvement.
 
 ## 8. Observability
 
-| Event | Level | Fields |
-|---|---|---|
-| Login success | INFO | `event=user_logged_in`, `userId`, `ip`, `userAgent`, `correlationId` |
-| Login failure | WARN | `event=login_failed`, `emailHash` (SHA-256), `reason` (`not_found` \| `bad_password` \| `null_password_hash`), `ip`, `correlationId` |
-| Unexpected error | ERROR | `event=login_error`, `reason` (e.g. `refresh_token_insert_failed`), `userId`, `correlationId` |
+| Event            | Level | Fields                                                                                                                               |
+| ---------------- | ----- | ------------------------------------------------------------------------------------------------------------------------------------ |
+| Login success    | INFO  | `event=user_logged_in`, `userId`, `ip`, `userAgent`, `correlationId`                                                                 |
+| Login failure    | WARN  | `event=login_failed`, `emailHash` (SHA-256), `reason` (`not_found` \| `bad_password` \| `null_password_hash`), `ip`, `correlationId` |
+| Unexpected error | ERROR | `event=login_error`, `reason` (e.g. `refresh_token_insert_failed`), `userId`, `correlationId`                                        |
 
 **IP:** read from `X-Forwarded-For` first value, trimmed:
+
 ```java
 String xForwardedFor = request.getHeader("X-Forwarded-For");
 String ip = (xForwardedFor != null && !xForwardedFor.isBlank())
@@ -211,8 +215,8 @@ Update all import references. No logic changes.
 
 **Naming rename — drop `User` infix from auth port names:**
 
-| Old name | New name |
-|---|---|
+| Old name                   | New name               |
+| -------------------------- | ---------------------- |
 | `RegisterUserUseCase.java` | `RegisterUseCase.java` |
 | `RegisterUserCommand.java` | `RegisterCommand.java` |
 
@@ -227,22 +231,23 @@ Files requiring import reference updates (no file rename):
 
 ### New classes
 
-| Layer | Class | Notes |
-|---|---|---|
-| Migration | `V3__create_refresh_tokens.sql` | |
-| Port (in) | `LoginUseCase.java` | |
-| Port (in) | `LoginCommand.java` | Fields: email (raw), password |
-| Port (in) | `LoginResult.java` | Fields: accessToken string, user summary |
-| Port (out) | `RefreshTokenRepository.java` | Saves hashed token + metadata to Postgres |
-| App service | `AuthApplicationService.login()` | New method on existing class |
-| JPA entity | `RefreshTokenEntity.java` | |
-| Spring Data | `RefreshTokenJpaRepository.java` | |
-| Adapter | `RefreshTokenJpaAdapter.java` | Implements `RefreshTokenRepository` |
-| DTO | `LoginRequest.java` | Bean Validation annotations |
-| DTO | `LoginResponse.java` | |
-| Controller | `AuthController` — add login method | |
+| Layer       | Class                               | Notes                                     |
+| ----------- | ----------------------------------- | ----------------------------------------- |
+| Migration   | `V3__create_refresh_tokens.sql`     |                                           |
+| Port (in)   | `LoginUseCase.java`                 |                                           |
+| Port (in)   | `LoginCommand.java`                 | Fields: email (raw), password             |
+| Port (in)   | `LoginResult.java`                  | Fields: accessToken string, user summary  |
+| Port (out)  | `RefreshTokenRepository.java`       | Saves hashed token + metadata to Postgres |
+| App service | `AuthApplicationService.login()`    | New method on existing class              |
+| JPA entity  | `RefreshTokenEntity.java`           |                                           |
+| Spring Data | `RefreshTokenJpaRepository.java`    |                                           |
+| Adapter     | `RefreshTokenJpaAdapter.java`       | Implements `RefreshTokenRepository`       |
+| DTO         | `LoginRequest.java`                 | Bean Validation annotations               |
+| DTO         | `LoginResponse.java`                |                                           |
+| Controller  | `AuthController` — add login method |                                           |
 
 **`JwtService` notes — do not re-implement:**
+
 - `issueAccessToken(userId, memberships)` — sets `sub = "user:" + userId`,
   `jti = UUID.randomUUID()`, signs RS256 ✓
 - `issueRefreshToken()` — returns `RefreshTokenPair(plaintext, hash)` already ✓  

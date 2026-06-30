@@ -292,14 +292,16 @@ cp services/auth-workspace/.env.example services/auth-workspace/.env.local
 ## Make targets reference
 
 ```
-make up           — Start infrastructure containers (postgres, mongo, redis, localstack)
-make down         — Stop and remove infrastructure containers (volumes preserved)
-make reset        — Stop, remove volumes, restart, and re-run setup-local + migrations
-make up-all       — Start infrastructure + application containers (--profile services)
-make down-all     — Stop all containers including application services
-make setup-local  — Create LocalStack resources (idempotent)
-make logs         — Tail docker-compose logs for all infrastructure services
-make logs s=<svc> — Tail logs for a specific service (e.g., make logs s=postgres)
+make up              — Start infrastructure containers (postgres, mongo, redis, localstack)
+make down            — Stop and remove infrastructure containers (volumes preserved)
+make reset           — Stop, remove volumes, restart, and re-run setup-local + migrations
+make up-all          — Start infrastructure + all application containers (--profile services)
+make down-all        — Stop all containers including application services
+make setup-local     — Create LocalStack resources (idempotent)
+make logs            — Tail docker-compose logs for all infrastructure services
+make logs s=<svc>    — Tail logs for a specific service (e.g., make logs s=postgres)
+make auth-dev        — Start auth-workspace natively via spring-boot:run (blocks terminal; use for development)
+make auth-docker     — Build auth-workspace Docker image, run as container, open Swagger UI when healthy
 ```
 
 ### AWS dev environment targets

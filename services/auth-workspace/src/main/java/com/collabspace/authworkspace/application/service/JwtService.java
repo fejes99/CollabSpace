@@ -15,7 +15,6 @@ import java.security.SecureRandom;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Base64;
-import java.util.Date;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -41,8 +40,6 @@ public class JwtService {
 		this.clock = clock;
 	}
 
-	@SuppressWarnings("java:S2143") // Date.from(Instant) is required by the Nimbus
-									// JWTClaimsSet API
 	public String issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
 		Instant now = clock.instant();
 		List<Map<String, String>> membershipClaims = memberships.stream()
@@ -52,8 +49,8 @@ public class JwtService {
 		JWTClaimsSet claims = new JWTClaimsSet.Builder().subject("user:" + userId)
 			.issuer(jwtProperties.issuer())
 			.audience(jwtProperties.audience())
-			.issueTime(Date.from(now))
-			.expirationTime(Date.from(now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS)))
+			.claim("iat", now.getEpochSecond())
+			.claim("exp", now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS).getEpochSecond())
 			.jwtID(UUID.randomUUID().toString())
 			.claim("userId", userId)
 			.claim("memberships", membershipClaims)
