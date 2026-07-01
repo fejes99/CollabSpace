@@ -7,6 +7,7 @@ import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -43,6 +44,27 @@ public class AuthController {
 	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
 		var command = new RegisterCommand(request.name(), request.email(), request.password());
 		return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse.from(registerUseCase.register(command)));
+	}
+
+	@Operation(summary = "Login user", description = "Login existing user and returns a JWT access and refresh token.")
+	@ApiResponse(responseCode = "200", description = "Login successful",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = LoginResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Validation failed",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "401", description = "Invalid credentials",
+			content = @Content(mediaType = "application/problem+json"))
+	@PostMapping("/login")
+	public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request,
+			HttpServletRequest httpRequest) {
+		// Extract ip and user agent
+
+		// Create command
+
+		// Set-Cookie refresh token in response Header as HttpOnly, Secure and Strict.
+		// Include token exp time
+
+		throw new UnsupportedOperationException();
 	}
 
 }

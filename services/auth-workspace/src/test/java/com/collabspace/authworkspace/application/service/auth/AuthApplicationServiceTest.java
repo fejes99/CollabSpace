@@ -2,6 +2,7 @@ package com.collabspace.authworkspace.application.service.auth;
 
 import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterResult;
+import com.collabspace.authworkspace.application.port.out.auth.RefreshTokenRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
@@ -34,6 +35,9 @@ class AuthApplicationServiceTest {
 	private UserRepository userRepository;
 
 	@Mock
+	private RefreshTokenRepository refreshTokenRepository;
+
+	@Mock
 	private JwtService jwtService;
 
 	@Mock
@@ -43,7 +47,7 @@ class AuthApplicationServiceTest {
 
 	@BeforeEach
 	void setup() {
-		service = new AuthApplicationService(userRepository, jwtService, passwordEncoder,
+		service = new AuthApplicationService(userRepository, refreshTokenRepository, jwtService, passwordEncoder,
 				Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
 	}
 
