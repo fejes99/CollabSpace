@@ -68,7 +68,8 @@ public class AuthApplicationService implements RegisterUseCase, LoginUseCase {
 			throw ex;
 		}
 		String accessToken = jwtService.issueAccessToken(saved.id().toString(), List.of());
-		log.info("event=user_registered userId={} emailHash={}", saved.id(), CryptoUtils.sha256Hex(normalisedEmail));
+		log.info("event=user_registered userId={} emailHash={} ip={}", saved.id(),
+				CryptoUtils.sha256Hex(normalisedEmail), command.ipAddress().orElse(null));
 		return new RegisterResult(saved, accessToken);
 	}
 

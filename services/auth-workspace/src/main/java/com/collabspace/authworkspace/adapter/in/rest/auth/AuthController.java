@@ -56,8 +56,12 @@ public class AuthController {
 			content = @Content(mediaType = "application/problem+json",
 					schema = @Schema(implementation = ProblemDetail.class)))
 	@PostMapping("/register")
-	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request) {
-		var command = new RegisterCommand(request.name(), request.email(), request.password());
+	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request,
+			HttpServletRequest httpRequest) {
+		String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
+		String ipAddress = (xForwardedFor != null && !xForwardedFor.isBlank()) ? xForwardedFor.split(",")[0].trim()
+				: httpRequest.getRemoteAddr();
+		var command = new RegisterCommand(request.name(), request.email(), request.password(), Optional.of(ipAddress));
 		return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse.from(registerUseCase.register(command)));
 	}
 

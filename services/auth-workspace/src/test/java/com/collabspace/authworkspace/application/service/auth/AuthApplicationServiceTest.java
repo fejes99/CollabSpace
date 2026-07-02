@@ -39,6 +39,8 @@ class AuthApplicationServiceTest {
 
 	private static final Instant FIXED_INSTANT = Instant.parse("2026-06-04T10:00:00Z");
 
+	private static final String TEST_IP = "192.0.2.1";
+
 	@Mock
 	private UserRepository userRepository;
 
@@ -62,7 +64,8 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("returns user and access token for a valid register command")
 	void registerValidCommandReturnsUserAndToken() {
-		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123",
+				Optional.of(TEST_IP));
 		when(passwordEncoder.encode("password123")).thenReturn("hashed_pw");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("jwt.token");
@@ -80,7 +83,8 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("register normalises email to lowercase before persisting")
 	void registerEmailIsNormalisedStoredAsLowercase() {
-		RegisterCommand command = new RegisterCommand("Alice", "Alice@EXAMPLE.COM", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "Alice@EXAMPLE.COM", "password123",
+				Optional.of(TEST_IP));
 		when(passwordEncoder.encode(anyString())).thenReturn("hashed");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("token");
@@ -94,7 +98,8 @@ class AuthApplicationServiceTest {
 	@Test
 	@DisplayName("register throws EmailAlreadyTakenException when repository rejects duplicate email")
 	void registerDuplicateEmailThrowsWhenRepositoryRejects() {
-		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123");
+		RegisterCommand command = new RegisterCommand("Alice", "alice@example.com", "password123",
+				Optional.of(TEST_IP));
 		when(passwordEncoder.encode("password123")).thenReturn("hashed_pw");
 		when(userRepository.save(any(User.class))).thenThrow(new EmailAlreadyTakenException());
 
