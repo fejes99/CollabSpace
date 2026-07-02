@@ -70,8 +70,11 @@ class RegisterTransactionalIT {
 
 		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
 			.andExpect(status().isConflict())
-			.andExpect(content().contentType("application/problem+json"))
-			.andExpect(jsonPath("$.status").value(409));
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/email-already-taken"))
+			.andExpect(jsonPath("$.title").value("Conflict"))
+			.andExpect(jsonPath("$.status").value(409))
+			.andExpect(jsonPath("$.detail").value("Email address is already registered."));
 	}
 
 }

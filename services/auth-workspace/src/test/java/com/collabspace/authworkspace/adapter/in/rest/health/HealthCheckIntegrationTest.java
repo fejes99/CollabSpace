@@ -31,10 +31,4 @@ class HealthCheckIntegrationTest {
 			.andExpect(jsonPath("$.components.db.status").value("UP"));
 	}
 
-	@Test
-	@DisplayName("response includes db component")
-	void healthResponseContainsDbComponent() throws Exception {
-		mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.db").exists());
-	}
-
 }

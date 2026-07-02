@@ -37,7 +37,14 @@ class WellKnownControllerTest {
 			.andExpect(jsonPath("$.keys").isArray())
 			.andExpect(jsonPath("$.keys[0].kty").value("RSA"))
 			.andExpect(jsonPath("$.keys[0].kid").isNotEmpty())
-			.andExpect(jsonPath("$.keys[0].d").doesNotExist());
+			.andExpect(jsonPath("$.keys[0].n").isNotEmpty())
+			.andExpect(jsonPath("$.keys[0].e").isNotEmpty())
+			.andExpect(jsonPath("$.keys[0].d").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].p").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].q").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].dp").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].dq").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].qi").doesNotExist());
 	}
 
 	@Test

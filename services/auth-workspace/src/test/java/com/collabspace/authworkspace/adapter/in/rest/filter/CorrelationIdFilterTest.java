@@ -97,4 +97,19 @@ class CorrelationIdFilterTest {
 		assertThat(loggingList.list).anyMatch(e -> expectedId.equals(e.getMDCPropertyMap().get("correlationId")));
 	}
 
+	@Test
+	@DisplayName("correlation ID does not leak from one request to the next")
+	void correlationIdDoesNotLeakBetweenRequests() throws Exception {
+		mvc.perform(get("/actuator/health").header("X-Correlation-ID", "first-id"));
+
+		String secondId = mvc.perform(get("/actuator/health"))
+			.andExpect(header().exists("X-Correlation-ID"))
+			.andReturn()
+			.getResponse()
+			.getHeader("X-Correlation-ID");
+
+		assertThat(secondId).isNotEqualTo("first-id")
+			.matches("[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}");
+	}
+
 }

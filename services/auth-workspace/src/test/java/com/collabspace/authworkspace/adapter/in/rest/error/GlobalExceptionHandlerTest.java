@@ -55,12 +55,20 @@ class GlobalExceptionHandlerTest {
 
 	}
 
+	// ThrowingController uses concrete subclasses to trigger each handler:
+	// EmailAlreadyTakenException → ConflictException handler
+	// InvalidCredentialsException → UnauthorizedException handler
 	@RestController
 	static class ThrowingController {
 
 		@GetMapping(BOOM_PATH)
 		String boom() {
 			throw new IllegalStateException("internal details that must not leak");
+		}
+
+		@GetMapping(UNAUTHORIZED_PATH)
+		String unauthorized() {
+			throw new InvalidCredentialsException();
 		}
 
 		@GetMapping(CONFLICT_PATH)
@@ -88,11 +96,6 @@ class GlobalExceptionHandlerTest {
 			};
 		}
 
-		@GetMapping(UNAUTHORIZED_PATH)
-		String unauthorized() {
-			throw new InvalidCredentialsException();
-		}
-
 		@PostMapping(VALIDATE_PATH)
 		String validate(@RequestBody @Valid ValidatedBody body) {
 			return "ok";
@@ -105,13 +108,13 @@ class GlobalExceptionHandlerTest {
 
 	private static final String BOOM_PATH = "/test/boom";
 
+	private static final String UNAUTHORIZED_PATH = "/test/unauthorized";
+
 	private static final String CONFLICT_PATH = "/test/conflict";
 
 	private static final String NOT_FOUND_PATH = "/test/not-found";
 
 	private static final String DOMAIN_PATH = "/test/domain";
-
-	private static final String UNAUTHORIZED_PATH = "/test/unauthorized";
 
 	private static final String VALIDATE_PATH = "/test/validate";
 
@@ -149,7 +152,8 @@ class GlobalExceptionHandlerTest {
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/internal-error"))
 			.andExpect(jsonPath("$.title").value("Internal server error"))
 			.andExpect(jsonPath("$.status").value(500))
-			.andExpect(jsonPath("$.detail").value("An unexpected error occurred."));
+			.andExpect(jsonPath("$.detail").value("An unexpected error occurred."))
+			.andExpect(jsonPath("$.instance").value(BOOM_PATH));
 	}
 
 	@Test
@@ -186,7 +190,17 @@ class GlobalExceptionHandlerTest {
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/invalid-credentials"))
 			.andExpect(jsonPath("$.title").value("Unauthorized"))
 			.andExpect(jsonPath("$.status").value(401))
-			.andExpect(jsonPath("$.detail").value("Invalid credentials."));
+			.andExpect(jsonPath("$.detail").value("Invalid credentials."))
+			.andExpect(jsonPath("$.instance").value(UNAUTHORIZED_PATH));
+	}
+
+	@Test
+	@DisplayName("UnauthorizedException is logged at WARN level")
+	void unauthorizedExceptionIsLoggedAtWarnLevel() throws Exception {
+		mvc.perform(get(UNAUTHORIZED_PATH)).andReturn();
+
+		assertThat(logCapture.list)
+			.anyMatch(e -> e.getLevel() == Level.WARN && e.getMessage().contains("event=unauthorized"));
 	}
 
 	@Test
