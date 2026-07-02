@@ -143,7 +143,7 @@ jobs:
       # See ADR-024 §Decision.
       - name: Run Claude code review
         if: steps.gate.outputs.should-review == 'true'
-        uses: anthropics/claude-code-action@86eb26bf0139bdd75acd15ea5f00f45ee0a284c2  # v1.0.122 (= current @v1)
+        uses: anthropics/claude-code-action@fc6b9d4a0a8400c5e066ae686de922d161ea935e  # (= current @v1, rotated 2026-07-02)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: --model claude-sonnet-4-6 --max-turns 15
