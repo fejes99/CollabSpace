@@ -2,13 +2,14 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** UserJpaAdapter, user registration, and local-dev JWT configuration complete. `POST /v1/auth/register` is live. Login endpoint not yet implemented.
+**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie).
 
 ## What it does
 
 - `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},...}}`. Public route — no JWT required. Returns `503` with `status=DOWN` if the database is unreachable.
 - `GET /.well-known/jwks.json` — RS256 public key set. **Must remain a public route** — the API Gateway JWT Authorizer fetches signing keys from this URL. See ADR-026.
 - `POST /v1/auth/register` — public route. No JWT required. Returns `201` with access token and user summary on success; `400` for validation errors; `409` if the email is already registered.
+- `POST /v1/auth/login` — public route. No JWT required. Returns `200` with access token and user on success; sets an HttpOnly `refresh_token` cookie (`Path=/auth`, `Max-Age=604800`, `Secure`, `SameSite=Strict`). Returns `400` for validation errors; `401` for invalid credentials.
 - `GET /v3/api-docs` — OpenAPI 3.x JSON spec (internal tooling only, not routed through API Gateway).
 - `GET /swagger-ui.html` — interactive Swagger UI for local development.
 
@@ -41,27 +42,37 @@ src/main/java/com/collabspace/authworkspace/
 ├── domain/
 │   ├── model/
 │   │   └── auth/           Pure Java records. No Spring, no JPA annotations.
-│   │       └── User.java
+│   │       ├── User.java
+│   │       ├── RefreshToken.java
+│   │       └── WorkspaceMembership.java
 │   └── exception/          Cross-cutting domain exceptions.
 │       ├── DomainException.java
 │       ├── ConflictException.java
 │       ├── EmailAlreadyTakenException.java
+│       ├── InvalidCredentialsException.java
+│       ├── UnauthorizedException.java
 │       └── NotFoundException.java
 │
 ├── application/
 │   ├── port/
 │   │   ├── in/
 │   │   │   └── auth/       Use case interfaces — one per operation.
-│   │   │       ├── RegisterUserUseCase.java
-│   │   │       └── LoginUseCase.java          (future)
+│   │   │       ├── RegisterUseCase.java
+│   │   │       ├── RegisterCommand.java
+│   │   │       ├── RegisterResult.java
+│   │   │       ├── LoginUseCase.java
+│   │   │       ├── LoginCommand.java
+│   │   │       └── LoginResult.java
 │   │   └── out/
 │   │       └── auth/       Outbound port interfaces.
 │   │           ├── UserRepository.java
-│   │           └── TokenBlocklistPort.java    (future)
+│   │           └── RefreshTokenRepository.java
 │   └── service/
 │       ├── auth/           Application services: implement in-ports, call out-ports.
 │       │   └── AuthApplicationService.java
-│       └── JwtService.java
+│       ├── JwtService.java
+│       ├── JwtProperties.java
+│       └── RefreshTokenPair.java
 │
 ├── config/                 Spring configuration and startup components.
 │   ├── ApplicationConfig.java
@@ -74,11 +85,13 @@ src/main/java/com/collabspace/authworkspace/
     │       ├── auth/       Auth controllers and DTOs.
     │       │   ├── AuthController.java
     │       │   ├── RegisterRequest.java
-    │       │   └── RegisterResponse.java
+    │       │   ├── RegisterResponse.java
+    │       │   ├── LoginRequest.java
+    │       │   └── LoginResponse.java
     │       ├── error/      RFC 9457 global exception handler.
+    │       │   └── GlobalExceptionHandler.java
     │       ├── wellknown/
     │       │   └── WellKnownController.java
-    │       │   └── GlobalExceptionHandler.java
     │       ├── filter/
     │       │   └── CorrelationIdFilter.java
     │       ├── health/
@@ -89,10 +102,13 @@ src/main/java/com/collabspace/authworkspace/
         ├── persistence/
         │   └── auth/       JPA entities + Spring Data repository.
         │       ├── UserJpaAdapter.java
+        │       ├── RefreshTokenJpaAdapter.java
         │       ├── entity/
-        │       │   └── UserEntity.java
+        │       │   ├── UserEntity.java
+        │       │   └── RefreshTokenEntity.java
         │       └── repository/
-        │           └── UserJpaRepository.java
+        │           ├── UserJpaRepository.java
+        │           └── RefreshTokenJpaRepository.java
         └── ssm/            JWT key loading from SSM (AWS) or env var (local).
             ├── JwtKeyConfig.java
             └── LocalJwtConfig.java
@@ -182,6 +198,7 @@ Flyway runs migrations automatically on startup. Migration files live in `src/ma
 |---|---|---|
 | V1 | `V1__create_users.sql` | Creates `users` table: `id UUID PK`, `name VARCHAR(255)`, `email VARCHAR(320)`, `password_hash TEXT` (nullable), `created_at`/`updated_at TIMESTAMPTZ` |
 | V2 | `V2__name_email_constraint.sql` | Renames the email unique constraint from the Postgres auto-generated `users_email_key` to the explicit `users_email_unique` |
+| V3 | `V3__create_refresh_tokens.sql` | Creates `refresh_tokens` table: `id UUID PK`, `user_id UUID FK → users.id ON DELETE CASCADE`, `token_hash TEXT UNIQUE`, `created_at TIMESTAMPTZ`, `expires_at TIMESTAMPTZ`, `user_agent TEXT` (nullable), `ip_address TEXT` (nullable). Includes index on `user_id`. |
 
 ## Deployment
 
