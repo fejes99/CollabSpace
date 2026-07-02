@@ -138,3 +138,7 @@ logs/
 
 # ─── Notes ───────────────────────────────────────────────────────────────────
 notes/
+
+# ─── Claude Code ─────────────────────────────────────────────────────────────
+# settings.local.json is machine-specific; settings.json is the committed project config
+.claude/settings.local.json
