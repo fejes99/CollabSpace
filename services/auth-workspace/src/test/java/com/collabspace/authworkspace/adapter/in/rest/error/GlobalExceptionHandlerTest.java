@@ -4,15 +4,18 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
+import com.collabspace.authworkspace.domain.exception.InvalidCredentialsException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,6 +42,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @WebMvcTest
 @Import(JwtTestConfiguration.class)
+@DisplayName("GlobalExceptionHandler")
 class GlobalExceptionHandlerTest {
 
 	@TestConfiguration
@@ -84,6 +88,11 @@ class GlobalExceptionHandlerTest {
 			};
 		}
 
+		@GetMapping(UNAUTHORIZED_PATH)
+		String unauthorized() {
+			throw new InvalidCredentialsException();
+		}
+
 		@PostMapping(VALIDATE_PATH)
 		String validate(@RequestBody @Valid ValidatedBody body) {
 			return "ok";
@@ -102,12 +111,17 @@ class GlobalExceptionHandlerTest {
 
 	private static final String DOMAIN_PATH = "/test/domain";
 
+	private static final String UNAUTHORIZED_PATH = "/test/unauthorized";
+
 	private static final String VALIDATE_PATH = "/test/validate";
 
 	private final ListAppender<ILoggingEvent> logCapture = new ListAppender<>();
 
 	@Autowired
 	MockMvc mvc;
+
+	@MockitoBean
+	LoginUseCase loginUseCase;
 
 	@MockitoBean
 	RegisterUseCase registerUseCase;
@@ -127,6 +141,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("unhandled exception returns RFC 9457 problem detail with 500")
 	void returnsRfc9457ProblemDetail() throws Exception {
 		mvc.perform(get(BOOM_PATH))
 			.andExpect(status().isInternalServerError())
@@ -138,6 +153,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("unhandled exception is logged at ERROR level")
 	void logsExceptionAtErrorLevel() throws Exception {
 		mvc.perform(get(BOOM_PATH)).andReturn();
 
@@ -146,12 +162,14 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("internal exception message does not appear in response")
 	void internalExceptionMessageDoesNotLeakToResponse() throws Exception {
 		mvc.perform(get(BOOM_PATH))
 			.andExpect(content().string(not(containsString("internal details that must not leak"))));
 	}
 
 	@Test
+	@DisplayName("correlation ID from request header appears in error log")
 	void correlationIdAppearsInErrorLog() throws Exception {
 		mvc.perform(get(BOOM_PATH).header("X-Correlation-ID", "trace-123")).andReturn();
 
@@ -160,6 +178,19 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("UnauthorizedException returns 401 with problem detail")
+	void unauthorizedExceptionReturns401() throws Exception {
+		mvc.perform(get(UNAUTHORIZED_PATH))
+			.andExpect(status().isUnauthorized())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/invalid-credentials"))
+			.andExpect(jsonPath("$.title").value("Unauthorized"))
+			.andExpect(jsonPath("$.status").value(401))
+			.andExpect(jsonPath("$.detail").value("Invalid credentials."));
+	}
+
+	@Test
+	@DisplayName("ConflictException returns 409 with problem detail")
 	void conflictExceptionReturns409() throws Exception {
 		mvc.perform(get(CONFLICT_PATH))
 			.andExpect(status().isConflict())
@@ -171,6 +202,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("NotFoundException returns 404 with problem detail")
 	void notFoundExceptionReturns404() throws Exception {
 		mvc.perform(get(NOT_FOUND_PATH))
 			.andExpect(status().isNotFound())
@@ -182,6 +214,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("DomainException returns 422 with problem detail")
 	void domainExceptionReturns422() throws Exception {
 		mvc.perform(get(DOMAIN_PATH))
 			.andExpect(status().isUnprocessableEntity())
@@ -193,6 +226,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("validation failure returns 400 with errors array")
 	void validationFailureReturns400WithErrorsArray() throws Exception {
 		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"\"}"))
 			.andExpect(status().isBadRequest())
@@ -205,6 +239,7 @@ class GlobalExceptionHandlerTest {
 	}
 
 	@Test
+	@DisplayName("malformed JSON body returns 400 with problem detail")
 	void malformedJsonReturns400() throws Exception {
 		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON).content("{broken json"))
 			.andExpect(status().isBadRequest())

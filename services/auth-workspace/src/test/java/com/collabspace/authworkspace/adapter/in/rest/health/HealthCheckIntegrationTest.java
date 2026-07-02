@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.health;
 
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -15,12 +16,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
 @Import(TestContainersConfiguration.class)
+@DisplayName("GET /actuator/health")
 class HealthCheckIntegrationTest {
 
 	@Autowired
 	MockMvc mvc;
 
 	@Test
+	@DisplayName("returns 200 UP when database is reachable")
 	void healthReturnsUpWhenDbReachable() throws Exception {
 		mvc.perform(get("/actuator/health"))
 			.andExpect(status().isOk())
@@ -29,6 +32,7 @@ class HealthCheckIntegrationTest {
 	}
 
 	@Test
+	@DisplayName("response includes db component")
 	void healthResponseContainsDbComponent() throws Exception {
 		mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.db").exists());
 	}

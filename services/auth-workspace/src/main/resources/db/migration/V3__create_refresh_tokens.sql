@@ -6,7 +6,7 @@ CREATE TABLE refresh_tokens
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   expires_at TIMESTAMPTZ NOT NULL,
   user_agent TEXT,
-  ip_address INET
+  ip_address TEXT
 );
 
 ALTER TABLE refresh_tokens

@@ -20,6 +20,8 @@ RUN ./mvnw package -DskipTests -q
 FROM eclipse-temurin:25-jre-noble
 WORKDIR /app
 
+RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
+
 # Non-root user. Containers should not run as root unless there is a specific
 # reason — the ECS task role already grants AWS permissions, so root adds risk
 # with no benefit.

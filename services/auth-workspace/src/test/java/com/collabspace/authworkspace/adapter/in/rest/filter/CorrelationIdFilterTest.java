@@ -6,6 +6,7 @@ import ch.qos.logback.core.read.ListAppender;
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +26,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @TestPropertySource(properties = "logging.level.com.collabspace.authworkspace=DEBUG")
 @Import(TestContainersConfiguration.class)
+@DisplayName("CorrelationIdFilter")
 class CorrelationIdFilterTest {
 
 	private final ListAppender<ILoggingEvent> loggingList = new ListAppender<>();
@@ -48,6 +50,7 @@ class CorrelationIdFilterTest {
 	}
 
 	@Test
+	@DisplayName("generates UUID correlation ID when header is absent")
 	void requestWithoutHeader() throws Exception {
 		var result = mvc.perform(get("/actuator/health")).andExpect(header().exists("X-Correlation-ID")).andReturn();
 
@@ -59,6 +62,7 @@ class CorrelationIdFilterTest {
 	}
 
 	@Test
+	@DisplayName("echoes provided correlation ID header")
 	void requestWithHeader() throws Exception {
 		mvc.perform(get("/actuator/health").header("X-Correlation-ID", "test-correlation-id"))
 			.andExpect(header().string("X-Correlation-ID", "test-correlation-id"));
@@ -68,6 +72,7 @@ class CorrelationIdFilterTest {
 	}
 
 	@Test
+	@DisplayName("generates UUID correlation ID when header is blank")
 	void requestWithEmptyHeader() throws Exception {
 		var result = mvc.perform(get("/actuator/health").header("X-Correlation-ID", ""))
 			.andExpect(header().exists("X-Correlation-ID"))
@@ -81,6 +86,7 @@ class CorrelationIdFilterTest {
 	}
 
 	@Test
+	@DisplayName("truncates oversized correlation ID to 64 characters")
 	void requestWithOversizedHeader() throws Exception {
 		String oversizedId = "a".repeat(100);
 		String expectedId = oversizedId.substring(0, 64);

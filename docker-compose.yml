@@ -31,8 +31,13 @@ services:
     image: auth-workspace:local
     ports:
       - "8080:8080"
+    env_file:
+      - services/auth-workspace/.env
     environment:
-      SPRING_PROFILES_ACTIVE: development
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+    depends_on:
+      postgres:
+        condition: service_healthy
     networks:
       - collabspace
     healthcheck:

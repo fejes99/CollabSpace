@@ -21,9 +21,14 @@ public class UserJpaAdapter implements UserRepository {
 	}
 
 	@Override
+	public Optional<User> findByEmail(String email) {
+		return jpaRepository.findByEmail(email).map(UserJpaAdapter::toDomain);
+	}
+
+	@Override
 	public User save(User user) {
 		try {
-			return toDomain(jpaRepository.save(toEntity(user)));
+			return toDomain(jpaRepository.saveAndFlush(toEntity(user)));
 		}
 		catch (DataIntegrityViolationException ex) {
 			// users_email_unique is defined in V2__name_email_constraint.sql. If a

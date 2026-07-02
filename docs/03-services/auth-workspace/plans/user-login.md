@@ -68,6 +68,15 @@ Set-Cookie on success:
 Set-Cookie: refresh_token=<plaintext>; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=604800
 ```
 
+### Token lifetimes
+
+| Token         | TTL        | Constant                                         |
+| ------------- | ---------- | ------------------------------------------------ |
+| Access token  | 15 minutes | `ACCESS_TOKEN_TTL_SECONDS = 900` in `JwtService` |
+| Refresh token | 7 days     | `REFRESH_TOKEN_TTL_SECONDS = 604800` — see §9    |
+
+Both values **must stay in sync**: the cookie `Max-Age` and the `expires_at` stored in `refresh_tokens` must use the same 604800 seconds.
+
 The `Secure` flag is driven by the `app.cookie.secure` property (default `true`).
 Override to `false` in `.env` for local dev — browsers reject `Secure` cookies over
 plain `http://localhost`. Same pattern as the local JWT key config.
@@ -252,6 +261,13 @@ Files requiring import reference updates (no file rename):
   `jti = UUID.randomUUID()`, signs RS256 ✓
 - `issueRefreshToken()` — returns `RefreshTokenPair(plaintext, hash)` already ✓  
   `RefreshTokenRepository` only needs to store the hash.
+
+**`expires_at` for the refresh token row:** `issueRefreshToken()` returns no
+expiry — the caller computes it. Define `REFRESH_TOKEN_TTL_SECONDS = 604800` as
+a `private static final int` on `AuthApplicationService` and pass
+`clock.instant().plusSeconds(REFRESH_TOKEN_TTL_SECONDS)` to the repository save
+call. This keeps the 7-day value co-located with the cookie `Max-Age` build so
+they cannot drift independently.
 
 **`app.cookie.secure` property:** add to `application.properties` with default `true`.
 Override in `.env` with `APP_COOKIE_SECURE=false` for local dev.

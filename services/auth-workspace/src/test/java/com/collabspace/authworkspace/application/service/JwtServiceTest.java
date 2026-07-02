@@ -6,6 +6,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
 import java.security.KeyPair;
@@ -18,6 +19,7 @@ import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+@DisplayName("JwtService")
 class JwtServiceTest {
 
 	private static RSAKey testKey;
@@ -41,6 +43,7 @@ class JwtServiceTest {
 	}
 
 	@Test
+	@DisplayName("access token contains correct claims and 15-minute TTL")
 	void issueAccessTokenClaimsAreCorrect() throws Exception {
 		List<WorkspaceMembership> memberships = List.of(new WorkspaceMembership("ws-1", "admin"));
 
@@ -60,6 +63,7 @@ class JwtServiceTest {
 	}
 
 	@Test
+	@DisplayName("refresh token plaintext decodes to 32 bytes")
 	void issueRefreshTokenPlaintextDecodesToThirtyTwoBytes() {
 		RefreshTokenPair pair = jwtService.issueRefreshToken();
 
@@ -68,6 +72,7 @@ class JwtServiceTest {
 	}
 
 	@Test
+	@DisplayName("refresh token hash is SHA-256 of plaintext")
 	void issueRefreshTokenHashMatchesSha256OfPlaintext() {
 		RefreshTokenPair pair = jwtService.issueRefreshToken();
 
@@ -75,6 +80,7 @@ class JwtServiceTest {
 	}
 
 	@Test
+	@DisplayName("two refresh tokens are always distinct")
 	void issueRefreshTokenTwoCallsProduceDifferentTokens() {
 		RefreshTokenPair first = jwtService.issueRefreshToken();
 		RefreshTokenPair second = jwtService.issueRefreshToken();

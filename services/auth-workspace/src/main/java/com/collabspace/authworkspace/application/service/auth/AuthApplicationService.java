@@ -9,8 +9,11 @@ import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.out.auth.RefreshTokenRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.service.JwtService;
+import com.collabspace.authworkspace.application.service.RefreshTokenPair;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
+import com.collabspace.authworkspace.domain.exception.InvalidCredentialsException;
+import com.collabspace.authworkspace.domain.model.auth.RefreshToken;
 import com.collabspace.authworkspace.domain.model.auth.User;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -72,26 +75,35 @@ public class AuthApplicationService implements RegisterUseCase, LoginUseCase {
 	@Override
 	@Transactional
 	public LoginResult login(LoginCommand command) {
-		// Normalize email
+		String normalisedEmail = command.email().toLowerCase();
+		String emailHash = CryptoUtils.sha256Hex(normalisedEmail);
 
-		// Query user by email - if user don't exist throw error
+		User user = userRepository.findByEmail(normalisedEmail)
+			.orElseThrow(() -> loginFailed("not_found", emailHash, command.ipAddress()));
 
-		// password_hash on user is null -never attempt bcrypt on null
+		String storedHash = user.passwordHash()
+			.orElseThrow(() -> loginFailed("null_password_hash", emailHash, command.ipAddress()));
 
-		// Log event=login_failed reason=not_found|bad_password|null_password_hash
-		// emailHash, ip
+		if (!passwordEncoder.matches(command.password(), storedHash)) {
+			throw loginFailed("bad_password", emailHash, command.ipAddress());
+		}
 
-		// Log event=user_logged_in userId, ip, userAgent
+		String accessToken = jwtService.issueAccessToken(user.id().toString(), List.of());
+		RefreshTokenPair tokenPair = jwtService.issueRefreshToken();
 
-		// Comapre password hash with command password - if doesn't match, throw error
+		Instant now = clock.instant();
+		refreshTokenRepository.save(new RefreshToken(UUID.randomUUID(), user.id(), tokenPair.hash(), now,
+				now.plusSeconds(604800), command.userAgent(), command.ipAddress()));
 
-		// Issue access token
+		log.info("event=user_logged_in userId={} ip={} userAgent={}", user.id(), command.ipAddress().orElse(null),
+				command.userAgent().orElse(null));
 
-		// Issue refresh token
+		return new LoginResult(user, accessToken, tokenPair.plaintext());
+	}
 
-		// Insert refresh token in database
-
-		throw new UnsupportedOperationException();
+	private InvalidCredentialsException loginFailed(String reason, String emailHash, Optional<String> ip) {
+		log.warn("event=login_failed reason={} emailHash={} ip={}", reason, emailHash, ip.orElse(null));
+		return new InvalidCredentialsException();
 	}
 
 }

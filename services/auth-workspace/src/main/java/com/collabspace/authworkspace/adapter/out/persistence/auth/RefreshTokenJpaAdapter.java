@@ -19,11 +19,7 @@ public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
 
 	@Override
 	public RefreshToken save(RefreshToken refreshToken) {
-		// As domain save using repository
-
-		// Handle exceptions - which ones?
-
-		throw new UnsupportedOperationException("Not supported yet.");
+		return toDomain(jpaRepository.save(toEntity(refreshToken)));
 	}
 
 	private static RefreshTokenEntity toEntity(RefreshToken refreshToken) {

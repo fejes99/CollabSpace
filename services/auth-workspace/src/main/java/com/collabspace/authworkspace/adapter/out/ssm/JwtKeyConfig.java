@@ -22,6 +22,7 @@ import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
 
 @Configuration
+@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 public class JwtKeyConfig {
 
 	private static final Logger log = LoggerFactory.getLogger(JwtKeyConfig.class);
@@ -48,7 +49,6 @@ public class JwtKeyConfig {
 	}
 
 	@Bean
-	@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 	public RSAKey rsaKey() throws NoSuchAlgorithmException, InvalidKeySpecException, JOSEException {
 		if (!StringUtils.hasText(this.privateKeySsmPath)) {
 			throw new IllegalStateException("JWT_PRIVATE_KEY_SSM_PATH is not configured");
@@ -62,7 +62,6 @@ public class JwtKeyConfig {
 	}
 
 	@Bean
-	@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 	public JwtProperties jwtProperties() {
 		String jwksUri = StringUtils.hasText(this.jwksUriSsmPath) ? this.ssm.getParameter(this.jwksUriSsmPath)
 				: "http://localhost:8080/.well-known/jwks.json";

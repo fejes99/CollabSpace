@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.health;
 
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -20,12 +21,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 				"spring.jpa.hibernate.ddl-auto=none" })
 @AutoConfigureMockMvc
 @Import(JwtTestConfiguration.class)
+@DisplayName("GET /actuator/health — database down")
 class HealthCheckDownIntegrationTest {
 
 	@Autowired
 	MockMvc mvc;
 
 	@Test
+	@DisplayName("returns 503 DOWN when database is unreachable")
 	void healthReturnsServiceUnavailableWhenDbDown() throws Exception {
 		mvc.perform(get("/actuator/health"))
 			.andExpect(status().isServiceUnavailable())

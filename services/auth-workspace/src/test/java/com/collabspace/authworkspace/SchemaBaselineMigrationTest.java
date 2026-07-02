@@ -2,6 +2,7 @@ package com.collabspace.authworkspace;
 
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.flywaydb.core.Flyway;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -14,6 +15,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.NONE)
 @Import(TestContainersConfiguration.class)
+@DisplayName("Schema migration baseline")
 class SchemaBaselineMigrationTest {
 
 	@Autowired
@@ -23,6 +25,7 @@ class SchemaBaselineMigrationTest {
 	Flyway flyway;
 
 	@Test
+	@DisplayName("users table exists with correct columns and types")
 	void usersTableHasCorrectSchema() {
 		assertThat(tableExists("users")).isTrue();
 
@@ -35,6 +38,7 @@ class SchemaBaselineMigrationTest {
 	}
 
 	@Test
+	@DisplayName("email column has a unique constraint")
 	void emailColumnHasUniqueConstraint() {
 		Integer count = jdbc.queryForObject("""
 				SELECT COUNT(*)
@@ -50,6 +54,7 @@ class SchemaBaselineMigrationTest {
 	}
 
 	@Test
+	@DisplayName("running migrations again executes nothing")
 	void migrationIsIdempotent() {
 		var result = flyway.migrate();
 		assertThat(result.migrationsExecuted).isZero();
