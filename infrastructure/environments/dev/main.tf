@@ -318,6 +318,14 @@ module "auth_workspace" {
   memory         = 512
   desired_count  = 1
 
+  # 100%: with a container health check now defined (ADR-031), the default
+  # 0% would let ECS stop the old (healthy) task before the new one passes
+  # its readiness check - a real zero-healthy-task gap, reproduced live.
+  # 100% forces ECS to start the new task, wait for it to become HEALTHY,
+  # and only then stop the old one. Requires deployment_maximum_percent to
+  # allow >100% (default 200%) so both tasks can briefly coexist.
+  deployment_minimum_healthy_percent = 100
+
   task_execution_role_arn = module.iam_ecs.task_execution_role_arn
   task_role_arn           = module.iam_ecs.task_role_arns["auth-workspace"]
 
