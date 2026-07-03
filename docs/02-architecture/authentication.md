@@ -130,6 +130,19 @@ The blocklist check is a per-service responsibility. API Gateway validates signa
 
 **The fail-open gap.** Deleting the refresh token is immediate. Adding the `jti` to the Redis blocklist takes effect immediately for services that check it. However, a service that does not implement the blocklist check, or a service experiencing a Redis outage, will accept the access token for up to 15 minutes after logout. This is a known, accepted limitation of the stateless JWT model — documented in [ADR-002](../06-decisions/adr-002-auth-workspace-combined.md). The 15-minute window is short enough that the risk is acceptable; closing it would require a synchronous revocation check on every request, eliminating the statelessness benefit entirely.
 
+### Membership and role change invalidation
+
+The `jti` blocklist above revokes a *specific token* on logout. It does not help with a token that is still validly logged in but whose `memberships` claim has gone stale because something changed the user's workspace access after the token was issued.
+
+Which mechanism applies depends on whether the affected user is the one making the request right now, not on whether the change is a grant or a revocation:
+
+- **Self-directed** (a user creates a workspace, accepts an invite, or changes their own role): the mutating endpoint reissues a fresh access token synchronously in its response, or the client immediately calls `POST /v1/auth/refresh`. No wait, whether the change is a grant or a revocation (e.g., demoting yourself).
+- **Other-directed** (an admin promotes, demotes, or removes a *different* user; a workspace is deleted): the affected user isn't part of that request, so a per-user Redis marker is set instead — `membership-changed-at:<affectedUserId>` — whether the change grants or revokes access. Every authenticated request compares this marker against the token's `iat` claim (using `>=`, not `>`, since `iat` is second-granularity and a same-second tie must fail closed), alongside the `jti` blocklist check. A stale comparison rejects with `401 claims-stale`, handled transparently by the client's existing refresh-and-retry flow. The marker is written only by auth-workspace — the sole owner of membership data — so there's no cross-service clock skew to account for, and its TTL is `access_token_max_lifetime + buffer`, not indefinite.
+
+Either path only works because `POST /v1/auth/refresh` re-derives `memberships` from the database on every call — it must never copy the previous token's claims forward with a new expiry. Refresh already touches Postgres to validate and rotate the refresh token row (see Token refresh, above), so re-reading current memberships adds one query to an already DB-bound call, at a frequency of once per token lifetime rather than once per request — this is standard practice, and the entire point of having a refresh step at all.
+
+Full design, alternatives considered, and the write-ordering requirements this depends on: [ADR-032](../06-decisions/adr-032-membership-claims-staleness-and-revocation.md).
+
 ---
 
 ## Auth flows
@@ -176,9 +189,18 @@ Token rotation is atomic — if the transaction fails, neither the deletion nor 
 4. Clear the cookie: `Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=0`.
 5. Response: `200 OK`.
 
+### Membership and role changes
+
+1. **Self-directed** — a mutation where the affected user is the one making the call (create workspace, accept invite, self role change): the endpoint reissues a fresh access token in its response, or the client immediately calls `POST /v1/auth/refresh`. No wait, regardless of whether the change is a grant or a revocation (e.g., demoting yourself).
+2. **Other-directed** — a mutation affecting a *different* user (promoted, demoted, removed, or their workspace deleted): the mutation sets `membership-changed-at:<affectedUserId>` in Redis. That user's next authenticated request anywhere is rejected with `401 claims-stale` (see Membership and role change invalidation, above) and transparently retried by the client after a refresh — this applies the same way whether the other-directed change grants or revokes access.
+
+See [ADR-032](../06-decisions/adr-032-membership-claims-staleness-and-revocation.md) for the full mechanism and why the dividing line is who's affected, not grant vs. revocation.
+
 ### Password reset
 
 Password reset is **out of scope for v1**. It requires an email delivery integration (Amazon SES or a transactional email provider) and a time-limited, single-use token flow that is separate from the session token model. The user, token, and session schema are designed to be compatible with adding it — no redesign is required. It is deferred to v1.5 or later when email infrastructure is in scope.
+
+When password reset is implemented, it should force-invalidate **all** of the user's active sessions, not just workspace-membership claims — this is the intended use case for the per-user token floor mechanism noted as reserved-but-unused in [ADR-032](../06-decisions/adr-032-membership-claims-staleness-and-revocation.md).
 
 ---
 

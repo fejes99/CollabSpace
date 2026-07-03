@@ -71,6 +71,8 @@ Runs on port `8080`. Hot reload is not enabled for Spring Boot by default — ad
 
 Health check: `curl http://localhost:8080/actuator/health`
 
+**Testing protected routes locally.** Once the `X-Internal-Token`/`X-User-Id`/`X-User-Workspaces` filter lands (`feat/auth/security-filter`), there is no local API Gateway to inject those headers — Swagger's "Try it out" will 401 on any protected route unless you supply them yourself. The planned approach is Swagger UI `apiKey` security schemes so you set them once via the "Authorize" button instead of per-request; full details land in `docs/03-services/auth-workspace/plans/security-filter.md` when that PR is built.
+
 ### Document Service (TypeScript / Fastify)
 
 ```bash
