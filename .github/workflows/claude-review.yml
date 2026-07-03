@@ -154,12 +154,18 @@ jobs:
           # --allowedTools grants gh read commands Claude needs to fetch the PR diff.
           # .claude/settings.json's Bash(*) does NOT cover these — gh subcommands appear
           # to require an explicit grant here regardless of the repo's own permissions.allow.
-          claude_args: --model claude-sonnet-4-6 --max-turns 15 --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*)"
+          # --max-turns raised 15 -> 30: real usage (post permission fixes) showed a ~20-file
+          # diff exhausts 15 turns just fetching the diff, before any review text is written.
+          # See ADR-024 addendum.
+          claude_args: --model claude-sonnet-4-6 --max-turns 30 --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*)"
           show_full_output: true  # temporary — diagnosing permission_denials_count; see ADR-024. Remove once resolved.
           prompt: |
             You are a senior engineer reviewing pull request #${{ steps.gate.outputs.pr-number }}
             in ${{ github.repository }} on a learning project. The PR's code is already checked
             out in the working directory — do not look up or list other PRs.
+            Fetch the full diff once with `gh pr diff <number>` (redirect it to a file if it's
+            long) rather than re-running `gh pr diff` separately per file — you have a limited
+            turn budget.
             Review the PR diff for: correctness, potential bugs, security issues (OWASP top 10),
             idiomatic usage per language, and production readiness concerns.
             Be direct and educational — this is a tutor relationship, not just a checklist.
