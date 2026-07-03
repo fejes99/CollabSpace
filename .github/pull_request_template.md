@@ -27,7 +27,7 @@ Plan: `docs/03-services/<service>/plans/<slug>.md`
 - [ ] Happy-path integration test green against real DB
 - [ ] Edge-case tests cover validation, authorization, conflict/not-found, observability
 - [ ] Manual smoke run (command below)
-- [ ] AWS smoke run (response below)
+- [ ] AWS smoke run (response pasted after merge — see note below)
 - [ ] OpenAPI spec updated and matches actual response shape
 - [ ] Service README updated
 - [ ] CLAUDE.md Layer 2 `Completed:` list updated
@@ -43,6 +43,12 @@ Plan: `docs/03-services/<service>/plans/<slug>.md`
 
 ### AWS response
 
+<!--
+AWS dev is a single shared environment (ADR-022) and only deploys on push to
+main (service-auth.yml). This endpoint cannot be verified against AWS before
+merge. Paste the exact bytes from the deployed endpoint here immediately after
+merge, with timestamp, then check the box above.
+-->
 ```
 # Paste exact bytes from the deployed endpoint, with timestamp
 ```
