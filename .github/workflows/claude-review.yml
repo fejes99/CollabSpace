@@ -151,13 +151,21 @@ jobs:
         uses: anthropics/claude-code-action@fc6b9d4a0a8400c5e066ae686de922d161ea935e  # (= current @v1, rotated 2026-07-02)
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
-          # --allowedTools grants gh read commands Claude needs to fetch the PR diff.
-          # .claude/settings.json's Bash(*) does NOT cover these — gh subcommands appear
-          # to require an explicit grant here regardless of the repo's own permissions.allow.
+          # --allowedTools grants gh commands Claude needs to fetch the diff AND post the
+          # review. .claude/settings.json's Bash(*) does NOT cover these — gh subcommands
+          # require an explicit grant here regardless of the repo's own permissions.allow.
+          # gh pr review is the actual posting mechanism: this action's "agent" mode (used
+          # whenever a custom prompt is supplied) does NOT auto-post Claude's final text
+          # anywhere — confirmed by reading the action's own post-run step, which only
+          # checks for buffered inline comments and revokes the installation token.
           # --max-turns raised 15 -> 30: real usage (post permission fixes) showed a ~20-file
           # diff exhausts 15 turns just fetching the diff, before any review text is written.
           # See ADR-024 addendum.
-          claude_args: --model claude-sonnet-4-6 --max-turns 30 --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*)"
+          #
+          # TEMPORARY: model swapped to haiku for one cheap validation run to confirm the
+          # posting mechanism works before paying Sonnet prices again. Revert to
+          # claude-sonnet-4-6 once confirmed.
+          claude_args: --model claude-haiku-4-5 --max-turns 30 --allowedTools "Bash(gh pr view:*),Bash(gh pr diff:*),Bash(gh pr review:*)"
           show_full_output: true  # temporary — diagnosing permission_denials_count; see ADR-024. Remove once resolved.
           prompt: |
             You are a senior engineer reviewing pull request #${{ steps.gate.outputs.pr-number }}
@@ -170,7 +178,7 @@ jobs:
             idiomatic usage per language, and production readiness concerns.
             Be direct and educational — this is a tutor relationship, not just a checklist.
 
-            Do not try to post the review yourself — do not call `gh pr review`, `gh pr comment`,
-            the code-review skill, or write it to a file. Simply end your final response with the
-            review text itself, summarising findings by category. The workflow posts it as the PR
-            comment automatically.
+            Once you've written the review, post it yourself with:
+            gh pr review ${{ steps.gate.outputs.pr-number }} --comment --body "<review text>"
+            Do not use the code-review skill or write the review to a file — only `gh pr review`
+            actually posts it.
