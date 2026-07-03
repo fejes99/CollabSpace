@@ -14,7 +14,7 @@ auth-workspace can connect to Redis and report its health, with no business logi
 - Post-merge AWS smoke test (per feature-workflow.md's DoD) must save a response showing `components.redis.status=UP` specifically — not just a `200` — since this is the only place the real `rediss://` TLS+auth path gets exercised (Testcontainers is plaintext/unauthenticated)
 
 ## 3. API contract (config surface, not a new endpoint)
-- `/actuator/health` gains a `redis` key under `components` — automatic once `spring-boot-starter-data-redis` + a working `RedisConnectionFactory` are present
+- `/actuator/health` gains a `redis` key under `components` via a **custom** `RedisHealthIndicator` (mirroring `DbHealthIndicator`'s pattern — a `PING` check via `StringRedisTemplate`), not Spring Boot's auto-configured default indicator
 - New `/actuator/health/liveness` path via `management.endpoint.health.probes.enabled=true` + `management.endpoint.health.group.liveness.include=db`
 - `probes.enabled=true` also auto-creates `/actuator/health/readiness` — left at Spring Boot's default and intentionally unused (ALB only checks `liveness`); this is a deliberate no-op, documented as such
 - Terraform's ALB `health_check_path` changes from `/actuator/health` to `/actuator/health/liveness` in this same PR
@@ -28,7 +28,7 @@ auth-workspace can connect to Redis and report its health, with no business logi
 ## 8. Observability
 - One startup INFO log line: `event=redis_client_initialized host=<host> port=<port>` — host/port only, never the raw URL or credential. Named "initialized," not "configured" or "connected," since Lettuce connects lazily — this line proves the bean was created, not that a connection succeeded
 - One startup WARN log line when `spring.data.redis.url` is absent from the `Environment`: `event=redis_url_not_configured` — makes a missing SSM/env wiring visible immediately instead of silently deferred until PR 7
-- No custom logging for health-check polls or state transitions
+- Health transitions logged, not every poll — `event=redis.health.down` / `event=redis.health.recovered`, deduped via `AtomicReference<Boolean>`, matching `DbHealthIndicator`'s established pattern exactly
 - Correlation ID: not applicable, no request-handling code in this slice
 - Audit events: not applicable, no security-significant action in this slice
 
