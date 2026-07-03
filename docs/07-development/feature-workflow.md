@@ -246,12 +246,14 @@ Three required sections.
 
 - [ ] Integration tests pass
 - [ ] Manual smoke: curl command pasted below
-- [ ] AWS smoke: live response pasted below
+- [ ] AWS smoke: live response pasted below **post-merge** — `dev` is a single shared
+      environment and only deploys on push to `main` (ADR-022), so this cannot be
+      verified pre-merge
 - [ ] OpenAPI spec updated
 - [ ] Service README updated
 - [ ] CLAUDE.md Layer 2 updated
 
-The AWS response goes in a fenced block at the bottom. The exact bytes, not a summary.
+The AWS response goes in a fenced block at the bottom, pasted post-merge. The exact bytes, not a summary.
 
 ### Draft vs ready
 
@@ -265,23 +267,33 @@ Even solo, you review your own PR. Reading the diff in GitHub's PR view (not in 
 
 ## Definition of Done (feature-level)
 
-A feature is done when all of these are true. This is the gate before squash-merging.
+A feature is done when all of these are true.
+
+**Before merge — the gate before squash-merging:**
 
 - [ ] Plan document committed at `docs/03-services/<service>/plans/<slug>.md`
 - [ ] Plan was reviewed adversarially (`/plan-feature` or manual prompt)
 - [ ] Happy-path integration test green against a real DB
 - [ ] Edge-case tests cover validation, authorization, conflict/not-found, observability
+- [ ] Manual smoke run against the local stack
 - [ ] OpenAPI spec updated and matches actual response shape
 - [ ] Service README updated to reflect new behavior
 - [ ] CLAUDE.md Layer 2 `Completed:` list updated
 - [ ] ADR written if a non-obvious decision was made; ADR number added to `Recent ADRs:` line
 - [ ] CI green on the PR
 - [ ] Squash-merged to main
+
+Treat this list as a hard gate. If any item is incomplete, the PR does not merge — even if the code works.
+
+**After merge — required to close the PR/issue, not to merge it:**
+
+`dev` is a single shared AWS environment (ADR-022) with no pre-merge sandbox, and
+`service-auth.yml`-style workflows only build and deploy on push to `main`. AWS
+verification is therefore structurally a post-merge step:
+
 - [ ] Endpoint hit on the live AWS dev environment; response saved in the PR
 - [ ] `/retrospect` run; learnings captured (memory entries approved, doc updates proposed and accepted or declined)
 - [ ] Branch deleted locally and remotely
-
-Treat this as a hard gate. If any item is incomplete, the feature is not done — even if the code works.
 
 ---
 

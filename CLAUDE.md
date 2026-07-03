@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Build out real functionality in auth-workspace — database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, and user registration done; next: login endpoint and workspace endpoints.
+Current goal: Build out real functionality in auth-workspace — database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, and login endpoint (PR #20, pending merge + AWS verification) done; next: workspace endpoints.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Implement login endpoint (POST /v1/auth/login).
+Next milestone: Implement workspace endpoints.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
