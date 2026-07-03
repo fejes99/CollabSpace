@@ -10,14 +10,14 @@ Services are also available as Docker Compose profiles for when you need to run 
 
 Install these before running anything:
 
-| Tool | Purpose | Install |
-|---|---|---|
-| Docker Desktop (or Rancher Desktop) | Container runtime for infrastructure | [docker.com](https://docker.com) |
-| Java 25 (JDK) | Auth & Workspace service | `sdk install java 25-tem` via SDKMAN |
-| Node.js 24 | Document, Realtime, Notification services and frontend | `nvm install 24` |
-| Python 3.14 | AI Assistant service | `pyenv install 3.14` |
-| AWS CLI v2 | LocalStack interaction, ECR login | [aws.amazon.com/cli](https://aws.amazon.com/cli) |
-| Terraform 1.9+ | Optional — only needed to run `terraform plan/apply` locally | [terraform.io](https://terraform.io) |
+| Tool                                | Purpose                                                      | Install                                          |
+| ----------------------------------- | ------------------------------------------------------------ | ------------------------------------------------ |
+| Docker Desktop (or Rancher Desktop) | Container runtime for infrastructure                         | [docker.com](https://docker.com)                 |
+| Java 25 (JDK)                       | Auth & Workspace service                                     | `sdk install java 25-tem` via SDKMAN             |
+| Node.js 24                          | Document, Realtime, Notification services and frontend       | `nvm install 24`                                 |
+| Python 3.14                         | AI Assistant service                                         | `pyenv install 3.14`                             |
+| AWS CLI v2                          | LocalStack interaction, ECR login                            | [aws.amazon.com/cli](https://aws.amazon.com/cli) |
+| Terraform 1.9+                      | Optional — only needed to run `terraform plan/apply` locally | [terraform.io](https://terraform.io)             |
 
 SDKMAN (`sdk`) manages Java versions. nvm manages Node.js versions. pyenv manages Python versions. Using these version managers avoids system-level Java/Node/Python conflicts between projects.
 
@@ -33,12 +33,12 @@ make up
 
 This brings up:
 
-| Service | Port | Purpose |
-|---|---|---|
-| PostgreSQL 16 | 5432 | Auth & Workspace (auth_db) + AI Assistant (vector_db) |
-| MongoDB 7 | 27017 | Document Service |
-| Redis 7 | 6379 | Auth (JWT blocklist, refresh token storage) + Realtime (pub/sub coordination) |
-| LocalStack | 4566 | AWS emulation: SNS, SQS, Lambda |
+| Service       | Port  | Purpose                                                                       |
+| ------------- | ----- | ----------------------------------------------------------------------------- |
+| PostgreSQL 16 | 5432  | Auth & Workspace (auth_db) + AI Assistant (vector_db)                         |
+| MongoDB 7     | 27017 | Document Service                                                              |
+| Redis 7       | 6379  | Auth (JWT blocklist, refresh token storage) + Realtime (pub/sub coordination) |
+| LocalStack    | 4566  | AWS emulation: SNS, SQS, Lambda                                               |
 
 Stop and remove containers:
 
@@ -152,6 +152,7 @@ make down-all
 ```
 
 `make up-all` is not the recommended default workflow because it requires a Docker rebuild whenever code changes (`docker compose build <service>`). Use it for:
+
 - Verifying that a service's Dockerfile builds and produces a working container.
 - Running the integration test suite (which targets the containerised stack).
 - Reproducing a CI failure locally.
@@ -179,6 +180,7 @@ make setup-local
 ```
 
 What `setup-local` creates:
+
 - SNS topic: `document-events`
 - SQS queue: `notifications` (with DLQ: `notifications-dlq`)
 - SQS queue: `realtime-updates` (with DLQ: `realtime-updates-dlq`)
@@ -199,9 +201,35 @@ To run migrations manually (e.g., to check the schema state before starting the 
 
 ```bash
 cd services/auth-workspace
-./mvnw flyway:migrate -Dflyway.url=jdbc:postgresql://localhost:5432/auth_db \
-  -Dflyway.user=collabspace -Dflyway.password=<from .env.local>
+./mvnw flyway:migrate \
+  -Dflyway.url=jdbc:postgresql://localhost:15432/auth_db \
+  -Dflyway.user=collabspace \
+  -Dflyway.password=<from .env.local> \
+  -q
 ```
+
+#### Reverting a local migration
+
+If you edit a migration file that Flyway has already applied, the next migrate will fail with a checksum mismatch. This happens legitimately during local development when a migration has not yet been committed or shared with others.
+
+**Option A — reset everything (simplest):**
+
+```bash
+make reset
+```
+
+`make reset` runs `docker compose down -v` (removes all volumes), restarts infrastructure, and re-provisions LocalStack. The next `flyway:migrate` or service start re-applies all migrations from V1. Use this when you do not mind resetting MongoDB and Redis as well.
+
+**Option B — reset only the auth database:**
+
+```bash
+docker exec collabspace-postgres-1 \
+  psql -U collabspace -c "DROP DATABASE auth_db; CREATE DATABASE auth_db;"
+```
+
+Then run migrations manually or start the service. Use this when you want to keep MongoDB and Redis data intact.
+
+> **Rule:** only edit an existing migration file when it has not been applied outside your local machine — i.e., it is not on `main` and no one else has run it. Once a migration is shared, write a new version instead.
 
 ### AI Assistant (TBD)
 
@@ -222,56 +250,58 @@ cp services/auth-workspace/.env.example services/auth-workspace/.env.local
 
 ### Common variables (all services)
 
-| Variable | Description |
-|---|---|
-| `ENV` | Environment name: `development`, `staging`, `production` |
-| `LOG_LEVEL` | Log level: `debug`, `info`, `warn`, `error` |
+| Variable              | Description                                               |
+| --------------------- | --------------------------------------------------------- |
+| `ENV`                 | Environment name: `development`, `staging`, `production`  |
+| `LOG_LEVEL`           | Log level: `debug`, `info`, `warn`, `error`               |
 | `CORS_ALLOWED_ORIGIN` | Frontend origin for CORS (local: `http://localhost:5173`) |
 
 ### Auth & Workspace
 
-| Variable | Description |
-|---|---|
-| `DB_URL` | PostgreSQL connection URL (`jdbc:postgresql://localhost:5432/auth_db`) |
-| `DB_USER` | Database username |
-| `DB_PASSWORD` | Database password |
-| `REDIS_URL` | Redis connection URL (`redis://localhost:6379`) |
+| Variable          | Description                                                                                             |
+| ----------------- | ------------------------------------------------------------------------------------------------------- |
+| `DB_URL`          | PostgreSQL connection URL (`jdbc:postgresql://localhost:5432/auth_db`)                                  |
+| `DB_USER`         | Database username                                                                                       |
+| `DB_PASSWORD`     | Database password                                                                                       |
+| `REDIS_URL`       | Redis connection URL (`redis://localhost:6379`)                                                         |
 | `JWT_PRIVATE_KEY` | RSA private key (PEM-encoded). In AWS, this is read from SSM; locally, it is a file path or inline PEM. |
-| `JWT_ISSUER` | JWT issuer claim (`http://localhost:8080` locally) |
-| `JWT_AUDIENCE` | JWT audience claim (`collabspace-api`) |
-| `BCRYPT_COST` | bcrypt cost factor (default: `12`) |
+| `JWT_ISSUER`      | JWT issuer claim (`http://localhost:8080` locally)                                                      |
+| `JWT_AUDIENCE`    | JWT audience claim (`collabspace-api`)                                                                  |
+| `BCRYPT_COST`     | bcrypt cost factor (default: `12`)                                                                      |
 
 ### Document Service
 
-| Variable | Description |
-|---|---|
-| `MONGODB_URI` | MongoDB connection string (`mongodb://localhost:27017/documents`) |
+| Variable                | Description                                                                |
+| ----------------------- | -------------------------------------------------------------------------- |
+| `MONGODB_URI`           | MongoDB connection string (`mongodb://localhost:27017/documents`)          |
 | `AI_SERVICE_PUBLIC_KEY` | RSA public key of the AI Assistant (for service-to-service JWT validation) |
 
 ### AI Assistant
 
-| Variable | Description |
-|---|---|
-| `VECTOR_DB_URL` | PostgreSQL connection URL for the vector database |
-| `VECTOR_DB_USER` | Database username |
-| `VECTOR_DB_PASSWORD` | Database password |
+| Variable               | Description                                         |
+| ---------------------- | --------------------------------------------------- |
+| `VECTOR_DB_URL`        | PostgreSQL connection URL for the vector database   |
+| `VECTOR_DB_USER`       | Database username                                   |
+| `VECTOR_DB_PASSWORD`   | Database password                                   |
 | `DOCUMENT_SERVICE_URL` | Document Service base URL (`http://localhost:3001`) |
-| `AI_PRIVATE_KEY` | RSA private key for service-to-service JWT signing |
-| `ANTHROPIC_API_KEY` | Claude API key for embedding and completion calls |
+| `AI_PRIVATE_KEY`       | RSA private key for service-to-service JWT signing  |
+| `ANTHROPIC_API_KEY`    | Claude API key for embedding and completion calls   |
 
 ---
 
 ## Make targets reference
 
 ```
-make up           — Start infrastructure containers (postgres, mongo, redis, localstack)
-make down         — Stop and remove infrastructure containers (volumes preserved)
-make reset        — Stop, remove volumes, restart, and re-run setup-local + migrations
-make up-all       — Start infrastructure + application containers (--profile services)
-make down-all     — Stop all containers including application services
-make setup-local  — Create LocalStack resources (idempotent)
-make logs         — Tail docker-compose logs for all infrastructure services
-make logs s=<svc> — Tail logs for a specific service (e.g., make logs s=postgres)
+make up              — Start infrastructure containers (postgres, mongo, redis, localstack)
+make down            — Stop and remove infrastructure containers (volumes preserved)
+make reset           — Stop, remove volumes, restart, and re-run setup-local + migrations
+make up-all          — Start infrastructure + all application containers (--profile services)
+make down-all        — Stop all containers including application services
+make setup-local     — Create LocalStack resources (idempotent)
+make logs            — Tail docker-compose logs for all infrastructure services
+make logs s=<svc>    — Tail logs for a specific service (e.g., make logs s=postgres)
+make auth-dev        — Start auth-workspace natively via spring-boot:run (blocks terminal; use for development)
+make auth-docker     — Build auth-workspace Docker image, run as container, open Swagger UI when healthy
 ```
 
 ### AWS dev environment targets

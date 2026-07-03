@@ -6,7 +6,7 @@
 #
 # Run `make` or `make help` to list all targets.
 
-.PHONY: up down reset up-all down-all setup-local logs auth-swagger \
+.PHONY: up down reset up-all down-all setup-local logs auth-dev auth-docker \
         dev-plan dev-up dev-down dev-pause dev-resume dev-status \
         dev-start dev-stop \
         help
@@ -79,7 +79,10 @@ setup-local: ## Provision LocalStack resources — idempotent, safe to re-run
 logs: ## Tail docker compose logs; filter with: make logs s=postgres
 	docker compose logs -f $(s)
 
-auth-swagger: up ## Build + start auth-workspace in Docker, open Swagger UI when healthy
+auth-dev: up ## Start auth-workspace natively — blocks the terminal, hot-reload via spring-boot:run
+	cd services/auth-workspace && ./mvnw spring-boot:run
+
+auth-docker: up ## Build auth-workspace Docker image, run as container, open Swagger UI when healthy
 	docker compose --profile services up -d --build auth-workspace
 	@echo -n "==> Waiting for auth-workspace"
 	@until curl -sf http://localhost:8080/actuator/health > /dev/null 2>&1; do \
@@ -159,7 +162,7 @@ dev-stop: ## Stop a single ECS service — make dev-stop s=auth-workspace
 help: ## Show available targets
 	@echo ""
 	@echo "Local dev (Docker Compose):"
-	@grep -E '^(up|down|reset|up-all|down-all|setup-local|logs|auth-swagger):.*?## ' $(MAKEFILE_LIST) | \
+	@grep -E '^(up|down|reset|up-all|down-all|setup-local|logs|auth-dev|auth-docker):.*?## ' $(MAKEFILE_LIST) | \
 		awk 'BEGIN {FS = ":.*?## "}; {printf "  %-18s %s\n", $$1, $$2}'
 	@echo ""
 	@echo "AWS dev environment:"

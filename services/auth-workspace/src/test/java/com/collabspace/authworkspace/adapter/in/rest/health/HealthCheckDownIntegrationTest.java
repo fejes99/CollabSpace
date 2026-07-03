@@ -1,16 +1,17 @@
 package com.collabspace.authworkspace.adapter.in.rest.health;
 
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.web.servlet.MockMvc;
+
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK,
 		properties = { "spring.datasource.url=jdbc:postgresql://localhost:1/invalid",
@@ -20,12 +21,14 @@ import org.springframework.test.web.servlet.MockMvc;
 				"spring.jpa.hibernate.ddl-auto=none" })
 @AutoConfigureMockMvc
 @Import(JwtTestConfiguration.class)
+@DisplayName("GET /actuator/health — database down")
 class HealthCheckDownIntegrationTest {
 
 	@Autowired
 	MockMvc mvc;
 
 	@Test
+	@DisplayName("returns 503 DOWN when database is unreachable")
 	void healthReturnsServiceUnavailableWhenDbDown() throws Exception {
 		mvc.perform(get("/actuator/health"))
 			.andExpect(status().isServiceUnavailable())

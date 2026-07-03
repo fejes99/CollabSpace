@@ -1,10 +1,12 @@
 package com.collabspace.authworkspace.adapter.out.ssm;
 
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Component;
 import software.amazon.awssdk.services.ssm.SsmClient;
 import software.amazon.awssdk.services.ssm.model.GetParameterRequest;
 
 @Component
+@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 public class SsmConfigLoader {
 
 	private final SsmClient ssmClient;

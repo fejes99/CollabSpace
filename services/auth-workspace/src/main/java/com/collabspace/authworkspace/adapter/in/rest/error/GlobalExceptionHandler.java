@@ -3,10 +3,8 @@ package com.collabspace.authworkspace.adapter.in.rest.error;
 import com.collabspace.authworkspace.domain.exception.ConflictException;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
+import com.collabspace.authworkspace.domain.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
-import java.net.URI;
-import java.util.List;
-import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
@@ -15,6 +13,10 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+import java.net.URI;
+import java.util.List;
+import java.util.Map;
 
 @RestControllerAdvice
 class GlobalExceptionHandler {
@@ -35,6 +37,17 @@ class GlobalExceptionHandler {
 		problem.setInstance(URI.create(request.getRequestURI()));
 		problem.setProperty("errors", errors);
 		log.warn("event=validation_failed uri={} fields={}", request.getRequestURI(), fieldNames(ex));
+		return problem;
+	}
+
+	@ExceptionHandler(UnauthorizedException.class)
+	ProblemDetail handleUnauthorized(UnauthorizedException ex, HttpServletRequest request) {
+		ProblemDetail problem = ProblemDetail.forStatus(401);
+		problem.setType(ex.getType());
+		problem.setTitle("Unauthorized");
+		problem.setDetail(ex.getMessage());
+		problem.setInstance(URI.create(request.getRequestURI()));
+		log.warn("event=unauthorized type={}", ex.getType());
 		return problem;
 	}
 

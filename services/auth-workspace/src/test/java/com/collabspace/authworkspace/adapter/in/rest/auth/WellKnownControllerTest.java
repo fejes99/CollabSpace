@@ -4,6 +4,7 @@ import com.collabspace.authworkspace.adapter.in.rest.security.SecurityConfig;
 import com.collabspace.authworkspace.adapter.in.rest.wellknown.WellKnownController;
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.RSAKey;
+import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
@@ -22,22 +23,32 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest(WellKnownController.class)
 @Import({ SecurityConfig.class, WellKnownControllerTest.TestConfig.class })
+@DisplayName("GET /.well-known")
 class WellKnownControllerTest {
 
 	@Autowired
 	MockMvc mockMvc;
 
 	@Test
+	@DisplayName("returns RSA public key without private key material")
 	void jwksReturnsPublicKeyOnly() throws Exception {
 		mockMvc.perform(get("/.well-known/jwks.json"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.keys").isArray())
 			.andExpect(jsonPath("$.keys[0].kty").value("RSA"))
 			.andExpect(jsonPath("$.keys[0].kid").isNotEmpty())
-			.andExpect(jsonPath("$.keys[0].d").doesNotExist());
+			.andExpect(jsonPath("$.keys[0].n").isNotEmpty())
+			.andExpect(jsonPath("$.keys[0].e").isNotEmpty())
+			.andExpect(jsonPath("$.keys[0].d").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].p").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].q").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].dp").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].dq").doesNotExist())
+			.andExpect(jsonPath("$.keys[0].qi").doesNotExist());
 	}
 
 	@Test
+	@DisplayName("OIDC discovery returns issuer, JWKS URI, and signing algorithm")
 	void oidcDiscoveryReturnsRequiredFields() throws Exception {
 		mockMvc.perform(get("/.well-known/openid-configuration"))
 			.andExpect(status().isOk())

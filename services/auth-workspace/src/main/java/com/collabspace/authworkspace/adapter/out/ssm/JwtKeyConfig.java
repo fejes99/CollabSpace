@@ -3,6 +3,14 @@ package com.collabspace.authworkspace.adapter.out.ssm;
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.RSAKey;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Configuration;
+import org.springframework.util.StringUtils;
+
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
 import java.security.interfaces.RSAPrivateCrtKey;
@@ -12,15 +20,9 @@ import java.security.spec.InvalidKeySpecException;
 import java.security.spec.PKCS8EncodedKeySpec;
 import java.security.spec.RSAPublicKeySpec;
 import java.util.Base64;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.Configuration;
-import org.springframework.util.StringUtils;
 
 @Configuration
+@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 public class JwtKeyConfig {
 
 	private static final Logger log = LoggerFactory.getLogger(JwtKeyConfig.class);
@@ -47,7 +49,6 @@ public class JwtKeyConfig {
 	}
 
 	@Bean
-	@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 	public RSAKey rsaKey() throws NoSuchAlgorithmException, InvalidKeySpecException, JOSEException {
 		if (!StringUtils.hasText(this.privateKeySsmPath)) {
 			throw new IllegalStateException("JWT_PRIVATE_KEY_SSM_PATH is not configured");
@@ -61,7 +62,6 @@ public class JwtKeyConfig {
 	}
 
 	@Bean
-	@ConditionalOnProperty("JWT_PRIVATE_KEY_SSM_PATH")
 	public JwtProperties jwtProperties() {
 		String jwksUri = StringUtils.hasText(this.jwksUriSsmPath) ? this.ssm.getParameter(this.jwksUriSsmPath)
 				: "http://localhost:8080/.well-known/jwks.json";

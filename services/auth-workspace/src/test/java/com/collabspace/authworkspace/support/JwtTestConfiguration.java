@@ -2,12 +2,13 @@ package com.collabspace.authworkspace.support;
 
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.RSAKey;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
-import org.springframework.boot.test.context.TestConfiguration;
-import org.springframework.context.annotation.Bean;
 
 @TestConfiguration(proxyBeanMethods = false)
 public class JwtTestConfiguration {
