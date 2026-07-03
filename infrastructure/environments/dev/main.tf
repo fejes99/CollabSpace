@@ -342,6 +342,12 @@ module "auth_workspace" {
     SPRING_DATASOURCE_PASSWORD = aws_ssm_parameter.db_password.arn
     SPRING_DATA_REDIS_URL      = aws_ssm_parameter.redis_url.arn
   }
+
+  # Measured cold start (JPA + Flyway + JWT key load + Tomcat) took ~122s in
+  # practice — start_period must clear that comfortably or ECS will kill a
+  # task that's still legitimately starting. See ADR-031.
+  health_check_command      = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
+  health_check_start_period = 150
 }
 
 # auth-workspace API Gateway integration

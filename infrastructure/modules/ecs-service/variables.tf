@@ -104,3 +104,33 @@ variable "deployment_maximum_percent" {
   type        = number
   default     = 200
 }
+
+variable "health_check_command" {
+  description = "Container-level health check command (ECS CMD-SHELL array), e.g. [\"CMD-SHELL\", \"curl -f http://localhost:8080/actuator/health/readiness || exit 1\"]. null (default) disables it — ECS then only tracks process RUNNING state, not application readiness, and Cloud Map registers the task the instant the container starts rather than when it's actually able to serve traffic."
+  type        = list(string)
+  default     = null
+}
+
+variable "health_check_interval" {
+  description = "Seconds between health check attempts, once startPeriod has elapsed."
+  type        = number
+  default     = 15
+}
+
+variable "health_check_timeout" {
+  description = "Seconds to wait for the health check command to return before treating it as a failure."
+  type        = number
+  default     = 5
+}
+
+variable "health_check_retries" {
+  description = "Consecutive failures required before ECS marks the container UNHEALTHY."
+  type        = number
+  default     = 3
+}
+
+variable "health_check_start_period" {
+  description = "Grace period in seconds during which failing health checks don't count against retries. Must exceed the application's real cold-start time, or ECS will kill tasks that are still legitimately starting."
+  type        = number
+  default     = 150
+}

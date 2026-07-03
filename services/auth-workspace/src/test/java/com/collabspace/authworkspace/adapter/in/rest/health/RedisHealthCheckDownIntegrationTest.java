@@ -29,11 +29,11 @@ class RedisHealthCheckDownIntegrationTest {
 	MockMvc mvc;
 
 	@Test
-	@DisplayName("root health shows redis DOWN, but liveness (db-only) stays UP")
-	void redisDownDoesNotAffectLiveness() throws Exception {
+	@DisplayName("root health shows redis DOWN, but readiness (db-only) stays UP")
+	void redisDownDoesNotAffectReadiness() throws Exception {
 		mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.redis.status").value("DOWN"));
 
-		mvc.perform(get("/actuator/health/liveness"))
+		mvc.perform(get("/actuator/health/readiness"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("UP"));
 	}
