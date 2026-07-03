@@ -162,5 +162,9 @@ jobs:
             out in the working directory — do not look up or list other PRs.
             Review the PR diff for: correctness, potential bugs, security issues (OWASP top 10),
             idiomatic usage per language, and production readiness concerns.
-            Post a single PR review comment summarising findings by category.
             Be direct and educational — this is a tutor relationship, not just a checklist.
+
+            Do not try to post the review yourself — do not call `gh pr review`, `gh pr comment`,
+            the code-review skill, or write it to a file. Simply end your final response with the
+            review text itself, summarising findings by category. The workflow posts it as the PR
+            comment automatically.
