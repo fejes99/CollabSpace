@@ -116,3 +116,12 @@ resource "aws_vpc_security_group_egress_rule" "ecs_to_postgres" {
   to_port           = 5432
   cidr_ipv4         = "0.0.0.0/0"
 }
+
+resource "aws_vpc_security_group_egress_rule" "ecs_to_redis" {
+  security_group_id = aws_security_group.ecs_tasks.id
+  description       = "Redis (TLS) to Upstash (external managed service). See ADR-030."
+  ip_protocol       = "tcp"
+  from_port         = 6379
+  to_port           = 6379
+  cidr_ipv4         = "0.0.0.0/0"
+}
