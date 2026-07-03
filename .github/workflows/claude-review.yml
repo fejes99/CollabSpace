@@ -132,6 +132,11 @@ jobs:
       - name: Check out repo
         if: steps.gate.outputs.should-review == 'true'
         uses: actions/checkout@v4
+        with:
+          # actions/checkout defaults to github.sha, which for issue_comment
+          # events is main's HEAD, not the PR's code. Force the PR's head
+          # commit explicitly so Claude has an actual diff to review.
+          ref: ${{ github.event.pull_request.head.sha || format('refs/pull/{0}/head', github.event.issue.number) }}
 
       # SHA-pinned (GitHub Actions security best practice — see ADR-024).
       # Resolve a new SHA via: `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1`
@@ -149,7 +154,9 @@ jobs:
           claude_args: --model claude-sonnet-4-6 --max-turns 15
           show_full_output: true  # temporary — diagnosing permission_denials_count; see ADR-024. Remove once resolved.
           prompt: |
-            You are a senior engineer reviewing a pull request on a learning project.
+            You are a senior engineer reviewing pull request #${{ steps.gate.outputs.pr-number }}
+            in ${{ github.repository }} on a learning project. The PR's code is already checked
+            out in the working directory — do not look up or list other PRs.
             Review the PR diff for: correctness, potential bugs, security issues (OWASP top 10),
             idiomatic usage per language, and production readiness concerns.
             Post a single PR review comment summarising findings by category.
