@@ -102,6 +102,12 @@ Examples of business invariants that are often confused with authorization:
 
 These invariants throw a domain exception (e.g., `WorkspaceInvariantViolationException`) that maps to a `422 Unprocessable Entity` response at the controller's exception handler. Authorization failures, by contrast, map to `403 Forbidden`. The distinction is meaningful to callers: `403` means "you are not allowed"; `422` means "you are allowed but this specific action is currently impossible."
 
+### Workspace ownership and admin handoff
+
+There is no distinct "owner" role — `admin` is not unique, and any number of members can hold it. The workspace **creator** is tracked separately from role, and only for the invariant above: a creator can never remove themselves from a workspace they created, but they *can* demote themselves from `admin` to `member` and remain a member, as long as the last-admin invariant is still satisfied.
+
+There is consequently no single "transfer ownership" action. Giving up admin status is two separate calls, both targeting a specific `userId` via the existing "change member role" capability: promote a named user to `admin`, then optionally demote yourself. This is safe by construction without needing an atomic combined endpoint — the role-change endpoint rejects any demotion (self or otherwise) that would leave the workspace with zero admins, checked at demote-time regardless of when it's called. So there is no window where the workspace can end up with zero admins even if the two calls happen far apart or only the first one is ever made.
+
 ---
 
 ## Authorization failure response
