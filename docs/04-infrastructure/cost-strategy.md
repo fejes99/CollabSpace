@@ -18,7 +18,7 @@ Always-free tiers that remain active:
 | SNS | 1M publishes/month |
 | SQS | 1M requests/month |
 | MongoDB Atlas M0 | 512 MB storage, permanent |
-| Upstash Redis | 10K commands/day (Upstash free plan) |
+| Upstash Redis | 500K commands/month, 256MB storage (Upstash free plan) |
 
 ---
 
