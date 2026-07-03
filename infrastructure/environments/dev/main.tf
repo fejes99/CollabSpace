@@ -172,6 +172,18 @@ resource "aws_ssm_parameter" "internal_token" {
   tags  = { Name = "/collabspace/${var.environment}/api/internal-token" }
 }
 
+# ── SSM parameter — Upstash Redis ─────────────────────────────────────────────
+# Value sourced from secrets.auto.tfvars (gitignored). See ADR-030: one shared
+# Upstash instance for auth-workspace and (later) realtime-service, isolated by
+# key-naming convention rather than ACL (ACL requires a paid Upstash plan).
+
+resource "aws_ssm_parameter" "redis_url" {
+  name  = "/collabspace/${var.environment}/redis/url"
+  type  = "SecureString"
+  value = var.redis_url
+  tags  = { Name = "/collabspace/${var.environment}/redis/url" }
+}
+
 # ── ECS IAM roles ─────────────────────────────────────────────────────────────
 
 module "iam_ecs" {
