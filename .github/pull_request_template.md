@@ -27,7 +27,7 @@ Plan: `docs/03-services/<service>/plans/<slug>.md`
 - [ ] Happy-path integration test green against real DB
 - [ ] Edge-case tests cover validation, authorization, conflict/not-found, observability
 - [ ] Manual smoke run (command below)
-- [ ] AWS smoke run (response pasted after merge — see note below)
+- [ ] AWS smoke run (response pasted post-merge — see note below)
 - [ ] OpenAPI spec updated and matches actual response shape
 - [ ] Service README updated
 - [ ] CLAUDE.md Layer 2 `Completed:` list updated

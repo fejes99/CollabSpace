@@ -246,7 +246,7 @@ Three required sections.
 
 - [ ] Integration tests pass
 - [ ] Manual smoke: curl command pasted below
-- [ ] AWS smoke: live response pasted below **after merge** — `dev` is a single shared
+- [ ] AWS smoke: live response pasted below **post-merge** — `dev` is a single shared
       environment and only deploys on push to `main` (ADR-022), so this cannot be
       verified pre-merge
 - [ ] OpenAPI spec updated
