@@ -354,8 +354,19 @@ module "auth_workspace" {
   # Measured cold start (JPA + Flyway + JWT key load + Tomcat) took ~122s in
   # practice — start_period must clear that comfortably or ECS will kill a
   # task that's still legitimately starting. See ADR-031.
+  #
+  # interval/timeout/retries tightened below the module default (15s/5s/3)
+  # to 5s/3s/2. Verified live this does NOT shrink the startup-transition
+  # flicker (start_period suppresses UNHEALTHY the whole time a task is
+  # legitimately starting, regardless of interval/retries) - it's kept
+  # because it's the correct setting for detecting a task that goes
+  # unhealthy after a successful deploy, where start_period no longer
+  # applies. See ADR-031's Empirical results section.
   health_check_command      = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
   health_check_start_period = 150
+  health_check_interval     = 5
+  health_check_timeout      = 3
+  health_check_retries      = 2
 }
 
 # auth-workspace API Gateway integration
