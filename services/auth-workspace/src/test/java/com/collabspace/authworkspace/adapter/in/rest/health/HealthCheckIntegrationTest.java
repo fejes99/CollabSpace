@@ -31,4 +31,20 @@ class HealthCheckIntegrationTest {
 			.andExpect(jsonPath("$.components.db.status").value("UP"));
 	}
 
+	@Test
+	@DisplayName("returns 200 UP with redis component when Redis is reachable")
+	void healthReturnsUpWhenRedisReachable() throws Exception {
+		mvc.perform(get("/actuator/health"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.components.redis.status").value("UP"));
+	}
+
+	@Test
+	@DisplayName("liveness group only reflects db, ignores redis")
+	void livenessGroupOnlyChecksDb() throws Exception {
+		mvc.perform(get("/actuator/health/liveness"))
+			.andExpect(status().isOk())
+			.andExpect(jsonPath("$.status").value("UP"));
+	}
+
 }

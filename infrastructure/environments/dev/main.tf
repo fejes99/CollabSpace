@@ -340,6 +340,7 @@ module "auth_workspace" {
 
   secrets = {
     SPRING_DATASOURCE_PASSWORD = aws_ssm_parameter.db_password.arn
+    SPRING_DATA_REDIS_URL      = aws_ssm_parameter.redis_url.arn
   }
 }
 
