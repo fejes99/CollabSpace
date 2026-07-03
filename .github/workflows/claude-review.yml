@@ -147,7 +147,6 @@ jobs:
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           claude_args: --model claude-sonnet-4-6 --max-turns 15
-          show_full_output: true  # temporary — remove after diagnosing permission_denials_count
           prompt: |
             You are a senior engineer reviewing a pull request on a learning project.
             Review the PR diff for: correctness, potential bugs, security issues (OWASP top 10),
