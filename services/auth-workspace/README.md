@@ -2,11 +2,12 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie).
+**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030); no business logic depends on it yet — the JWT blocklist is a later PR.
 
 ## What it does
 
-- `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},...}}`. Public route — no JWT required. Returns `503` with `status=DOWN` if the database is unreachable.
+- `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},"redis":{"status":"UP"},...}}`. Public route — no JWT required. Returns `503` with `status=DOWN` if the database is unreachable. `redis` reflects live Redis reachability but does not (yet) affect the overall `status` in any way that gates traffic — see `/actuator/health/liveness` below. Nothing in business logic depends on Redis yet (that lands in a later PR); this component exists for visibility only.
+- `GET /actuator/health/liveness` — scoped to `db` only. Intended as the traffic-routing signal once a container-level ECS health check is added (not yet wired — Cloud Map currently tracks ECS task state only, not this endpoint).
 - `GET /.well-known/jwks.json` — RS256 public key set. **Must remain a public route** — the API Gateway JWT Authorizer fetches signing keys from this URL. See ADR-026.
 - `POST /v1/auth/register` — public route. No JWT required. Returns `201` with access token and user summary on success; `400` for validation errors; `409` if the email is already registered.
 - `POST /v1/auth/login` — public route. No JWT required. Returns `200` with access token and user on success; sets an HttpOnly `refresh_token` cookie (`Path=/auth`, `Max-Age=604800`, `Secure`, `SameSite=Strict`). Returns `400` for validation errors; `401` for invalid credentials.
@@ -174,6 +175,7 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_PRIVATE_KEY` | Yes | Base64-encoded PKCS8 DER private key (no headers, no newlines). Generate: `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \| openssl pkcs8 -topk8 -nocrypt -outform DER \| base64 \| tr -d '\n'` |
 | `JWT_ISSUER` | Yes | JWT `iss` claim, e.g. `http://localhost:8080` |
 | `JWT_AUDIENCE` | Yes | JWT `aud` claim, e.g. `collabspace-api` |
+| `SPRING_DATA_REDIS_URL` | No | `redis://localhost:16379` when running via Docker Compose. If unset, falls back to Spring's own default (`localhost:6379`) and logs a startup WARN — the app still starts, since nothing depends on Redis yet |
 
 **AWS dev environment** (set `JWT_PRIVATE_KEY_SSM_PATH` to activate this mode — requires AWS credentials):
 
@@ -186,7 +188,7 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_ISSUER_SSM_PATH` | Yes | SSM path for JWT issuer string (`/collabspace/dev/jwt/issuer`) |
 | `JWT_AUDIENCE_SSM_PATH` | Yes | SSM path for JWT audience string (`/collabspace/dev/jwt/audience`) |
 | `JWT_JWKS_URI_SSM_PATH` | No | SSM path for JWKS URI (`/collabspace/dev/jwt/jwks-uri`) — defaults to `http://localhost:8080/.well-known/jwks.json` if unset |
-| `REDIS_URL` | Yes | Upstash TLS URL, injected from SSM |
+| `SPRING_DATA_REDIS_URL` | No | Upstash `rediss://` TLS URL, injected directly as an ECS task secret (not an SSM-path env var like the JWT_* rows above) from `/collabspace/dev/redis/url` — see ADR-030 |
 
 Set variables via IntelliJ run configuration or an `.env` file (gitignored). See `.env.example` for a template.
 
