@@ -19,6 +19,13 @@ class RedisHealthIndicator implements HealthIndicator {
 
 	private static final String REDIS_URL_PROPERTY = "spring.data.redis.url";
 
+	// Checked separately from REDIS_URL_PROPERTY: application.properties binds
+	// spring.data.redis.url to a valid fallback (redis://localhost:6379) when
+	// SPRING_DATA_REDIS_URL is absent, so REDIS_URL_PROPERTY is never blank -
+	// the raw env var name is the only reliable signal for "was this actually
+	// configured, or silently defaulted."
+	private static final String REDIS_URL_ENV_VAR = "SPRING_DATA_REDIS_URL";
+
 	private final StringRedisTemplate redisTemplate;
 
 	private final String host;
@@ -27,13 +34,12 @@ class RedisHealthIndicator implements HealthIndicator {
 
 	RedisHealthIndicator(StringRedisTemplate redisTemplate, Environment environment) {
 		this.redisTemplate = redisTemplate;
-		String url = environment.getProperty(REDIS_URL_PROPERTY);
-		this.host = extractHost(url);
-		if (url == null || url.isBlank()) {
-			log.warn("event=redis_url_not_configured msg=\"falling back to default host, verify SSM/env wiring\"");
+		this.host = extractHost(environment.getProperty(REDIS_URL_PROPERTY));
+		if (environment.containsProperty(REDIS_URL_ENV_VAR)) {
+			log.info("event=redis_client_initialized host={}", host);
 		}
 		else {
-			log.info("event=redis_client_initialized host={}", host);
+			log.warn("event=redis_url_not_configured msg=\"falling back to default host, verify SSM/env wiring\"");
 		}
 	}
 
@@ -42,19 +48,19 @@ class RedisHealthIndicator implements HealthIndicator {
 		try {
 			String pong = redisTemplate.execute(RedisConnection::ping);
 			if ("PONG".equalsIgnoreCase(pong)) {
-				logTransition(true);
+				logTransition(true, null);
 				return Health.up().build();
 			}
-			logTransition(false);
+			logTransition(false, null);
 			return Health.down().build();
 		}
-		catch (Exception _) {
-			logTransition(false);
+		catch (Exception e) {
+			logTransition(false, e);
 			return Health.down().build();
 		}
 	}
 
-	private void logTransition(boolean up) {
+	private void logTransition(boolean up, Exception exception) {
 		Boolean previous = lastStatus.getAndSet(up);
 		if (up) {
 			if (Boolean.FALSE.equals(previous)) {
@@ -62,11 +68,13 @@ class RedisHealthIndicator implements HealthIndicator {
 			}
 		}
 		else {
+			String cause = exception != null ? exception.getClass().getSimpleName() + ": " + exception.getMessage()
+					: "non-PONG response";
 			if (previous == null) {
-				log.warn("event=redis.health.down previousStatus=UNKNOWN host={}", host);
+				log.warn("event=redis.health.down previousStatus=UNKNOWN host={} cause=\"{}\"", host, cause);
 			}
 			else if (previous) {
-				log.warn("event=redis.health.down previousStatus=UP host={}", host);
+				log.warn("event=redis.health.down previousStatus=UP host={} cause=\"{}\"", host, cause);
 			}
 		}
 	}
