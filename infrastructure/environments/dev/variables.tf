@@ -49,3 +49,10 @@ variable "neon_dbname" {
   description = "Neon PostgreSQL database name. Source from secrets.auto.tfvars (gitignored)."
   type        = string
 }
+
+variable "redis_url" {
+  description = "Upstash Redis connection URL. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+  sensitive   = true
+}
+
