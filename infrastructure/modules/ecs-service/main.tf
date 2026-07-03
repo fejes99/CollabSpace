@@ -12,11 +12,15 @@
 # dns_records ttl = 10: short TTL so API Gateway picks up newly started or
 # stopped tasks quickly. A long TTL would cause 502s when a task is replaced.
 #
-# health_check_custom_config: ECS-managed health. Cloud Map marks a task
-# healthy when ECS reports it as RUNNING and unhealthy when ECS marks it
-# STOPPED or DRAINING. This avoids Route 53 health check costs ($0.75 per
-# endpoint per month). Adding a container-level healthCheck block to the
-# task definition (see ADR-026 consequences) improves signal quality here.
+# health_check_custom_config: ECS-managed health. Without a container-level
+# healthCheck (var.health_check_command, below), Cloud Map marks a task
+# healthy the instant ECS reports it RUNNING — before the application has
+# necessarily finished starting — and unhealthy only on STOPPED/DRAINING.
+# When a container healthCheck is defined, ECS's own HEALTHY/UNHEALTHY
+# status feeds into this same Cloud Map health tracking automatically, so
+# Cloud Map (and therefore API Gateway) stops routing to a task that's
+# RUNNING but not yet actually ready. Still avoids Route 53 health check
+# costs ($0.75/endpoint/month) either way — see ADR-031.
 
 resource "aws_service_discovery_service" "this" {
   name = var.service_name
@@ -79,30 +83,41 @@ resource "aws_ecs_task_definition" "service" {
   task_role_arn            = var.task_role_arn
 
   container_definitions = jsonencode([
-    {
-      name      = var.service_name
-      image     = var.image_url
-      essential = true
+    merge(
+      {
+        name      = var.service_name
+        image     = var.image_url
+        essential = true
 
-      portMappings = [
-        {
-          containerPort = var.container_port
-          protocol      = "tcp"
+        portMappings = [
+          {
+            containerPort = var.container_port
+            protocol      = "tcp"
+          }
+        ]
+
+        logConfiguration = {
+          logDriver = "awslogs"
+          options = {
+            awslogs-group         = var.log_group_name
+            awslogs-region        = var.aws_region
+            awslogs-stream-prefix = "ecs"
+          }
         }
-      ]
 
-      logConfiguration = {
-        logDriver = "awslogs"
-        options = {
-          awslogs-group         = var.log_group_name
-          awslogs-region        = var.aws_region
-          awslogs-stream-prefix = "ecs"
+        environment = [for k, v in var.environment_variables : { name = k, value = v }]
+        secrets     = [for k, v in var.secrets : { name = k, valueFrom = v }]
+      },
+      var.health_check_command == null ? {} : {
+        healthCheck = {
+          command     = var.health_check_command
+          interval    = var.health_check_interval
+          timeout     = var.health_check_timeout
+          retries     = var.health_check_retries
+          startPeriod = var.health_check_start_period
         }
       }
-
-      environment = [for k, v in var.environment_variables : { name = k, value = v }]
-      secrets     = [for k, v in var.secrets : { name = k, valueFrom = v }]
-    }
+    )
   ])
 
   tags = {

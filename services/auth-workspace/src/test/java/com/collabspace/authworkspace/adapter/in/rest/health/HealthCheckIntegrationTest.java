@@ -40,9 +40,9 @@ class HealthCheckIntegrationTest {
 	}
 
 	@Test
-	@DisplayName("liveness group only reflects db, ignores redis")
-	void livenessGroupOnlyChecksDb() throws Exception {
-		mvc.perform(get("/actuator/health/liveness"))
+	@DisplayName("readiness group only reflects db, ignores redis")
+	void readinessGroupOnlyChecksDb() throws Exception {
+		mvc.perform(get("/actuator/health/readiness"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.status").value("UP"));
 	}
