@@ -369,7 +369,11 @@ module "auth_workspace" {
   health_check_retries      = 2
 }
 
-# auth-workspace API Gateway integration
+# auth-workspace API Gateway integration — public routes only (no JWT authorizer
+# attached to any route using this integration). See auth_workspace_protected
+# below for the JWT-authorized counterpart used by /v1/auth/{proxy+} and
+# /v1/workspaces/{proxy+}.
+#
 # VPC_LINK + Cloud Map: API Gateway routes through the VPC Link to live task
 # IPs registered in Cloud Map. integration_uri is the Cloud Map service ARN.
 #
@@ -379,6 +383,22 @@ module "auth_workspace" {
 #   X-Correlation-ID: injected from $context.requestId — a unique ID API
 #     Gateway assigns to every request. The CorrelationIdFilter in Spring picks
 #     this up and adds it to MDC for structured log correlation.
+#
+# Deliberately does NOT map $context.authorizer.jwt.claims.* here: none of the
+# routes below (register, login, jwks, oidc-discovery, health) have a JWT
+# authorizer attached, so that context simply does not exist for them —
+# referencing it here would fail requests to every route on this integration,
+# not just skip the mapping. See auth_workspace_protected for where those
+# claims are actually mapped.
+#
+# remove:header.* strips X-User-Id/X-User-Workspaces/X-JWT-Jti from whatever
+# the client sent, rather than leaving them unmapped. Unmapped would just pass
+# a client-supplied value straight through unmodified — harmless today since
+# no public route trusts those headers, but a filter that reads them without
+# knowing which integration a request came through has no other way to tell a
+# gateway-verified value apart from a client-forged one. Stripping here means
+# they are only ever present when this integration's authorized counterpart
+# (auth_workspace_protected) actually set them.
 
 resource "aws_apigatewayv2_integration" "auth_workspace" {
   api_id             = module.api_gateway.api_id
@@ -391,6 +411,9 @@ resource "aws_apigatewayv2_integration" "auth_workspace" {
   request_parameters = {
     "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
     "overwrite:header.x-correlation-id" = "$context.requestId"
+    "remove:header.x-user-id"           = "''"
+    "remove:header.x-user-workspaces"   = "''"
+    "remove:header.x-jwt-jti"           = "''"
   }
 }
 
@@ -482,6 +505,39 @@ resource "aws_apigatewayv2_route" "auth_health" {
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
+# auth-workspace API Gateway integration — JWT-authorized routes only.
+#
+# Split from auth_workspace above because request_parameters is set per
+# integration, not per route, and $context.authorizer.jwt.claims.* only
+# resolves on routes where the JWT authorizer actually ran. Mixing this into
+# the public integration would break register/login/health/jwks, since that
+# context variable is unresolvable there.
+#
+#   X-User-Id: the userId claim — see authentication.md §Claims structure.
+#   X-User-Workspaces: the memberships claim. JwtService serializes this claim
+#     as a JSON *string*, not a nested array — API Gateway's claim-to-header
+#     mapping cannot carry an array/object value, only string/number/boolean.
+#   X-JWT-Jti: the jti claim, forwarded so each service can check it against
+#     the Redis blocklist on logout. See docs/02-architecture/authentication.md
+#     §Token revocation.
+
+resource "aws_apigatewayv2_integration" "auth_workspace_protected" {
+  api_id             = module.api_gateway.api_id
+  integration_type   = "HTTP_PROXY"
+  integration_method = "ANY"
+  integration_uri    = module.auth_workspace.cloud_map_service_arn
+  connection_type    = "VPC_LINK"
+  connection_id      = module.api_gateway.vpc_link_id
+
+  request_parameters = {
+    "overwrite:header.x-internal-token"  = "$stageVariables.internalToken"
+    "overwrite:header.x-correlation-id"  = "$context.requestId"
+    "overwrite:header.x-user-id"         = "$context.authorizer.jwt.claims.userId"
+    "overwrite:header.x-user-workspaces" = "$context.authorizer.jwt.claims.memberships"
+    "overwrite:header.x-jwt-jti"         = "$context.authorizer.jwt.claims.jti"
+  }
+}
+
 # Protected routes — JWT required. Any request without a valid token is
 # rejected by the JWT Authorizer with 401 before reaching the service.
 
@@ -490,7 +546,7 @@ resource "aws_apigatewayv2_route" "auth_proxy" {
   route_key          = "ANY /v1/auth/{proxy+}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace_protected.id}"
 }
 
 resource "aws_apigatewayv2_route" "workspaces_proxy" {
@@ -498,7 +554,7 @@ resource "aws_apigatewayv2_route" "workspaces_proxy" {
   route_key          = "ANY /v1/workspaces/{proxy+}"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
-  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace_protected.id}"
 }
 
 # ── realtime-service ──────────────────────────────────────────────────────────
