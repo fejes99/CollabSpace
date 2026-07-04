@@ -390,6 +390,15 @@ module "auth_workspace" {
 # referencing it here would fail requests to every route on this integration,
 # not just skip the mapping. See auth_workspace_protected for where those
 # claims are actually mapped.
+#
+# remove:header.* strips X-User-Id/X-User-Workspaces/X-JWT-Jti from whatever
+# the client sent, rather than leaving them unmapped. Unmapped would just pass
+# a client-supplied value straight through unmodified — harmless today since
+# no public route trusts those headers, but a filter that reads them without
+# knowing which integration a request came through has no other way to tell a
+# gateway-verified value apart from a client-forged one. Stripping here means
+# they are only ever present when this integration's authorized counterpart
+# (auth_workspace_protected) actually set them.
 
 resource "aws_apigatewayv2_integration" "auth_workspace" {
   api_id             = module.api_gateway.api_id
@@ -402,6 +411,9 @@ resource "aws_apigatewayv2_integration" "auth_workspace" {
   request_parameters = {
     "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
     "overwrite:header.x-correlation-id" = "$context.requestId"
+    "remove:header.x-user-id"           = "''"
+    "remove:header.x-user-workspaces"   = "''"
+    "remove:header.x-jwt-jti"           = "''"
   }
 }
 
