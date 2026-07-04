@@ -9,6 +9,8 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.ObjectMapper;
 
 import java.security.KeyPair;
 import java.security.KeyPairGenerator;
@@ -30,6 +32,8 @@ class JwtServiceTest {
 
 	private JwtService jwtService;
 
+	private ObjectMapper objectMapper;
+
 	@BeforeAll
 	static void generateKey() throws Exception {
 		KeyPairGenerator gen = KeyPairGenerator.getInstance("RSA");
@@ -42,8 +46,10 @@ class JwtServiceTest {
 
 	@BeforeEach
 	void setup() {
+		objectMapper = new ObjectMapper();
 		jwtService = new JwtService(testKey,
-				new JwtProperties("https://test.issuer", "test-audience", "https://test/jwks"), Clock.systemUTC());
+				new JwtProperties("https://test.issuer", "test-audience", "https://test/jwks"), Clock.systemUTC(),
+				objectMapper);
 	}
 
 	@Test
@@ -65,8 +71,9 @@ class JwtServiceTest {
 				- claims.getIssueTime().toInstant().getEpochSecond();
 		assertThat(ttl).isEqualTo(900);
 
-		@SuppressWarnings("unchecked")
-		List<Map<String, Object>> membershipsInToken = (List<Map<String, Object>>) claims.getClaim("memberships");
+		String membershipsClaim = claims.getStringClaim("memberships");
+		List<Map<String, Object>> membershipsInToken = objectMapper.readValue(membershipsClaim, new TypeReference<>() {
+		});
 		assertThat(membershipsInToken).hasSize(1);
 		assertThat(membershipsInToken.get(0)).containsEntry("workspaceId", "ws-1").containsEntry("role", "admin");
 	}

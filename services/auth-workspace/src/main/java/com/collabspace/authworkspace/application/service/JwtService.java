@@ -10,6 +10,7 @@ import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.JWTClaimsSet;
 import com.nimbusds.jwt.SignedJWT;
 import org.springframework.stereotype.Service;
+import tools.jackson.databind.ObjectMapper;
 
 import java.security.SecureRandom;
 import java.time.Clock;
@@ -32,12 +33,15 @@ public class JwtService {
 
 	private final Clock clock;
 
+	private final ObjectMapper objectMapper;
+
 	private final SecureRandom secureRandom = new SecureRandom();
 
-	public JwtService(RSAKey rsaKey, JwtProperties jwtProperties, Clock clock) {
+	public JwtService(RSAKey rsaKey, JwtProperties jwtProperties, Clock clock, ObjectMapper objectMapper) {
 		this.rsaKey = rsaKey;
 		this.jwtProperties = jwtProperties;
 		this.clock = clock;
+		this.objectMapper = objectMapper;
 	}
 
 	public String issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
@@ -46,6 +50,12 @@ public class JwtService {
 			.map(m -> Map.of("workspaceId", m.workspaceId(), "role", m.role()))
 			.toList();
 
+		// Serialized to a JSON string, not a nested array claim: API Gateway's JWT
+		// authorizer maps claims to headers via $context.authorizer.jwt.claims.*, which
+		// only supports string/number/boolean claim values — an array claim cannot be
+		// forwarded as X-User-Workspaces.
+		String membershipsJson = objectMapper.writeValueAsString(membershipClaims);
+
 		JWTClaimsSet claims = new JWTClaimsSet.Builder().subject("user:" + userId)
 			.issuer(jwtProperties.issuer())
 			.audience(jwtProperties.audience())
@@ -53,7 +63,7 @@ public class JwtService {
 			.claim("exp", now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS).getEpochSecond())
 			.jwtID(UUID.randomUUID().toString())
 			.claim("userId", userId)
-			.claim("memberships", membershipClaims)
+			.claim("memberships", membershipsJson)
 			.build();
 
 		JWSHeader header = new JWSHeader.Builder(JWSAlgorithm.RS256).keyID(rsaKey.getKeyID()).build();
