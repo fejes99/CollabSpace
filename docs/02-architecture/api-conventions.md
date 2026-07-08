@@ -20,6 +20,8 @@ A "breaking change" is any change that requires existing clients to update: remo
 
 All error responses use **RFC 9457 Problem Details** (`Content-Type: application/problem+json`). The format is:
 
+The full list of `type` URIs in use across all services lives in [error-catalog.md](error-catalog.md) — check there before minting a new one, to avoid inventing a naming convention that collides with or duplicates an existing type.
+
 ```json
 {
   "type": "https://errors.collabspace.io/documents/not-found",
@@ -183,8 +185,8 @@ Idempotency is most valuable when client retry logic cannot distinguish between 
 
 ## Authentication header
 
-Authenticated endpoints expect the access token in the `Authorization: Bearer <token>` header. The token is a JWT signed with RS256 as described in [authentication.md](authentication.md).
+Clients send the access token in the `Authorization: Bearer <token>` header. The token is a JWT signed with RS256 as described in [authentication.md](authentication.md).
 
-API Gateway validates the token before forwarding the request. Services receive the raw JWT in the `Authorization` header and may parse the claims for authorization decisions (see [authorization.md](authorization.md)) but must not re-validate the signature — that is API Gateway's responsibility.
+API Gateway validates the token's signature, expiry, issuer, and audience, then forwards the request **without** the raw JWT. Services receive the extracted claims as plain headers instead — `X-User-Id` and `X-User-Workspaces` — and use them for authorization decisions (see [authorization.md](authorization.md)). Services never see the JWT itself and must not attempt to parse or validate it. Full trust model: [api-gateway-trust.md](api-gateway-trust.md).
 
 Exception: the auth endpoints (`/v1/auth/login`, `/v1/auth/register`, `/v1/auth/refresh`) do not require a token. They are unauthenticated routes in the API Gateway configuration.

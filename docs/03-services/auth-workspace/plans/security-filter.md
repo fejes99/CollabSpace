@@ -3,7 +3,7 @@
 **Branch:** `feat/auth/security-filter`
 **Tier:** Full
 **Service:** auth-workspace
-**Status:** Draft
+**Status:** Ready
 
 ---
 
@@ -12,6 +12,8 @@
 auth-workspace validates `X-Internal-Token` on every request, populates Spring Security's `SecurityContext` from `X-User-Id`/`X-User-Workspaces`, and rejects requests whose JWT `jti` is present in the Redis blocklist. No business endpoint is added or changed. After this lands, `@PreAuthorize` becomes meaningful for the first time in this service.
 
 Prerequisites (already merged): `X-User-Id`, `X-User-Workspaces`, `X-JWT-Jti` are now actually forwarded by API Gateway on the JWT-authorized routes (`infra/auth-claim-headers`), stripped on public routes so a client can never forge them there (follow-up in the same PR), and `memberships` is issued as a JSON string claim, not a nested array (`fix/auth/membership-claim-string`).
+
+The raw JWT itself is never forwarded to this or any downstream service — API Gateway terminates it entirely and forwards only the extracted claim headers above. See [api-gateway-trust.md](../../../02-architecture/api-gateway-trust.md) and [api-conventions.md](../../../02-architecture/api-conventions.md) (§ Authentication header).
 
 ---
 
@@ -24,16 +26,19 @@ No new endpoint. Observable via response codes on existing/future routes:
 | `/v1/auth/{proxy+}` or `/v1/workspaces/{proxy+}`, missing/wrong `X-Internal-Token` | `401` |
 | Same, correct token, no `X-User-Id` (shouldn't happen — API Gateway's authorizer already required a valid JWT to reach here) | `401` |
 | Same, correct token, `X-User-Id` present, `X-User-Workspaces` malformed JSON | `401` |
+| Same, `X-User-Id` present, `X-User-Workspaces` absent (or vice versa) | `401` — this combination should never occur; API Gateway's mapping sets both together or neither |
+| Same, `X-User-Workspaces` exceeds size limits (see §4) | `401` |
 | Same, `X-JWT-Jti` present and blocklisted in Redis | `401` |
-| Same, `X-JWT-Jti` absent, or Redis unreachable | passes through (nothing to check — see §4) |
-| `POST /v1/auth/register` / `login`, correct `X-Internal-Token` | passes through, anonymous `SecurityContext` (no identity headers on this route at all — see §3) |
+| Same, `X-JWT-Jti` absent, or Redis unreachable | passes through (nothing to check — see §5) |
+| `POST /v1/auth/register` / `login`, correct `X-Internal-Token`, no identity headers present | passes through, anonymous `SecurityContext` |
+| `POST /v1/auth/register` / `login`, correct `X-Internal-Token`, identity headers unexpectedly present | `401` — fail closed, see §3 |
 | `/.well-known/**`, `/actuator/health/**` | internal-token check bypassed entirely (see §3) |
 
 ---
 
 ## 3. Route exemptions
 
-Two categories, for two different reasons — worth keeping distinct rather than one blanket rule.
+Three categories now — the original two plus a fail-closed rule for known-anonymous routes.
 
 **`/.well-known/**`** — called by API Gateway's own infrastructure (JWKS fetch, OIDC discovery at authorizer-creation time), not routed through the VPC Link at all. Never carries `X-Internal-Token`. Exempt by path match, unconditionally.
 
@@ -45,7 +50,13 @@ So the exemption is the intersection of path *and* origin, not path alone: bypas
 
 Implementation detail: use `org.springframework.security.web.util.matcher.IpAddressMatcher` for the loopback check rather than comparing `request.getRemoteAddr()` against string literals — it correctly handles both IPv4 (`127.0.0.1`) and IPv6 (`::1`) loopback forms.
 
-The more common production answer to this class of problem is a separate `management.server.port`, making the trust boundary structural (the security group never exposes it) rather than something a filter has to reason about. Not adopted here: it's a real infra change (new port, security-group rule, task-definition wiring) for a problem this filter already solves with zero infra impact. Worth revisiting if this service's health-check surface grows.
+**Loopback check integrity — `forward-headers-strategy` must stay `NONE`.** `X-Forwarded-For` cannot be used to determine "is this request really from loopback," even via Tomcat's `RemoteIpValve`/trusted-proxy mechanism: that mechanism only defends against a *downstream* proxy injecting a fake hop, not against the *originating client* declaring `X-Forwarded-For: 127.0.0.1` itself — which is exactly the attacker's position here. Any security decision built on a forwarded-IP header is spoofable by the party the check exists to stop.
+
+Resolution: `server.forward-headers-strategy` stays at its Spring Boot default (`NONE`) globally. `IpAddressMatcher` reads the true, unrewritten `getRemoteAddr()` — safe, because it reflects the actual TCP socket peer, which an attacker can't fake regardless of what headers they send. This does mean the login/registration audit `ip` field (authentication.md's audit events table) cannot come from `getRemoteAddr()` either, since behind the ALB that would just be the load balancer's address for real traffic. That field is populated by manually reading `X-Forwarded-For` at the log-line call site only — explicitly documented as untrusted, best-effort, for observability purposes, and never used for any security decision. This keeps the two concerns (audit IP vs. loopback security check) on separate, differently-trusted code paths rather than one shared, dual-purpose signal.
+
+The more common production answer to the loopback-bypass problem generally is a separate `management.server.port`, making the trust boundary structural (the security group never exposes it) rather than something a filter has to reason about. Not adopted here: it's a real infra change (new port, security-group rule, task-definition wiring) for a problem this filter already solves correctly with the `forward-headers-strategy=NONE` + raw-socket-address approach above. Worth revisiting if this service's health-check surface grows.
+
+**Known-anonymous routes — fail closed on unexpected identity headers.** `POST /v1/auth/register` and `POST /v1/auth/login` are the only routes where API Gateway's mapping template is expected to omit `X-User-Id`/`X-User-Workspaces` entirely (see §1 prerequisites — public routes strip these). If either header is present on these two specific paths, that's not treated as "extra, ignorable data" — it means the Terraform-side strip has regressed. `HeaderAuthenticationFilter` rejects with `401` rather than silently proceeding with an anonymous `SecurityContext`, so a real infra regression surfaces immediately instead of being masked.
 
 ---
 
@@ -53,17 +64,32 @@ The more common production answer to this class of problem is a separate `manage
 
 Three `OncePerRequestFilter`s in `adapter/in/rest/security/` (not `filter/` — that package is for framework-agnostic filters like `CorrelationIdFilter`; these are Spring-Security-specific and registered on the `SecurityFilterChain` via `addFilterBefore`, in this order:
 
-**1. `InternalTokenFilter`** — compares `X-Internal-Token` against the SSM-loaded value (mirrors the existing `JWT_PRIVATE_KEY`/`JWT_PRIVATE_KEY_SSM_PATH` local/AWS split — add `INTERNAL_TOKEN`/`INTERNAL_TOKEN_SSM_PATH`). 401 if missing/wrong. Applies the §3 exemptions.
+**1. `InternalTokenFilter`** — compares `X-Internal-Token` against the SSM-loaded value (mirrors the existing `JWT_PRIVATE_KEY`/`JWT_PRIVATE_KEY_SSM_PATH` local/AWS split — add `INTERNAL_TOKEN`/`INTERNAL_TOKEN_SSM_PATH`). 401 if missing/wrong. Applies the §3 exemptions. Logs on rejection: `log.warn("event=internal_token_invalid ip={} correlationId={} path={}", ip, correlationId, request.getRequestURI())` — no `userId` is available yet at this point in the chain.
 
 **2. `HeaderAuthenticationFilter`** — reads `X-User-Id`, parses `X-User-Workspaces` JSON into the existing `WorkspaceMembership` record (`domain/model/auth/`), and sets a `PreAuthenticatedAuthenticationToken(userId, null, authorities)` on the `SecurityContextHolder`. `PreAuthenticatedAuthenticationToken` is the idiomatic Spring Security type for "identity already established by something upstream I trust" (the same family used for SSO-header integrations) — simpler than pulling in the full `AbstractPreAuthenticatedProcessingFilter` + `AuthenticationUserDetailsService` machinery for what's fundamentally one header pair.
 
-If `X-User-Id` is absent (register/login — no identity headers reach these routes at all per the public integration), leaves the context anonymous; no rejection. If `X-User-Workspaces` is present but fails to parse, that's a `401` — it means API Gateway's mapping produced something unexpected, which should never happen silently.
+Validation rules, all fail-closed (401) except the two explicitly anonymous cases:
+
+| Header | Absent | Present, empty | Present, malformed/oversized |
+|---|---|---|---|
+| `X-User-Id` | anonymous, only on `/v1/auth/register`\|`/login` (§3); `401` everywhere else, and `401` if present at all on those two routes | `401` | — (opaque ID, no further shape to check) |
+| `X-User-Workspaces` | `401` if `X-User-Id` is present (inconsistent pair); anonymous only if `X-User-Id` is also absent | `401` | `401` (bad JSON, or exceeds size limits below) |
+
+**Size limits on `X-User-Workspaces`**, enforced before attempting to parse: raw header value capped at **4KB**, decoded array capped at **200 entries**. Both reject with `401` without attempting a parse if exceeded. 4KB comfortably covers realistic per-user membership counts for a v1 collaboration product with headroom to spare, well under gateway/ALB header-size ceilings; 200 entries is generous for how many workspaces one user plausibly belongs to.
+
+**These numbers are reasoned, not measured or enforced anywhere else.** `JwtService.issueAccessToken` (PR 4, already merged) places no cap on the `memberships` list it serializes into the token — nothing upstream currently prevents a token from being issued with a membership count this filter would reject. There is no test or shared constant tying the two together; if `JwtService` is ever changed to allow more memberships, this filter would start rejecting otherwise-legitimate tokens with no signal pointing at the mismatch. Flagging rather than fixing here — capping `JwtService` symmetrically is a separate, small follow-up (`services/auth-workspace/.../JwtService.java`), not part of this PR's filter work.
 
 Authority representation: a small custom `GrantedAuthority` (`WorkspaceAuthority(workspaceId, role)`) rather than string-concatenating into `SimpleGrantedAuthority("WORKSPACE_x_ADMIN")` and re-parsing later — PR 8's `hasWorkspaceRole` expression needs structured access to both fields.
 
-**3. `JwtBlocklistFilter`** — reads `X-JWT-Jti`, checks Redis `blocklist:<jti>` via a new `TokenBlocklistRepository.isBlocklisted(jti)` outbound port (Redis-backed adapter using the existing `StringRedisTemplate` from PR 6.5). 401 if present. Only the read side is built now — the write side (`blocklist(jti, ttl)`) is added to the same interface by PR 12 (logout) when it has an actual caller; building it now would be untested, unused code.
+**3. `JwtBlocklistFilter`** — reads `X-JWT-Jti`, checks Redis `blocklist:<jti>` via a new `TokenBlocklistRepository.isBlocklisted(jti)` outbound port (Redis-backed adapter using the existing `StringRedisTemplate` from PR 6.5). 401 if present. Logs on rejection, matching the mandatory "Blocklist check failure" audit event in authentication.md's audit table: `log.warn("event=blocklist_check_failed jti={} userId={} ip={} correlationId={}", jti, userId, ip, correlationId)`. Only the read side is built now — the write side (`blocklist(jti, ttl)`) is added to the same interface by PR 12 (logout) when it has an actual caller; building it now would be untested, unused code.
 
-**Error responses:** these filters run before `DispatcherServlet`, so `GlobalExceptionHandler` (`@RestControllerAdvice`) never sees anything thrown here — it only catches exceptions inside the MVC dispatch. A small shared helper writes an RFC 9457 body directly to the `HttpServletResponse`, matching the existing error shape even though it bypasses the normal handler path.
+**Error responses:** these filters run before `DispatcherServlet`'s MVC dispatch, so `GlobalExceptionHandler` (`@RestControllerAdvice`) never sees anything thrown here. Rather than each filter writing an RFC 9457 body to `HttpServletResponse` directly, all three delegate to one shared component, `ProblemDetailsSecurityHandler`, implementing both `AuthenticationEntryPoint` (401) and `AccessDeniedHandler` (403), registered once in `SecurityConfig` via `.exceptionHandling(handling -> handling.authenticationEntryPoint(...).accessDeniedHandler(...))`.
+
+Each filter constructs a specific `AuthenticationException` subtype describing what failed (`InvalidInternalTokenException`, `MalformedIdentityHeadersException`, `TokenRevokedException`) and calls `problemDetailsSecurityHandler.commence(request, response, exception)` directly, rather than throwing and relying on `ExceptionTranslationFilter` to catch it — these three filters run *before* `ExceptionTranslationFilter` in the chain (each filter only wraps what runs after it via `chain.doFilter()`), so an exception thrown here would propagate straight to the servlet container, not to Spring Security's exception handling. Calling the entry point directly is the same pattern Spring Security's own `BasicAuthenticationFilter` uses internally for the same reason.
+
+`AccessDeniedHandler` is wired on the same bean now even though nothing in this PR throws `AccessDeniedException` yet: PR 8's `@PreAuthorize` checks run inside `DispatcherServlet`, which *is* wrapped by `ExceptionTranslationFilter` (positioned right before it in the chain), so PR 8's 403s will be routed to the same handler automatically, with no extra wiring, and render with the identical RFC 9457 shape these 401s use.
+
+**Error `type` URIs** — four new `auth/` types, one per distinct cause. Full catalog (including these plus every other service's error types): [error-catalog.md](../../../02-architecture/error-catalog.md).
 
 ---
 
@@ -84,27 +110,35 @@ Resolves the open question flagged in `redis-client.md`'s plan. **Fail open**: o
 
 | Scenario | Expected result |
 |---|---|
-| Missing/wrong `X-Internal-Token` | 401 |
-| Correct token, `/v1/auth/register` or `/login` (no identity headers present at all) | passes, anonymous `SecurityContext` |
-| Correct token, malformed `X-User-Workspaces` | 401 |
-| Blocklisted `jti` | 401 |
+| Missing/wrong `X-Internal-Token` | 401, `invalid-internal-token`, logged |
+| Correct token, `/v1/auth/register` or `/login`, no identity headers | passes, anonymous `SecurityContext` |
+| Correct token, `/v1/auth/register` or `/login`, `X-User-Id` unexpectedly present | 401, `unexpected-identity` (§3) |
+| Correct token, protected route, `X-User-Id` absent | 401, `malformed-identity-headers` |
+| Correct token, protected route, `X-User-Id` present, empty string | 401, `malformed-identity-headers` |
+| Correct token, `X-User-Id` present, `X-User-Workspaces` absent (or vice versa) | 401, `malformed-identity-headers` |
+| Correct token, malformed `X-User-Workspaces` JSON | 401, `malformed-identity-headers` |
+| `X-User-Workspaces` exceeds 4KB or 200 entries | 401, `malformed-identity-headers`, no parse attempted |
+| Blocklisted `jti` | 401, `token-revoked`, logged (`event=blocklist_check_failed`) |
 | Absent `jti` | passes |
 | Redis unreachable | passes + WARN log |
 | `/.well-known/**` | bypass, any origin |
 | `/actuator/health` (root) | normal validation (gateway-routed, carries token) |
-| `/actuator/health/readiness`, loopback origin | bypass |
+| `/actuator/health/readiness`, loopback origin | bypass (raw socket address, not `X-Forwarded-For` — see §3) |
 | `/actuator/health/readiness`, non-loopback origin | 401 (shouldn't be reachable at all — no gateway route exists for it, but the filter must not silently trust an unexpected caller) |
 
 ---
 
 ## 8. Test plan
 
-Unit tests per filter with fabricated headers and a fabricated `RemoteAddr` (no real SSM/API Gateway available locally). Testcontainers `redis:7` for the blocklist filter's integration test, mirroring PR 6.5's pattern — including the fail-open case (stop the container mid-test, confirm the request still passes with a WARN logged).
+Unit tests per filter with fabricated headers and a fabricated `RemoteAddr` (no real SSM/API Gateway available locally). Testcontainers `redis:7` for the blocklist filter's integration test, mirroring PR 6.5's pattern — including the fail-open case (stop the container mid-test, confirm the request still passes with a WARN logged) and the rejection-logging case (blocklisted `jti` produces the `event=blocklist_check_failed` line with all four required fields).
+
+Additional cases beyond the original set: the size-limit rejection for `X-User-Workspaces` (both the byte-length and entry-count boundaries), the present-without-pair inconsistency for `X-User-Id`/`X-User-Workspaces`, and the fail-closed rejection when identity headers appear on `/v1/auth/register`/`login`. Confirm `server.forward-headers-strategy` is `NONE` in test config so the loopback test's fabricated `RemoteAddr` isn't silently overridden.
 
 ---
 
 ## 9. Out of scope
 
 - `hasWorkspaceRole` custom `@PreAuthorize` expression — PR 8 builds it against its first real caller.
-- Blocklist *write* path — PR 12.
+- Blocklist *write* path — PR 12. TTL will use a fixed 15-minute ceiling (the documented max access-token lifetime), not an exact `exp - now()` computation — avoids needing a new `X-JWT-Exp` forwarded header. Always safe since 15 minutes is a hard ceiling on remaining lifetime; the cost is a few minutes of harmless extra Redis retention in the common case.
+- Membership-staleness check (`membership-changed-at:<userId>` vs. token `iat`, per ADR-032) — no PR in the sequence currently owns the *write* side of this marker (no remove-member/change-role endpoint is planned yet), so there's no caller to exercise the read side against. Deferred until that endpoint is planned, following the same read-before-write-exists precedent as the blocklist filter above.
 - Terraform claim-to-header mapping — already merged (`infra/auth-claim-headers`, `fix/auth/membership-claim-string`).

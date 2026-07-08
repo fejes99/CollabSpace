@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Build out real functionality in auth-workspace — database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, and login endpoint (PR #20, pending merge + AWS verification) done; next: workspace endpoints.
+Current goal: Database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, and login endpoint are merged and verified on AWS. Next: the internal token filter + header-based auth (Spring Security), required before any endpoint — including workspace endpoints — can be protected with @PreAuthorize.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Implement workspace endpoints.
+Next milestone: Implement the internal token filter + header-based auth (Spring Security), then workspace endpoints, which depend on it.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
