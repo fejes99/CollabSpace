@@ -18,8 +18,7 @@ public class LocalInternalTokenConfig {
 
 	@Bean
 	public InternalTokenProperties internalTokenProperties() {
-		// TODO: return new InternalTokenProperties(internalToken);
-		throw new UnsupportedOperationException("TODO: wire InternalTokenProperties from local INTERNAL_TOKEN");
+		return new InternalTokenProperties(internalToken);
 	}
 
 }
