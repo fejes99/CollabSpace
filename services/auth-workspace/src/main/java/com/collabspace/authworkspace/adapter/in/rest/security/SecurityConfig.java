@@ -7,16 +7,41 @@ import org.springframework.security.config.annotation.web.configuration.EnableWe
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 
 @Configuration
 @EnableWebSecurity
 public class SecurityConfig {
+
+	private final InternalTokenFilter internalTokenFilter;
+
+	private final HeaderAuthenticationFilter headerAuthenticationFilter;
+
+	private final JwtBlocklistFilter jwtBlocklistFilter;
+
+	private final ProblemDetailsSecurityHandler problemDetailsSecurityHandler;
+
+	public SecurityConfig(InternalTokenFilter internalTokenFilter,
+			HeaderAuthenticationFilter headerAuthenticationFilter, JwtBlocklistFilter jwtBlocklistFilter,
+			ProblemDetailsSecurityHandler problemDetailsSecurityHandler) {
+		this.internalTokenFilter = internalTokenFilter;
+		this.headerAuthenticationFilter = headerAuthenticationFilter;
+		this.jwtBlocklistFilter = jwtBlocklistFilter;
+		this.problemDetailsSecurityHandler = problemDetailsSecurityHandler;
+	}
 
 	@Bean
 	public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 		return http.csrf(AbstractHttpConfigurer::disable)
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+			// Order per plan §4: InternalTokenFilter -> HeaderAuthenticationFilter
+			// -> JwtBlocklistFilter.
+			.addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter.class)
+			.addFilterAfter(headerAuthenticationFilter, InternalTokenFilter.class)
+			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
+			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
+				.accessDeniedHandler(problemDetailsSecurityHandler))
 			.authorizeHttpRequests(auth -> auth.requestMatchers("/.well-known/**").permitAll().anyRequest().permitAll())
 			.build();
 	}

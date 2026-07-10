@@ -1,5 +1,9 @@
 package com.collabspace.authworkspace.adapter.in.rest.auth;
 
+import com.collabspace.authworkspace.adapter.in.rest.security.HeaderAuthenticationFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.InternalTokenFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.JwtBlocklistFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.adapter.in.rest.security.SecurityConfig;
 import com.collabspace.authworkspace.adapter.in.rest.wellknown.WellKnownController;
 import com.collabspace.authworkspace.application.service.JwtProperties;
@@ -22,7 +26,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest(WellKnownController.class)
-@Import({ SecurityConfig.class, WellKnownControllerTest.TestConfig.class })
+@Import({ SecurityConfig.class, InternalTokenFilter.class, HeaderAuthenticationFilter.class, JwtBlocklistFilter.class,
+		ProblemDetailsSecurityHandler.class, WellKnownControllerTest.TestConfig.class })
 @DisplayName("GET /.well-known")
 class WellKnownControllerTest {
 
