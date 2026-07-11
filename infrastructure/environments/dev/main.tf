@@ -337,13 +337,14 @@ module "auth_workspace" {
   aws_region     = var.aws_region
 
   environment_variables = {
-    SPRING_PROFILES_ACTIVE    = var.environment
-    SPRING_DATASOURCE_URL     = "jdbc:postgresql://${var.neon_host}/${var.neon_dbname}?sslmode=require&channel_binding=require"
+    SPRING_PROFILES_ACTIVE     = var.environment
+    SPRING_DATASOURCE_URL      = "jdbc:postgresql://${var.neon_host}/${var.neon_dbname}?sslmode=require&channel_binding=require"
     SPRING_DATASOURCE_USERNAME = var.neon_username
-    JWT_PRIVATE_KEY_SSM_PATH  = "/collabspace/${var.environment}/auth/jwt-private-key"
-    JWT_ISSUER_SSM_PATH       = "/collabspace/${var.environment}/jwt/issuer"
-    JWT_AUDIENCE_SSM_PATH     = "/collabspace/${var.environment}/jwt/audience"
-    JWT_JWKS_URI_SSM_PATH     = "/collabspace/${var.environment}/jwt/jwks-uri"
+    JWT_PRIVATE_KEY_SSM_PATH   = "/collabspace/${var.environment}/auth/jwt-private-key"
+    JWT_ISSUER_SSM_PATH        = "/collabspace/${var.environment}/jwt/issuer"
+    JWT_AUDIENCE_SSM_PATH      = "/collabspace/${var.environment}/jwt/audience"
+    JWT_JWKS_URI_SSM_PATH      = "/collabspace/${var.environment}/jwt/jwks-uri"
+    INTERNAL_TOKEN_SSM_PATH    = aws_ssm_parameter.internal_token.name
   }
 
   secrets = {
