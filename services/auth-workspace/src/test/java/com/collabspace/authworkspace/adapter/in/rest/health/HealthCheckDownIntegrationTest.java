@@ -1,5 +1,6 @@
 package com.collabspace.authworkspace.adapter.in.rest.health;
 
+import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -27,10 +28,13 @@ class HealthCheckDownIntegrationTest {
 	@Autowired
 	MockMvc mvc;
 
+	@Autowired
+	InternalTokenProperties internalTokenProperties;
+
 	@Test
 	@DisplayName("returns 503 DOWN when database is unreachable")
 	void healthReturnsServiceUnavailableWhenDbDown() throws Exception {
-		mvc.perform(get("/actuator/health"))
+		mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token()))
 			.andExpect(status().isServiceUnavailable())
 			.andExpect(jsonPath("$.components.db.status").value("DOWN"));
 	}

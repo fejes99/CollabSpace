@@ -38,8 +38,8 @@ class SecurityFilterChainIntegrationTest {
 	@Test
 	@DisplayName("returns 201 when internal token is valid and no identity headers are present")
 	void registerWithValidInternalTokenAndNoIdentityHeadersReturns201() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON)
-			.header("X-Internal-Token", internalToken)
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
 			.content("""
 					{ "name": "Alice", "email": "alice@example.com", "password": "password123" }
 					"""))

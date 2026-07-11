@@ -1,5 +1,6 @@
 package com.collabspace.authworkspace.adapter.in.rest.health;
 
+import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
@@ -28,10 +29,14 @@ class RedisHealthCheckDownIntegrationTest {
 	@Autowired
 	MockMvc mvc;
 
+	@Autowired
+	InternalTokenProperties internalTokenProperties;
+
 	@Test
 	@DisplayName("root health shows redis DOWN, but readiness (db-only) stays UP")
 	void redisDownDoesNotAffectReadiness() throws Exception {
-		mvc.perform(get("/actuator/health")).andExpect(jsonPath("$.components.redis.status").value("DOWN"));
+		mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token()))
+			.andExpect(jsonPath("$.components.redis.status").value("DOWN"));
 
 		mvc.perform(get("/actuator/health/readiness"))
 			.andExpect(status().isOk())
