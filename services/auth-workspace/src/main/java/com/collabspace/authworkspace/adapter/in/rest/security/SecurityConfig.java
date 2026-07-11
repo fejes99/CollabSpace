@@ -1,5 +1,8 @@
 package com.collabspace.authworkspace.adapter.in.rest.security;
 
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.HeaderAuthenticationFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.InternalTokenFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.JwtBlocklistFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;

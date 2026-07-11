@@ -1,11 +1,13 @@
 package com.collabspace.authworkspace.adapter.in.rest.auth;
 
-import com.collabspace.authworkspace.adapter.in.rest.security.HeaderAuthenticationFilter;
-import com.collabspace.authworkspace.adapter.in.rest.security.InternalTokenFilter;
-import com.collabspace.authworkspace.adapter.in.rest.security.JwtBlocklistFilter;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.adapter.in.rest.security.SecurityConfig;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.HeaderAuthenticationFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.InternalTokenFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.JwtBlocklistFilter;
 import com.collabspace.authworkspace.adapter.in.rest.wellknown.WellKnownController;
+import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
+import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.RSAKey;
 import org.junit.jupiter.api.DisplayName;
@@ -32,12 +34,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class WellKnownControllerTest {
 
 	@Autowired
-	MockMvc mockMvc;
+	MockMvc mvc;
 
 	@Test
 	@DisplayName("returns RSA public key without private key material")
 	void jwksReturnsPublicKeyOnly() throws Exception {
-		mockMvc.perform(get("/.well-known/jwks.json"))
+		mvc.perform(get("/.well-known/jwks.json"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.keys").isArray())
 			.andExpect(jsonPath("$.keys[0].kty").value("RSA"))
@@ -55,7 +57,7 @@ class WellKnownControllerTest {
 	@Test
 	@DisplayName("OIDC discovery returns issuer, JWKS URI, and signing algorithm")
 	void oidcDiscoveryReturnsRequiredFields() throws Exception {
-		mockMvc.perform(get("/.well-known/openid-configuration"))
+		mvc.perform(get("/.well-known/openid-configuration"))
 			.andExpect(status().isOk())
 			.andExpect(jsonPath("$.issuer").value("https://test.issuer"))
 			.andExpect(jsonPath("$.jwks_uri").value("https://test/jwks"))
@@ -78,6 +80,16 @@ class WellKnownControllerTest {
 		@Bean
 		JwtProperties jwtProperties() {
 			return new JwtProperties("https://test.issuer", "test-audience", "https://test/jwks");
+		}
+
+		@Bean
+		InternalTokenProperties internalTokenProperties() {
+			return new InternalTokenProperties("test-internal-token");
+		}
+
+		@Bean
+		TokenBlocklistRepository tokenBlocklistRepository() {
+			return jti -> false;
 		}
 
 	}
