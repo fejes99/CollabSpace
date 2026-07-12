@@ -25,7 +25,7 @@ Requests arriving from API Gateway carry four injected headers:
 
 | Header | Source | Purpose |
 |---|---|---|
-| `X-Internal-Token` | API Gateway stage variable | Validated by `InternalTokenFilter` on every request — reject 401 if missing or wrong. Exempt for `.well-known/**` (unconditional) and `/actuator/health/readiness`\|`liveness` (loopback origin only) |
+| `X-Internal-Token` | API Gateway stage variable | Validated by `InternalTokenFilter` on every request — reject 401 if missing or wrong. Exempt for `.well-known/**` (unconditional), `/actuator/health/readiness`\|`liveness` (loopback origin only), and `/swagger-ui/**`\|`/v3/api-docs/**` (local dev tooling, never routed through API Gateway) |
 | `X-User-Id` | JWT `userId` claim | Populated into `SecurityContextHolder` by `HeaderAuthenticationFilter` as a `PreAuthenticatedAuthenticationToken` principal |
 | `X-User-Workspaces` | JWT `memberships` claim | Parsed by `HeaderAuthenticationFilter` into `WorkspaceAuthority` grants (4KB / 100-entry limits enforced before parsing) |
 | `X-JWT-Jti` | JWT `jti` claim | Checked against the Redis blocklist by `JwtBlocklistFilter` — rejects 401 if revoked; fails open (passes through, logs WARN) if Redis is unreachable |
