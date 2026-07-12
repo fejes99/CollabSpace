@@ -62,7 +62,9 @@ The more common production answer to the loopback-bypass problem generally is a 
 
 ## 4. Filter design
 
-Three `OncePerRequestFilter`s in `adapter/in/rest/security/` (not `filter/` — that package is for framework-agnostic filters like `CorrelationIdFilter`; these are Spring-Security-specific and registered on the `SecurityFilterChain` via `addFilterBefore`, in this order:
+Three `OncePerRequestFilter`s, registered on the `SecurityFilterChain` via `addFilterBefore`, in this order:
+
+**Update from implementation:** originally scoped for `adapter/in/rest/security/` directly (reserving `filter/` for framework-agnostic filters like `CorrelationIdFilter`), the package was later split into `adapter/in/rest/security/filter/` (these three) and `adapter/in/rest/security/exception/` (the four `SecurityAuthenticationException` subtypes) once the flat package reached 10 files — see the `Reorganize security package` commit. `SecurityConfig`, `WorkspaceAuthority`, and `ProblemDetailsSecurityHandler` stay at the top level of `security/`.
 
 **1. `InternalTokenFilter`** — compares `X-Internal-Token` against the SSM-loaded value (mirrors the existing `JWT_PRIVATE_KEY`/`JWT_PRIVATE_KEY_SSM_PATH` local/AWS split — add `INTERNAL_TOKEN`/`INTERNAL_TOKEN_SSM_PATH`). 401 if missing/wrong. Applies the §3 exemptions. Logs on rejection: `log.warn("event=internal_token_invalid ip={} correlationId={} path={}", ip, correlationId, request.getRequestURI())` — no `userId` is available yet at this point in the chain.
 
@@ -75,7 +77,9 @@ Validation rules, all fail-closed (401) except the two explicitly anonymous case
 | `X-User-Id` | anonymous, only on `/v1/auth/register`\|`/login` (§3); `401` everywhere else, and `401` if present at all on those two routes | `401` | — (opaque ID, no further shape to check) |
 | `X-User-Workspaces` | `401` if `X-User-Id` is present (inconsistent pair); anonymous only if `X-User-Id` is also absent | `401` | `401` (bad JSON, or exceeds size limits below) |
 
-**Size limits on `X-User-Workspaces`**, enforced before attempting to parse: raw header value capped at **4KB**, decoded array capped at **200 entries**. Both reject with `401` without attempting a parse if exceeded. 4KB comfortably covers realistic per-user membership counts for a v1 collaboration product with headroom to spare, well under gateway/ALB header-size ceilings; 200 entries is generous for how many workspaces one user plausibly belongs to.
+**Size limits on `X-User-Workspaces`**, enforced before attempting to parse: raw header value capped at **4KB**, decoded array capped at **100 entries**. Both reject with `401` without attempting a parse if exceeded. 4KB comfortably covers realistic per-user membership counts for a v1 collaboration product with headroom to spare, well under gateway/ALB header-size ceilings.
+
+**Update from implementation:** the entry limit was reduced from an original 200 to 100. At the minimal valid entry size (`{"workspaceId":"...","role":"..."}`, ~38 bytes), 200 entries already total ~7.6KB — always exceeding the 4KB byte-size limit first, making the entry-count check unreachable dead code. 100 entries (~3.9KB at minimum size) stays under 4KB, so this check is actually the one that fires for a too-long list of small memberships. Found via mutation testing (disabling the 200-entry check produced zero test failures) before this shipped, not after.
 
 **These numbers are reasoned, not measured or enforced anywhere else.** `JwtService.issueAccessToken` (PR 4, already merged) places no cap on the `memberships` list it serializes into the token — nothing upstream currently prevents a token from being issued with a membership count this filter would reject. There is no test or shared constant tying the two together; if `JwtService` is ever changed to allow more memberships, this filter would start rejecting otherwise-legitimate tokens with no signal pointing at the mismatch. Flagging rather than fixing here — capping `JwtService` symmetrically is a separate, small follow-up (`services/auth-workspace/.../JwtService.java`), not part of this PR's filter work.
 
@@ -117,7 +121,7 @@ Resolves the open question flagged in `redis-client.md`'s plan. **Fail open**: o
 | Correct token, protected route, `X-User-Id` present, empty string | 401, `malformed-identity-headers` |
 | Correct token, `X-User-Id` present, `X-User-Workspaces` absent (or vice versa) | 401, `malformed-identity-headers` |
 | Correct token, malformed `X-User-Workspaces` JSON | 401, `malformed-identity-headers` |
-| `X-User-Workspaces` exceeds 4KB or 200 entries | 401, `malformed-identity-headers`, no parse attempted |
+| `X-User-Workspaces` exceeds 4KB or 100 entries | 401, `malformed-identity-headers`, no parse attempted |
 | Blocklisted `jti` | 401, `token-revoked`, logged (`event=blocklist_check_failed`) |
 | Absent `jti` | passes |
 | Redis unreachable | passes + WARN log |
@@ -130,7 +134,9 @@ Resolves the open question flagged in `redis-client.md`'s plan. **Fail open**: o
 
 ## 8. Test plan
 
-Unit tests per filter with fabricated headers and a fabricated `RemoteAddr` (no real SSM/API Gateway available locally). Testcontainers `redis:7` for the blocklist filter's integration test, mirroring PR 6.5's pattern — including the fail-open case (stop the container mid-test, confirm the request still passes with a WARN logged) and the rejection-logging case (blocklisted `jti` produces the `event=blocklist_check_failed` line with all four required fields).
+Unit tests per filter with fabricated headers and a fabricated `RemoteAddr` (no real SSM/API Gateway available locally). Testcontainers `redis:7` for `TokenBlocklistRedisAdapter`'s real-Redis behavior (key present/absent), plus the rejection-logging case in `JwtBlocklistFilterTest` (blocklisted `jti` produces the `event=blocklist_check_failed` line with all four required fields).
+
+**Update from implementation:** the fail-open case does not stop a live Testcontainers Redis mid-test as originally planned — it uses a `LettuceConnectionFactory` pointed at a closed local port (`localhost:1`), mirroring the existing `RedisHealthCheckDownIntegrationTest` trick. Faster and more deterministic than container lifecycle manipulation, and avoids the flakiness risk of stop/start timing. Every filter branch (this included) was verified by mutation testing — temporarily breaking the implementation and confirming the correct test fails — not just written and trusted.
 
 Additional cases beyond the original set: the size-limit rejection for `X-User-Workspaces` (both the byte-length and entry-count boundaries), the present-without-pair inconsistency for `X-User-Id`/`X-User-Workspaces`, and the fail-closed rejection when identity headers appear on `/v1/auth/register`/`login`. Confirm `server.forward-headers-strategy` is `NONE` in test config so the loopback test's fabricated `RemoteAddr` isn't silently overridden.
 

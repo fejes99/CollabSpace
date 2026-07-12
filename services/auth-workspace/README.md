@@ -2,14 +2,16 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030); no business logic depends on it yet — the JWT blocklist is a later PR.
+**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030). `JwtBlocklistFilter` checks the `jti` blocklist in Redis on every authenticated request (fail-open on Redis errors); the write side (setting a `jti` on logout) lands in a later PR.
+
+Every request is additionally gated by three Spring Security filters — internal-token validation, identity-header population, and the JWT blocklist check. See "Trust model" below and [docs/03-services/auth-workspace/plans/security-filter.md](../../docs/03-services/auth-workspace/plans/security-filter.md).
 
 ## What it does
 
-- `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},"redis":{"status":"UP"},...}}`. Public route — no JWT required. Returns `503` with `status=DOWN` if the database is unreachable. `redis` reflects live Redis reachability but does not affect what gates traffic — see `/actuator/health/readiness` below. Nothing in business logic depends on Redis yet (that lands in a later PR); this component exists for visibility only.
-- `GET /actuator/health/readiness` — scoped to `db` only. This is the traffic-readiness signal: an ECS container-level health check polls it, and ECS's HEALTHY/UNHEALTHY status feeds Cloud Map, which is what API Gateway routes against — see ADR-031. A DB outage stops traffic routing here without killing/restarting the container (restarting never fixes an external Neon outage).
-- `GET /actuator/health/liveness` — left at Spring Boot's default (no external dependency checks). Answers "should this process be killed and restarted," which only makes sense for internally-fixable brokenness — not used by anything yet.
-- `GET /.well-known/jwks.json` — RS256 public key set. **Must remain a public route** — the API Gateway JWT Authorizer fetches signing keys from this URL. See ADR-026.
+- `GET /actuator/health` — returns `{"status":"UP","components":{"db":{"status":"UP"},"redis":{"status":"UP"},...}}`. Routed through API Gateway (public integration) — requires a valid `X-Internal-Token` but no JWT. Returns `503` with `status=DOWN` if the database is unreachable. `redis` reflects live Redis reachability but does not affect what gates traffic — see `/actuator/health/readiness` below.
+- `GET /actuator/health/readiness` — scoped to `db` only. This is the traffic-readiness signal: an ECS container-level health check polls it, and ECS's HEALTHY/UNHEALTHY status feeds Cloud Map, which is what API Gateway routes against — see ADR-031. A DB outage stops traffic routing here without killing/restarting the container (restarting never fixes an external Neon outage). Has no API Gateway route at all — only reachable from loopback, and `InternalTokenFilter` exempts it from the token check only when both the path and the caller's raw socket address are loopback.
+- `GET /actuator/health/liveness` — left at Spring Boot's default (no external dependency checks). Answers "should this process be killed and restarted," which only makes sense for internally-fixable brokenness — not used by anything yet. Same loopback-only token exemption as `/readiness`.
+- `GET /.well-known/jwks.json` and `GET /.well-known/openid-configuration` — RS256 public key set and OIDC discovery document. **Must remain public** — called by API Gateway's own infrastructure (JWKS fetch, OIDC discovery), never routed through the VPC Link, never carries `X-Internal-Token`. Exempt from the token check unconditionally by path. See ADR-026.
 - `POST /v1/auth/register` — public route. No JWT required. Returns `201` with access token and user summary on success; `400` for validation errors; `409` if the email is already registered.
 - `POST /v1/auth/login` — public route. No JWT required. Returns `200` with access token and user on success; sets an HttpOnly `refresh_token` cookie (`Path=/auth`, `Max-Age=604800`, `Secure`, `SameSite=Strict`). Returns `400` for validation errors; `401` for invalid credentials.
 - `GET /v3/api-docs` — OpenAPI 3.x JSON spec (internal tooling only, not routed through API Gateway).
@@ -19,16 +21,17 @@ All responses include `X-Correlation-ID`. All errors return RFC 9457 Problem Det
 
 ### Trust model
 
-Requests arriving from API Gateway carry three injected headers:
+Requests arriving from API Gateway carry four injected headers:
 
 | Header | Source | Purpose |
 |---|---|---|
-| `X-Internal-Token` | API Gateway stage variable | Validate on every request — reject 401 if missing or wrong |
-| `X-User-Id` | JWT `userId` claim | Authenticated user identity |
-| `X-User-Workspaces` | JWT `memberships` claim | Workspace memberships for authorization |
-| `X-Correlation-ID` | API Gateway `$context.requestId` | Overwritten by `CorrelationIdFilter` into MDC |
+| `X-Internal-Token` | API Gateway stage variable | Validated by `InternalTokenFilter` on every request — reject 401 if missing or wrong. Exempt for `.well-known/**` (unconditional) and `/actuator/health/readiness`\|`liveness` (loopback origin only) |
+| `X-User-Id` | JWT `userId` claim | Populated into `SecurityContextHolder` by `HeaderAuthenticationFilter` as a `PreAuthenticatedAuthenticationToken` principal |
+| `X-User-Workspaces` | JWT `memberships` claim | Parsed by `HeaderAuthenticationFilter` into `WorkspaceAuthority` grants (4KB / 100-entry limits enforced before parsing) |
+| `X-JWT-Jti` | JWT `jti` claim | Checked against the Redis blocklist by `JwtBlocklistFilter` — rejects 401 if revoked; fails open (passes through, logs WARN) if Redis is unreachable |
+| `X-Correlation-ID` | API Gateway `$context.requestId` | Overwritten by `CorrelationIdFilter` into MDC — runs before the security filter chain so `correlationId` is available in their rejection logs |
 
-The service must **not** re-validate the JWT signature. See [api-gateway-trust.md](../../docs/02-architecture/api-gateway-trust.md).
+`X-User-Id`/`X-User-Workspaces` are expected to be absent on `/v1/auth/register` and `/v1/auth/login` (and the exempt routes above) — present there, they fail closed instead of being treated as harmless extra data, since it would mean the API Gateway header-stripping guarantee has regressed. The service must **not** re-validate the JWT signature. See [api-gateway-trust.md](../../docs/02-architecture/api-gateway-trust.md) and [the security-filter plan](../../docs/03-services/auth-workspace/plans/security-filter.md).
 
 The JWT issuer (`iss`) and audience (`aud`) the service sets in issued tokens are read from SSM at startup:
 - `/collabspace/dev/jwt/issuer` → `https://auth.dev.collabspace.io`
@@ -38,85 +41,7 @@ The JWT issuer (`iss`) and audience (`aud`) the service sets in issued tokens ar
 
 Hexagonal Architecture (Ports and Adapters) — see [ADR-025](../../docs/06-decisions/adr-025-hexagonal-architecture.md) for the rationale.
 
-```
-src/main/java/com/collabspace/authworkspace/
-│
-├── domain/
-│   ├── model/
-│   │   └── auth/           Pure Java records. No Spring, no JPA annotations.
-│   │       ├── User.java
-│   │       ├── RefreshToken.java
-│   │       └── WorkspaceMembership.java
-│   └── exception/          Cross-cutting domain exceptions.
-│       ├── DomainException.java
-│       ├── ConflictException.java
-│       ├── EmailAlreadyTakenException.java
-│       ├── InvalidCredentialsException.java
-│       ├── UnauthorizedException.java
-│       └── NotFoundException.java
-│
-├── application/
-│   ├── port/
-│   │   ├── in/
-│   │   │   └── auth/       Use case interfaces — one per operation.
-│   │   │       ├── RegisterUseCase.java
-│   │   │       ├── RegisterCommand.java
-│   │   │       ├── RegisterResult.java
-│   │   │       ├── LoginUseCase.java
-│   │   │       ├── LoginCommand.java
-│   │   │       └── LoginResult.java
-│   │   └── out/
-│   │       └── auth/       Outbound port interfaces.
-│   │           ├── UserRepository.java
-│   │           └── RefreshTokenRepository.java
-│   └── service/
-│       ├── auth/           Application services: implement in-ports, call out-ports.
-│       │   └── AuthApplicationService.java
-│       ├── JwtService.java
-│       ├── JwtProperties.java
-│       └── RefreshTokenPair.java
-│
-├── config/                 Spring configuration and startup components.
-│   ├── ApplicationConfig.java
-│   ├── OpenApiConfig.java
-│   └── SwaggerStartupListener.java
-│
-└── adapter/
-    ├── in/
-    │   └── rest/
-    │       ├── auth/       Auth controllers and DTOs.
-    │       │   ├── AuthController.java
-    │       │   ├── RegisterRequest.java
-    │       │   ├── RegisterResponse.java
-    │       │   ├── LoginRequest.java
-    │       │   └── LoginResponse.java
-    │       ├── error/      RFC 9457 global exception handler.
-    │       │   └── GlobalExceptionHandler.java
-    │       ├── wellknown/
-    │       │   └── WellKnownController.java
-    │       ├── filter/
-    │       │   └── CorrelationIdFilter.java
-    │       ├── health/
-    │       │   └── DbHealthIndicator.java
-    │       └── security/
-    │           └── SecurityConfig.java
-    └── out/
-        ├── persistence/
-        │   └── auth/       JPA entities + Spring Data repository.
-        │       ├── UserJpaAdapter.java
-        │       ├── RefreshTokenJpaAdapter.java
-        │       ├── entity/
-        │       │   ├── UserEntity.java
-        │       │   └── RefreshTokenEntity.java
-        │       └── repository/
-        │           ├── UserJpaRepository.java
-        │           └── RefreshTokenJpaRepository.java
-        └── ssm/            JWT key loading from SSM (AWS) or env var (local).
-            ├── JwtKeyConfig.java
-            └── LocalJwtConfig.java
-```
-
-**Dependency rule:** dependencies point inward only — `adapter` → `application` → `domain`. Nothing in `domain/` or `application/` imports from `adapter/`.
+**Dependency rule:** dependencies point inward only — `adapter` → `application` → `domain`. Nothing in `domain/` or `application/` imports from `adapter/`. Browse the actual package tree in your IDE rather than here — a hand-maintained file listing goes stale the moment a file moves and has no way to self-correct; this rule doesn't.
 
 ## Running locally
 
@@ -176,7 +101,8 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_PRIVATE_KEY` | Yes | Base64-encoded PKCS8 DER private key (no headers, no newlines). Generate: `openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:2048 \| openssl pkcs8 -topk8 -nocrypt -outform DER \| base64 \| tr -d '\n'` |
 | `JWT_ISSUER` | Yes | JWT `iss` claim, e.g. `http://localhost:8080` |
 | `JWT_AUDIENCE` | Yes | JWT `aud` claim, e.g. `collabspace-api` |
-| `SPRING_DATA_REDIS_URL` | No | `redis://localhost:16379` when running via Docker Compose. If unset, falls back to Spring's own default (`localhost:6379`) and logs a startup WARN — the app still starts, since nothing depends on Redis yet |
+| `INTERNAL_TOKEN` | Yes | Fixed shared-secret value `InternalTokenFilter` compares `X-Internal-Token` against. No API Gateway locally, so send this value by hand on every request (register/login included — they're not exempt) |
+| `SPRING_DATA_REDIS_URL` | No | `redis://localhost:16379` when running via Docker Compose. If unset, falls back to Spring's own default (`localhost:6379`) and logs a startup WARN. `JwtBlocklistFilter` fails open if unreachable, so the app still starts and serves traffic either way |
 
 **AWS dev environment** (set `JWT_PRIVATE_KEY_SSM_PATH` to activate this mode — requires AWS credentials):
 
@@ -189,7 +115,8 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_ISSUER_SSM_PATH` | Yes | SSM path for JWT issuer string (`/collabspace/dev/jwt/issuer`) |
 | `JWT_AUDIENCE_SSM_PATH` | Yes | SSM path for JWT audience string (`/collabspace/dev/jwt/audience`) |
 | `JWT_JWKS_URI_SSM_PATH` | No | SSM path for JWKS URI (`/collabspace/dev/jwt/jwks-uri`) — defaults to `http://localhost:8080/.well-known/jwks.json` if unset |
-| `SPRING_DATA_REDIS_URL` | No | Upstash `rediss://` TLS URL, injected directly as an ECS task secret (not an SSM-path env var like the JWT_* rows above) from `/collabspace/dev/redis/url` — see ADR-030 |
+| `INTERNAL_TOKEN_SSM_PATH` | Yes | SSM path to the shared internal-token secret (`/collabspace/dev/api/internal-token`), generated by Terraform and injected by API Gateway as `X-Internal-Token` on every forwarded request |
+| `SPRING_DATA_REDIS_URL` | No | Upstash `rediss://` TLS URL, injected directly as an ECS task secret (not an SSM-path env var like the JWT_*/INTERNAL_TOKEN rows above) from `/collabspace/dev/redis/url` — see ADR-030 |
 
 Set variables via IntelliJ run configuration or an `.env` file (gitignored). See `.env.example` for a template.
 
