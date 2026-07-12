@@ -8,6 +8,18 @@ New entries go at the top. Each entry names the stage, the date completed, and b
 
 ## Stage 2 — Service Implementation (in progress, 2026-05)
 
+### auth-workspace: security-filter (2026-07)
+
+- Three Spring Security filters, ordered `InternalTokenFilter` → `HeaderAuthenticationFilter` → `JwtBlocklistFilter`, run on every request ahead of the eventual `@PreAuthorize` work: `InternalTokenFilter` validates `X-Internal-Token` (SSM-backed in AWS, `.env`-backed locally); `HeaderAuthenticationFilter` populates `SecurityContextHolder` from `X-User-Id`/`X-User-Workspaces` as a `PreAuthenticatedAuthenticationToken`, fail-closed on malformed/unexpected headers; `JwtBlocklistFilter` checks `X-JWT-Jti` against a Redis-backed blocklist (`TokenBlocklistRepository`/`TokenBlocklistRedisAdapter`), fail-open if Redis is unreachable.
+- `ProblemDetailsSecurityHandler` renders all rejections as RFC 9457 Problem Details.
+- `SecurityExemptPaths` — shared path-exemption class (`.well-known/**`, loopback-only health probes, local Swagger/OpenAPI tooling) so the two path-dependent filters can't drift apart; boundary-checked (`/swagger-uikit-asset` must not match `/swagger-ui`).
+- Package reorg: `adapter/in/rest/security/` split into `exception/` and `filter/` subpackages.
+- Terraform: `INTERNAL_TOKEN_SSM_PATH` wired into `auth-workspace`'s ECS task definition, applied live to AWS dev.
+- Swagger `apiKey` security schemes for local "Try it out"; register/login scoped to just `X-Internal-Token` so Swagger's Authorize dialog can't attach headers those routes reject.
+- `jti` added to the `event=user_registered` and `event=user_logged_in` audit log lines (`JwtService.issueAccessToken` now returns `AccessToken(token, jti)` instead of a bare string) — closes the token-lifecycle traceability gap (issue → blocklist write → blocklist hit) for tokens minted at either registration or login.
+- Found and fixed: `RegisterTransactionalIT.java` used the Failsafe `*IT.java` naming convention, but this project has no Failsafe plugin configured — only Surefire, which doesn't match that pattern. It had never actually run, in CI or locally. Renamed to `RegisterTransactionalIntegrationTest.java` and fixed its missing `X-Internal-Token` header.
+- 101 tests, mutation-tested throughout (deliberately broke each check, confirmed the intended test failed, reverted).
+
 ### auth-workspace: db-connection (2026-05)
 
 - `spring-boot-starter-jdbc` + `postgresql` driver added; datasource config reads `SPRING_DATASOURCE_URL`, `_USERNAME`, `_PASSWORD` from environment. Neon PostgreSQL (SSL required: `sslmode=require`).
