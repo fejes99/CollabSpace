@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.security.filter;
 
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
+import com.collabspace.authworkspace.adapter.in.rest.security.SecurityExemptPaths;
 import com.collabspace.authworkspace.adapter.in.rest.security.WorkspaceAuthority;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.MalformedIdentityHeadersException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.SecurityAuthenticationException;
@@ -37,8 +38,6 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 	// the pre-authentication auth endpoints themselves (register, login).
 	private static final Set<String> ANONYMOUS_PATHS = Set.of("/v1/auth/register", "/v1/auth/login", "/actuator/health",
 			"/actuator/health/readiness", "/actuator/health/liveness");
-
-	private static final String WELL_KNOWN_PATH_PREFIX = "/.well-known/";
 
 	private static final int MAX_WORKSPACES_HEADER_BYTES = 4096;
 
@@ -109,8 +108,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 	}
 
 	private boolean isAnonymousRoute(HttpServletRequest request) {
-		String uri = request.getRequestURI();
-		return ANONYMOUS_PATHS.contains(uri) || uri.startsWith(WELL_KNOWN_PATH_PREFIX);
+		return ANONYMOUS_PATHS.contains(request.getRequestURI()) || SecurityExemptPaths.isWellKnownPath(request)
+				|| SecurityExemptPaths.isDevToolingPath(request);
 	}
 
 	// Size limits enforced before parsing (byte length) and after (entry count, which

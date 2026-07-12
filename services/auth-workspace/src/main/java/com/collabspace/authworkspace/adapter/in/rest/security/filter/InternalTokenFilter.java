@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.security.filter;
 
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
+import com.collabspace.authworkspace.adapter.in.rest.security.SecurityExemptPaths;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.InvalidInternalTokenException;
 import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import jakarta.servlet.FilterChain;
@@ -25,8 +26,6 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 	private static final Set<String> LOOPBACK_EXEMPT_PATHS = Set.of("/actuator/health/readiness",
 			"/actuator/health/liveness");
 
-	private static final String WELL_KNOWN_PATH_PREFIX = "/.well-known/";
-
 	private static final IpAddressMatcher IPV4_LOOPBACK = new IpAddressMatcher("127.0.0.1");
 
 	private static final IpAddressMatcher IPV6_LOOPBACK = new IpAddressMatcher("::1");
@@ -44,7 +43,8 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		if (isWellKnownPath(request) || isLoopbackExempt(request)) {
+		if (SecurityExemptPaths.isWellKnownPath(request) || isLoopbackExempt(request)
+				|| SecurityExemptPaths.isDevToolingPath(request)) {
 			filterChain.doFilter(request, response);
 			return;
 		}
@@ -69,13 +69,6 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 	private boolean isLoopbackExempt(HttpServletRequest request) {
 		return LOOPBACK_EXEMPT_PATHS.contains(request.getRequestURI())
 				&& (IPV4_LOOPBACK.matches(request) || IPV6_LOOPBACK.matches(request));
-	}
-
-	// Called by API Gateway's own infrastructure (JWKS fetch, OIDC discovery), never
-	// routed through the VPC Link -- never carries X-Internal-Token. Path alone is
-	// sufficient here, no origin check, per plan §3.
-	private boolean isWellKnownPath(HttpServletRequest request) {
-		return request.getRequestURI().startsWith(WELL_KNOWN_PATH_PREFIX);
 	}
 
 }
