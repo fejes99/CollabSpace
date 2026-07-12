@@ -7,6 +7,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -28,7 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @AutoConfigureMockMvc
 @Import(TestContainersConfiguration.class)
 @DisplayName("POST /v1/auth/register — transactional behaviour")
-class RegisterTransactionalIT {
+class RegisterTransactionalIntegrationTest {
 
 	private static final String REGISTER_URL = "/v1/auth/register";
 
@@ -41,6 +42,12 @@ class RegisterTransactionalIT {
 	@MockitoSpyBean
 	JwtService jwtService;
 
+	private final String internalToken;
+
+	RegisterTransactionalIntegrationTest(@Value("${INTERNAL_TOKEN}") String internalToken) {
+		this.internalToken = internalToken;
+	}
+
 	@BeforeEach
 	void cleanDatabase() {
 		userJpaRepository.deleteAll();
@@ -52,9 +59,11 @@ class RegisterTransactionalIT {
 		doThrow(new IllegalStateException("simulated signing failure")).when(jwtService)
 			.issueAccessToken(anyString(), anyList());
 
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "rollback@example.com", "password": "password123" }
-				""")).andExpect(status().isInternalServerError());
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "rollback@example.com", "password": "password123" }
+					""")).andExpect(status().isInternalServerError());
 
 		assertThat(userJpaRepository.count()).isZero();
 	}
@@ -65,10 +74,13 @@ class RegisterTransactionalIT {
 		String body = """
 				{ "name": "Alice", "email": "dup@example.com", "password": "password123" }
 				""";
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
-			.andExpect(status().isCreated());
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(body)).andExpect(status().isCreated());
 
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(body))
 			.andExpect(status().isConflict())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/email-already-taken"))
