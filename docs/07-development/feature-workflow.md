@@ -279,7 +279,7 @@ A feature is done when all of these are true.
 - [ ] OpenAPI spec updated and matches actual response shape
 - [ ] Service README updated to reflect new behavior
 - [ ] CLAUDE.md Layer 2 `Completed:` list updated
-- [ ] ADR written if a non-obvious decision was made; ADR number added to `Recent ADRs:` line
+- [ ] ADR written if a non-obvious decision was made; cross-linked from the relevant plan doc/README
 - [ ] CI green on the PR
 - [ ] Squash-merged to main
 

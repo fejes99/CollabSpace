@@ -66,8 +66,8 @@ For each changed file type, apply the relevant sub-section from commit-checklist
 - `Current goal` — still accurate?
 - `Next milestone` — completed by this commit? Rewrite to show only what remains.
 - `Blocked on` — new blockers or resolved ones?
-- `Recent ADRs` — new ADR number missing?
 - `Layer 3 Pointers` — new module/service/doc needs a pointer entry?
+- New ADR this commit? Check it's cross-linked from the relevant plan doc / service README — there is no `Recent ADRs` line in `CLAUDE.md`.
 
 ---
 

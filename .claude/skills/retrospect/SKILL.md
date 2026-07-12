@@ -127,10 +127,11 @@ For each existing document that is now stale:
 > **Proposed change:** <new text or specific edit>
 
 Common targets:
-- `CLAUDE.md` Layer 2 (`Recent ADRs:` line, `Next milestone:`, `Current goal:`)
+- `CLAUDE.md` Layer 2 (`Next milestone:`, `Current goal:`)
 - `CLAUDE.md` Layer 3 (new pointers)
 - Architecture docs in `docs/02-architecture/` — for design assumptions or constraints that turned out wrong
 - ADRs whose `Revisit when` condition has been met
+- If a new ADR was written this session: the relevant plan doc and/or affected service's README, so the ADR is cross-linked from wherever the decision is actually discussed — there is no central `Recent ADRs` list in `CLAUDE.md`
 
 Do not re-audit service READMEs, infrastructure tables, or workflow docs here — that is `/update-docs`' domain. Only propose doc updates for the *why-layer*: things that changed in understanding, not just in code.
 
@@ -144,12 +145,12 @@ After all candidates are listed, walk them one at a time. For each:
 2. Ask: `Save / Revise / Discard?`
 3. If **Save**: write the artifact.
    - Memory: write the file under `/Users/davidfejes/.claude/projects/-Users-davidfejes-Projects-CollabSpace/memory/` and add the pointer line to `MEMORY.md`.
-   - ADR: write to `docs/06-decisions/adr-NNN-<slug>.md`. Do not auto-update `CLAUDE.md`'s `Recent ADRs:` line — propose that as a separate doc-update candidate so the user explicitly approves the count change.
+   - ADR: write to `docs/06-decisions/adr-NNN-<slug>.md`. Do not auto-cross-link it from other docs — propose each cross-link as a separate doc-update candidate so the user explicitly approves where it gets referenced.
    - Doc update: apply the proposed edit to the named file.
 4. If **Revise**: ask what to change, redraft, then re-ask.
 5. If **Discard**: move on, no write.
 
-Process candidates in this order: memory first, ADRs second, doc updates last. This is because doc updates often reference newly-written ADRs (`Recent ADRs: adr-NNN`) and need the ADR file to exist first.
+Process candidates in this order: memory first, ADRs second, doc updates last. This is because doc updates often cross-link newly-written ADRs and need the ADR file to exist first.
 
 ---
 

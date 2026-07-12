@@ -41,7 +41,6 @@ Update this file whenever the project state changes. It is the source of truth f
 - [ ] **Current goal**: If the stage or goal has shifted, update the `Current goal:` line.
 - [ ] **Out of scope**: If the scope has been redefined, update it.
 - [ ] **Blocked on**: Add or remove blockers as they appear or are resolved.
-- [ ] **Recent ADRs**: If a new ADR was written, add it to the `Recent ADRs:` line.
 - [ ] **Pointers (Layer 3)**: If a new module, service, or doc file was created, add a pointer line so future sessions can navigate directly to it.
 
 ### Root README.md
@@ -100,7 +99,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] **ADR written**: Create `docs/06-decisions/adr-NNN-kebab-case-title.md` with the next sequential number. Required sections: Status, Date, Context, Decision, Alternatives Considered, Consequences (with + and − bullets), Revisit when.
 - [ ] **Adversarial review done**: Before committing the ADR, ask Claude Code to poke holes in the decision. Revise based on what that surfaces. Do not commit an ADR that has not been stress-tested.
 - [ ] **Status is correct**: `Proposed` if it has not been acted on yet. `Accepted` if it is implemented in this commit. If this commit supersedes an older decision, update the old ADR's status to `Superseded by ADR-NNN`.
-- [ ] **CLAUDE.md updated**: The new ADR number is added to `Recent ADRs:` in Layer 2.
+- [ ] **Cross-linked from relevant docs**: The ADR is linked from wherever the decision is actually discussed — the feature's plan doc, the affected service's README "Architecture decisions" section, or both. There is no central ADR list in `CLAUDE.md`; discoverability comes from contextual links plus the index in `docs/06-decisions/README.md`.
 - [ ] **Code cites the ADR**: If the decision is reflected in code (a lifecycle rule, a flag, a specific pattern), the relevant comment in the code should reference the ADR number.
 
 ---
