@@ -151,3 +151,4 @@ terraform output alb_dns_name
 - [ADR-002](../../docs/06-decisions/adr-002-auth-workspace-combined.md) — auth and workspace combined into one service
 - [ADR-012](../../docs/06-decisions/adr-012-terraform-cicd-task-definition-ownership.md) — Terraform owns initial task definition; CI/CD manages revisions
 - [ADR-025](../../docs/06-decisions/adr-025-hexagonal-architecture.md) — hexagonal architecture (ports and adapters)
+- [ADR-033](../../docs/06-decisions/adr-033-loopback-health-probe-exemption.md) — loopback-only exemption for `/actuator/health/readiness`\|`liveness` from the internal-token check

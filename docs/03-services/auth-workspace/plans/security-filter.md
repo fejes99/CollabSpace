@@ -48,6 +48,8 @@ Three categories now — the original two plus a fail-closed rule for known-anon
 
 So the exemption is the intersection of path *and* origin, not path alone: bypass the internal-token check only when the path is `/actuator/health/readiness` or `/actuator/health/liveness` **and** the caller's address matches loopback. This is the narrowest correct rule — it doesn't create a standing "anyone in the VPC can skip validation on this path" hole, since the bypass only ever fires for a request that could only physically originate inside that exact container's own network namespace. `/actuator/health` (root) stays under normal enforcement; real traffic to it always arrives via the gateway and always carries the token.
 
+**Update from implementation:** this decision, including the alternatives considered and rejected, is written up formally in [ADR-033](../../../06-decisions/adr-033-loopback-health-probe-exemption.md).
+
 Implementation detail: use `org.springframework.security.web.util.matcher.IpAddressMatcher` for the loopback check rather than comparing `request.getRemoteAddr()` against string literals — it correctly handles both IPv4 (`127.0.0.1`) and IPv6 (`::1`) loopback forms.
 
 **Loopback check integrity — `forward-headers-strategy` must stay `NONE`.** `X-Forwarded-For` cannot be used to determine "is this request really from loopback," even via Tomcat's `RemoteIpValve`/trusted-proxy mechanism: that mechanism only defends against a *downstream* proxy injecting a fake hop, not against the *originating client* declaring `X-Forwarded-For: 127.0.0.1` itself — which is exactly the attacker's position here. Any security decision built on a forwarded-IP header is spoofable by the party the check exists to stop.
