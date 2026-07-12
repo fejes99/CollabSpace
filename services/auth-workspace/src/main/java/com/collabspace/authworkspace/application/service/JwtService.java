@@ -44,8 +44,9 @@ public class JwtService {
 		this.objectMapper = objectMapper;
 	}
 
-	public String issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
+	public AccessToken issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
 		Instant now = clock.instant();
+		String jti = UUID.randomUUID().toString();
 		List<Map<String, String>> membershipClaims = memberships.stream()
 			.map(m -> Map.of("workspaceId", m.workspaceId(), "role", m.role()))
 			.toList();
@@ -61,7 +62,7 @@ public class JwtService {
 			.audience(jwtProperties.audience())
 			.claim("iat", now.getEpochSecond())
 			.claim("exp", now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS).getEpochSecond())
-			.jwtID(UUID.randomUUID().toString())
+			.jwtID(jti)
 			.claim("userId", userId)
 			.claim("memberships", membershipsJson)
 			.build();
@@ -74,7 +75,7 @@ public class JwtService {
 		catch (JOSEException ex) {
 			throw new IllegalStateException("JWT signing failed", ex);
 		}
-		return signedJwt.serialize();
+		return new AccessToken(signedJwt.serialize(), jti);
 	}
 
 	public RefreshTokenPair issueRefreshToken() {
