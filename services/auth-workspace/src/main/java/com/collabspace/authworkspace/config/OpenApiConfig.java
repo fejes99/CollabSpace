@@ -11,7 +11,9 @@ import org.springframework.context.annotation.Configuration;
 @Configuration
 public class OpenApiConfig {
 
-	private static final String INTERNAL_TOKEN_SCHEME = "X-Internal-Token";
+	// Public: referenced from AuthController to scope register/login's Swagger
+	// security requirement down to just this scheme -- see plan security-filter.md §6.
+	public static final String INTERNAL_TOKEN_SCHEME = "X-Internal-Token";
 
 	private static final String USER_ID_SCHEME = "X-User-Id";
 

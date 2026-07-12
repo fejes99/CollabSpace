@@ -5,10 +5,12 @@ import com.collabspace.authworkspace.application.port.in.auth.LoginResult;
 import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
+import com.collabspace.authworkspace.config.OpenApiConfig;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.security.SecurityRequirement;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
@@ -44,6 +46,12 @@ public class AuthController {
 		this.cookieSecure = cookieSecure;
 	}
 
+	// Overrides OpenApiConfig's global security requirement (X-Internal-Token +
+	// X-User-Id + X-User-Workspaces) down to just X-Internal-Token -- register is an
+	// anonymous route, and HeaderAuthenticationFilter fails closed if identity headers
+	// are present here (security-filter.md §3). Without this override, Swagger UI would
+	// attach whatever's set in the Authorize dialog for the other two schemes too.
+	@SecurityRequirement(name = OpenApiConfig.INTERNAL_TOKEN_SCHEME)
 	@Operation(summary = "Register a new user",
 			description = "Creates a user account and returns a JWT access token. The user is logged in immediately after registration.")
 	@ApiResponse(responseCode = "201", description = "Registration successful",
@@ -58,13 +66,16 @@ public class AuthController {
 	@PostMapping("/register")
 	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request,
 			HttpServletRequest httpRequest) {
-		String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
-		String ipAddress = (xForwardedFor != null && !xForwardedFor.isBlank()) ? xForwardedFor.split(",")[0].trim()
+		String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
+		String ipAddress = (forwardedFor != null && !forwardedFor.isBlank()) ? forwardedFor.split(",")[0].trim()
 				: httpRequest.getRemoteAddr();
+
 		var command = new RegisterCommand(request.name(), request.email(), request.password(), Optional.of(ipAddress));
+
 		return ResponseEntity.status(HttpStatus.CREATED).body(RegisterResponse.from(registerUseCase.register(command)));
 	}
 
+	@SecurityRequirement(name = OpenApiConfig.INTERNAL_TOKEN_SCHEME)
 	@Operation(summary = "Login user", description = "Login existing user and returns a JWT access and refresh token.")
 	@ApiResponse(responseCode = "200", description = "Login successful",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
@@ -76,8 +87,8 @@ public class AuthController {
 	@PostMapping("/login")
 	public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
-		String xForwardedFor = httpRequest.getHeader("X-Forwarded-For");
-		String ipAddress = (xForwardedFor != null && !xForwardedFor.isBlank()) ? xForwardedFor.split(",")[0].trim()
+		String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
+		String ipAddress = (forwardedFor != null && !forwardedFor.isBlank()) ? forwardedFor.split(",")[0].trim()
 				: httpRequest.getRemoteAddr();
 
 		LoginCommand command = new LoginCommand(request.email(), request.password(),
