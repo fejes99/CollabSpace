@@ -226,12 +226,14 @@ The following events are emitted as structured log lines and should always be pr
 
 | Event                   | Log fields                                                                    |
 | ----------------------- | ----------------------------------------------------------------------------- |
-| Registration            | `userId`, `email` (hashed), `ip`, `correlationId`                             |
-| Login success           | `userId`, `ip`, `userAgent`, `correlationId`                                  |
+| Registration            | `userId`, `email` (hashed), `ip`, `jti`, `correlationId`                      |
+| Login success           | `userId`, `ip`, `userAgent`, `jti`, `correlationId`                           |
 | Login failure           | `email` (hashed), `reason` (not_found \| bad_password), `ip`, `correlationId` |
 | Token refresh           | `userId`, `ip`, `correlationId`                                               |
 | Logout                  | `userId`, `jti`, `correlationId`                                              |
 | Blocklist check failure | `jti`, `userId`, `ip`, `correlationId`                                        |
+
+Registration and login success both include `jti`: both mint a live, revocable access token immediately (registration does not set a refresh-token cookie, so it is not a full login session, but the token it issues can still be blocklisted the same as any other), so both need to appear in the same `jti` trail as Logout and Blocklist check failure — otherwise a token issued at registration that never had an explicit login has no traceable point of origin.
 
 Email addresses are hashed in logs (SHA-256, non-reversible) to prevent plaintext PII in CloudWatch. A compliance-grade audit trail — stored durably, tamper-evidently, queryable by user and time range — is deferred to v1.5. → [roadmap.md](../roadmap.md)
 
