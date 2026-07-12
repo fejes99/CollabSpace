@@ -116,6 +116,30 @@ class InternalTokenFilterTest {
 	}
 
 	@Test
+	@DisplayName("bypasses the token check for Swagger UI and its OpenAPI JSON")
+	void bypassesTokenCheckForDevToolingPaths() throws Exception {
+		when(request.getRequestURI()).thenReturn("/swagger-ui/index.html");
+
+		filter.doFilterInternal(request, response, filterChain);
+
+		verify(filterChain).doFilter(request, response);
+		verifyNoInteractions(problemDetailsSecurityHandler);
+	}
+
+	@Test
+	@DisplayName("does not bypass the token check for a path that merely starts with a dev-tooling prefix")
+	void doesNotBypassTokenCheckForLookalikeDevToolingPath() throws Exception {
+		when(request.getRequestURI()).thenReturn("/swagger-uikit-asset");
+		when(request.getHeader("X-Internal-Token")).thenReturn("wrong-token");
+
+		filter.doFilterInternal(request, response, filterChain);
+
+		verify(filterChain, never()).doFilter(any(), any());
+		verify(problemDetailsSecurityHandler).commence(eq(request), eq(response),
+				any(InvalidInternalTokenException.class));
+	}
+
+	@Test
 	@DisplayName("bypasses the token check for the readiness probe from loopback")
 	void bypassesTokenCheckForReadinessFromLoopback() throws Exception {
 		when(request.getRequestURI()).thenReturn("/actuator/health/readiness");

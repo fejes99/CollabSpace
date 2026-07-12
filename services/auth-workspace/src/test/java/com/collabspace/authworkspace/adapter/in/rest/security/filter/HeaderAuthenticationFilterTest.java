@@ -87,6 +87,29 @@ class HeaderAuthenticationFilterTest {
 	}
 
 	@Test
+	@DisplayName("passes through anonymously for Swagger UI and its OpenAPI JSON")
+	void passesAnonymouslyForDevToolingPath() throws Exception {
+		when(request.getRequestURI()).thenReturn("/swagger-ui/index.html");
+
+		filter.doFilterInternal(request, response, filterChain);
+
+		verify(filterChain).doFilter(request, response);
+		verifyNoInteractions(problemDetailsSecurityHandler);
+	}
+
+	@Test
+	@DisplayName("rejects a path that merely starts with a dev-tooling prefix, same as any other protected route")
+	void rejectsLookalikeDevToolingPathMissingIdentityHeaders() throws Exception {
+		when(request.getRequestURI()).thenReturn("/swagger-uikit-asset");
+
+		filter.doFilterInternal(request, response, filterChain);
+
+		verify(filterChain, never()).doFilter(any(), any());
+		verify(problemDetailsSecurityHandler).commence(eq(request), eq(response),
+				any(MalformedIdentityHeadersException.class));
+	}
+
+	@Test
 	@DisplayName("rejects when X-User-Id is present but X-User-Workspaces is absent")
 	void rejectsWhenUserIdPresentWorkspacesAbsent() throws Exception {
 		when(request.getRequestURI()).thenReturn(PROTECTED_PATH);

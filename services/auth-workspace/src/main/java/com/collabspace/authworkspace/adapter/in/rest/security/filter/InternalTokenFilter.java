@@ -43,8 +43,7 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 	@Override
 	protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
 			throws ServletException, IOException {
-		if (SecurityExemptPaths.isWellKnownPath(request) || isLoopbackExempt(request)
-				|| SecurityExemptPaths.isDevToolingPath(request)) {
+		if (SecurityExemptPaths.isPathExempt(request) || isLoopbackExempt(request)) {
 			filterChain.doFilter(request, response);
 			return;
 		}

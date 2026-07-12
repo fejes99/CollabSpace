@@ -108,8 +108,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 	}
 
 	private boolean isAnonymousRoute(HttpServletRequest request) {
-		return ANONYMOUS_PATHS.contains(request.getRequestURI()) || SecurityExemptPaths.isWellKnownPath(request)
-				|| SecurityExemptPaths.isDevToolingPath(request);
+		return ANONYMOUS_PATHS.contains(request.getRequestURI()) || SecurityExemptPaths.isPathExempt(request);
 	}
 
 	// Size limits enforced before parsing (byte length) and after (entry count, which
