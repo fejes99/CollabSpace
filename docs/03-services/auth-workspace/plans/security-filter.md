@@ -58,6 +58,10 @@ The more common production answer to the loopback-bypass problem generally is a 
 
 **Known-anonymous routes — fail closed on unexpected identity headers.** `POST /v1/auth/register` and `POST /v1/auth/login` are the only routes where API Gateway's mapping template is expected to omit `X-User-Id`/`X-User-Workspaces` entirely (see §1 prerequisites — public routes strip these). If either header is present on these two specific paths, that's not treated as "extra, ignorable data" — it means the Terraform-side strip has regressed. `HeaderAuthenticationFilter` rejects with `401` rather than silently proceeding with an anonymous `SecurityContext`, so a real infra regression surfaces immediately instead of being masked.
 
+**Update from implementation — dev-tooling exemption, and a shared `SecurityExemptPaths` class.** Once `OpenApiConfig` gained `@SecurityScheme`s for the Swagger "Authorize" button (see §6), `/swagger-ui.html` and `/v3/api-docs` started failing with `401` — a browser loading the Swagger page can't attach `X-Internal-Token`/`X-User-Id` until *after* the page has loaded, so both filters rejected the page itself before it could ever be used to authorize. Fixed by adding a fourth exemption category: `/swagger-ui*` and `/v3/api-docs*`, unconditional by path, same as `.well-known/**`. This is local-tooling-only — never routed through API Gateway in AWS (the gateway has no route for these paths at all), so the exemption creates no production-facing hole.
+
+The `.well-known/**` path check was already duplicated verbatim across `InternalTokenFilter` and `HeaderAuthenticationFilter` (flagged by code review). Adding a second exempt-path category on top of that duplication would have made it worse, so both checks were extracted into a new shared `SecurityExemptPaths` (`isWellKnownPath`, `isDevToolingPath`), and both filters now call it instead of keeping their own copies.
+
 ---
 
 ## 4. Filter design
