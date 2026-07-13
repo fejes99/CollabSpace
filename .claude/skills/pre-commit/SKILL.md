@@ -66,8 +66,8 @@ For each changed file type, apply the relevant sub-section from commit-checklist
 - `Current goal` — still accurate?
 - `Next milestone` — completed by this commit? Rewrite to show only what remains.
 - `Blocked on` — new blockers or resolved ones?
-- `Recent ADRs` — new ADR number missing?
 - `Layer 3 Pointers` — new module/service/doc needs a pointer entry?
+- New ADR this commit? Check it's cross-linked from the relevant plan doc / service README — there is no `Recent ADRs` line in `CLAUDE.md`.
 
 ---
 
@@ -89,6 +89,7 @@ Run only the sections matching file types from Phase 1.
 - `@Transactional` on service methods spanning multiple repository calls
 - `jakarta.validation` at controller boundary only — not in service or repository
 - No direct DB access from controllers
+- No `UnsupportedOperationException`/TODO stub inside a `@Bean`, `@Component`, `@Service`, or `@Configuration` class — flag as ⚠️ advisory mid-feature, ❌ blocking if this commit's own message or the plan doc claims the feature is complete. These are reachable the moment Spring wires them; a `@ConditionalOnProperty` bean can activate silently once its trigger property is set elsewhere in the same PR (e.g. Terraform)
 
 **TypeScript**
 - No `any` without an inline comment justifying it
@@ -96,6 +97,7 @@ Run only the sections matching file types from Phase 1.
 - No `console.log` — pino only
 - External input validated with `zod`
 - No `.then()/.catch()` chains — async/await only
+- No stub route handler left registered on a live route (same advisory/blocking split as the Java stub check above)
 
 **Python**
 - Type hints on all public function signatures
@@ -103,6 +105,7 @@ Run only the sections matching file types from Phase 1.
 - `async def` for I/O-bound functions
 - No mutable default arguments
 - `structlog` only — not `print()` or `logging`
+- No `raise NotImplementedError` left inside a FastAPI route handler or dependency-injected class (same advisory/blocking split as the Java stub check above)
 
 ---
 
@@ -113,7 +116,7 @@ Run only the sections matching file types from Phase 1.
 - ADR has all sections: Status, Date, Context, Decision, Alternatives Considered, Consequences (+ and −), Revisit when
 - Implementing code cites the ADR number in a comment
 
-**Plan alignment** — if the current branch matches `feat/<service>/<slug>`, look for `docs/03-services/<service>/plans/<slug>.md`. If found, read it and verify the staged diff implements what the plan describes — correct endpoint path, method, request/response shape, validation rules. Flag divergences as ⚠️ advisory with the specific plan section and the differing implementation. Do not flag empty methods, TODO bodies, or stub returns — those are mid-feature placeholders, not divergences.
+**Plan alignment** — if the current branch matches `feat/<service>/<slug>`, look for `docs/03-services/<service>/plans/<slug>.md`. If found, read it and verify the staged diff implements what the plan describes — correct endpoint path, method, request/response shape, validation rules. Flag divergences as ⚠️ advisory with the specific plan section and the differing implementation. Do not flag empty methods, TODO bodies, or stub returns as plan divergences — those are mid-feature placeholders. (Phase 4's per-language stub check is a different concern — reachability, not plan conformance — and still applies.)
 
 **Code scan** — read each changed non-documentation file. Flag only what is worth fixing *within this commit's scope*; do not propose refactors of untouched code:
 - CLAUDE.md Layer 4 anti-patterns

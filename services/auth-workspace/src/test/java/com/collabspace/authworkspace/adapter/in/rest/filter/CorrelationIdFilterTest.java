@@ -3,6 +3,7 @@ package com.collabspace.authworkspace.adapter.in.rest.filter;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
+import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -34,6 +35,9 @@ class CorrelationIdFilterTest {
 	@Autowired
 	MockMvc mvc;
 
+	@Autowired
+	InternalTokenProperties internalTokenProperties;
+
 	private Logger rootLogger;
 
 	@BeforeEach
@@ -52,7 +56,9 @@ class CorrelationIdFilterTest {
 	@Test
 	@DisplayName("generates UUID correlation ID when header is absent")
 	void requestWithoutHeader() throws Exception {
-		var result = mvc.perform(get("/actuator/health")).andExpect(header().exists("X-Correlation-ID")).andReturn();
+		var result = mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token()))
+			.andExpect(header().exists("X-Correlation-ID"))
+			.andReturn();
 
 		String correlationId = result.getResponse().getHeader("X-Correlation-ID");
 
@@ -64,7 +70,8 @@ class CorrelationIdFilterTest {
 	@Test
 	@DisplayName("echoes provided correlation ID header")
 	void requestWithHeader() throws Exception {
-		mvc.perform(get("/actuator/health").header("X-Correlation-ID", "test-correlation-id"))
+		mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-Correlation-ID", "test-correlation-id"))
 			.andExpect(header().string("X-Correlation-ID", "test-correlation-id"));
 
 		assertThat(loggingList.list)
@@ -74,7 +81,9 @@ class CorrelationIdFilterTest {
 	@Test
 	@DisplayName("generates UUID correlation ID when header is blank")
 	void requestWithEmptyHeader() throws Exception {
-		var result = mvc.perform(get("/actuator/health").header("X-Correlation-ID", ""))
+		var result = mvc
+			.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token())
+				.header("X-Correlation-ID", ""))
 			.andExpect(header().exists("X-Correlation-ID"))
 			.andReturn();
 
@@ -91,8 +100,8 @@ class CorrelationIdFilterTest {
 		String oversizedId = "a".repeat(100);
 		String expectedId = oversizedId.substring(0, 64);
 
-		mvc.perform(get("/actuator/health").header("X-Correlation-ID", oversizedId))
-			.andExpect(header().string("X-Correlation-ID", expectedId));
+		mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-Correlation-ID", oversizedId)).andExpect(header().string("X-Correlation-ID", expectedId));
 
 		assertThat(loggingList.list).anyMatch(e -> expectedId.equals(e.getMDCPropertyMap().get("correlationId")));
 	}
@@ -100,9 +109,11 @@ class CorrelationIdFilterTest {
 	@Test
 	@DisplayName("correlation ID does not leak from one request to the next")
 	void correlationIdDoesNotLeakBetweenRequests() throws Exception {
-		mvc.perform(get("/actuator/health").header("X-Correlation-ID", "first-id"));
+		mvc.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-Correlation-ID", "first-id"));
 
-		String secondId = mvc.perform(get("/actuator/health"))
+		String secondId = mvc
+			.perform(get("/actuator/health").header("X-Internal-Token", internalTokenProperties.token()))
 			.andExpect(header().exists("X-Correlation-ID"))
 			.andReturn()
 			.getResponse()

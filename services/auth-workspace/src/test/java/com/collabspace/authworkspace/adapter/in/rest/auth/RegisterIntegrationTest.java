@@ -4,6 +4,7 @@ import com.collabspace.authworkspace.support.TestContainersConfiguration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.context.annotation.Import;
@@ -36,12 +37,20 @@ class RegisterIntegrationTest {
 	@Autowired
 	MockMvc mvc;
 
+	private final String internalToken;
+
+	public RegisterIntegrationTest(@Value("${INTERNAL_TOKEN}") String internalToken) {
+		this.internalToken = internalToken;
+	}
+
 	@Test
 	@DisplayName("returns 201 with access token and user for a valid request")
 	void registerValidRequestReturns201WithTokenAndUser() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "alice@example.com", "password": "password123" }
-				"""))
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "alice@example.com", "password": "password123" }
+					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.accessToken").isNotEmpty())
 			.andExpect(jsonPath("$.user.id").isNotEmpty())
@@ -54,9 +63,11 @@ class RegisterIntegrationTest {
 	@Test
 	@DisplayName("normalises email to lowercase in the response")
 	void registerEmailNormalisedResponseContainsLowercaseEmail() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "Alice@EXAMPLE.COM", "password": "password123" }
-				"""))
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "Alice@EXAMPLE.COM", "password": "password123" }
+					"""))
 			.andExpect(status().isCreated())
 			.andExpect(jsonPath("$.user.email").value("alice@example.com"))
 			.andExpect(cookie().doesNotExist(REFRESH_TOKEN_COOKIE));
@@ -65,65 +76,87 @@ class RegisterIntegrationTest {
 	@Test
 	@DisplayName("returns 400 with errors array when name is blank")
 	void registerBlankNameReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "", "email": "alice@example.com", "password": "password123" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "", "email": "alice@example.com", "password": "password123" }
+					""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when name is missing")
 	void registerMissingNameReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "email": "alice@example.com", "password": "password123" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "email": "alice@example.com", "password": "password123" }
+					""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when email is blank")
 	void registerBlankEmailReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "", "password": "password123" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "", "password": "password123" }
+					""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when email is missing")
 	void registerMissingEmailReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "password": "password123" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "password": "password123" }
+					""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when email format is invalid")
 	void registerInvalidEmailFormatReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "not-an-email", "password": "password123" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "not-an-email", "password": "password123" }
+					""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_EMAIL));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when password is blank")
 	void registerBlankPasswordReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "alice@example.com", "password": "" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "alice@example.com", "password": "" }
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when password is missing")
 	void registerMissingPasswordReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "alice@example.com" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "alice@example.com" }
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
 	}
 
 	@Test
 	@DisplayName("returns 400 with errors array when password is too short")
 	void registerPasswordTooShortReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content("""
-				{ "name": "Alice", "email": "alice@example.com", "password": "abc" }
-				""")).andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content("""
+					{ "name": "Alice", "email": "alice@example.com", "password": "abc" }
+					"""))
+			.andExpect(status().isBadRequest())
+			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
 	}
 
 	@Test
@@ -134,7 +167,9 @@ class RegisterIntegrationTest {
 				{ "name": "Alice", "email": "alice@example.com", "password": "%s" }
 				""", tooLongPassword);
 
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON).content(body))
+		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(body))
 			.andExpect(status().isBadRequest())
 			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_PASSWORD));
 	}
@@ -142,7 +177,9 @@ class RegisterIntegrationTest {
 	@Test
 	@DisplayName("returns 400 when request body is missing")
 	void registerMissingBodyReturns400() throws Exception {
-		mvc.perform(post(REGISTER_URL).contentType(MediaType.APPLICATION_JSON)).andExpect(status().isBadRequest());
+		mvc.perform(
+				post(REGISTER_URL).header("X-Internal-Token", internalToken).contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isBadRequest());
 	}
 
 }

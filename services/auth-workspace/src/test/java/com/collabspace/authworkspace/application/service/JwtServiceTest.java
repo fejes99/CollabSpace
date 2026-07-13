@@ -57,16 +57,16 @@ class JwtServiceTest {
 	void issueAccessTokenClaimsAreCorrect() throws Exception {
 		List<WorkspaceMembership> memberships = List.of(new WorkspaceMembership("ws-1", "admin"));
 
-		String token = jwtService.issueAccessToken(TEST_USER_ID, memberships);
+		AccessToken accessToken = jwtService.issueAccessToken(TEST_USER_ID, memberships);
 
-		SignedJWT jwt = SignedJWT.parse(token);
+		SignedJWT jwt = SignedJWT.parse(accessToken.token());
 		var claims = jwt.getJWTClaimsSet();
 		assertThat(jwt.getHeader().getAlgorithm().getName()).isEqualTo("RS256");
 		assertThat(claims.getSubject()).isEqualTo("user:" + TEST_USER_ID);
 		assertThat(claims.getStringClaim("userId")).isEqualTo(TEST_USER_ID);
 		assertThat(claims.getIssuer()).isEqualTo("https://test.issuer");
 		assertThat(claims.getAudience()).contains("test-audience");
-		assertThat(claims.getJWTID()).isNotNull();
+		assertThat(claims.getJWTID()).isEqualTo(accessToken.jti());
 		long ttl = claims.getExpirationTime().toInstant().getEpochSecond()
 				- claims.getIssueTime().toInstant().getEpochSecond();
 		assertThat(ttl).isEqualTo(900);
@@ -81,9 +81,9 @@ class JwtServiceTest {
 	@Test
 	@DisplayName("access token signature is verifiable with the RSA public key")
 	void issueAccessTokenSignatureIsVerifiableWithPublicKey() throws Exception {
-		String token = jwtService.issueAccessToken(TEST_USER_ID, List.of());
+		AccessToken accessToken = jwtService.issueAccessToken(TEST_USER_ID, List.of());
 
-		SignedJWT jwt = SignedJWT.parse(token);
+		SignedJWT jwt = SignedJWT.parse(accessToken.token());
 
 		assertThat(jwt.verify(new RSASSAVerifier(testKey.toPublicJWK()))).isTrue();
 	}

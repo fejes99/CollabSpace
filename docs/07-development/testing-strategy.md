@@ -92,6 +92,8 @@ Add to `pom.xml`:
 </dependency>
 ```
 
+**Naming matters, not just as style.** This project has no Failsafe plugin configured — only Surefire, whose default include patterns (`**/*Test.java`, `**/*Tests.java`, `**/Test*.java`, `**/*TestCase.java`) do not match the Failsafe-style `*IT.java` convention. Name every integration test `*IntegrationTest.java`. A file named `*IT.java` compiles fine and simply never runs, silently, in CI or locally — this has happened once already (`RegisterTransactionalIT.java`, renamed in the security-filter PR).
+
 ### TypeScript (Fastify — document, realtime, notification)
 
 | Concern | Library |

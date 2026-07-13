@@ -183,9 +183,9 @@ Token rotation is atomic — if the transaction fails, neither the deletion nor 
 
 ### Logout
 
-1. Client sends `POST /v1/auth/logout`. The current access token is in the `Authorization: Bearer <token>` header. The refresh token is in the cookie.
+1. Client sends `POST /v1/auth/logout`. The current access token is in the `Authorization: Bearer <token>` header (validated and stripped by API Gateway before the request reaches the service — see [api-gateway-trust.md](../02-architecture/api-gateway-trust.md)). The refresh token is in the cookie.
 2. Read the refresh token from the cookie. Hash it (SHA-256) and delete the matching row from `refresh_tokens`. If no row exists (already logged out, duplicate request), this is a no-op.
-3. Read the `jti` claim from the access token. Write `SET blocklist:<jti> 1 EX <remaining_ttl>` to Redis, where `remaining_ttl = max(0, exp - now())`.
+3. Read `jti` from the `X-JWT-Jti` header forwarded by API Gateway — the service never parses the access token itself. Write `SET blocklist:<jti> 1 EX <remaining_ttl>` to Redis, where `remaining_ttl = max(0, exp - now())`.
 4. Clear the cookie: `Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=0`.
 5. Response: `200 OK`.
 
@@ -226,12 +226,14 @@ The following events are emitted as structured log lines and should always be pr
 
 | Event                   | Log fields                                                                    |
 | ----------------------- | ----------------------------------------------------------------------------- |
-| Registration            | `userId`, `email` (hashed), `ip`, `correlationId`                             |
-| Login success           | `userId`, `ip`, `userAgent`, `correlationId`                                  |
+| Registration            | `userId`, `email` (hashed), `ip`, `jti`, `correlationId`                      |
+| Login success           | `userId`, `ip`, `userAgent`, `jti`, `correlationId`                           |
 | Login failure           | `email` (hashed), `reason` (not_found \| bad_password), `ip`, `correlationId` |
 | Token refresh           | `userId`, `ip`, `correlationId`                                               |
 | Logout                  | `userId`, `jti`, `correlationId`                                              |
 | Blocklist check failure | `jti`, `userId`, `ip`, `correlationId`                                        |
+
+Registration and login success both include `jti`: both mint a live, revocable access token immediately (registration does not set a refresh-token cookie, so it is not a full login session, but the token it issues can still be blocklisted the same as any other), so both need to appear in the same `jti` trail as Logout and Blocklist check failure — otherwise a token issued at registration that never had an explicit login has no traceable point of origin.
 
 Email addresses are hashed in logs (SHA-256, non-reversible) to prevent plaintext PII in CloudWatch. A compliance-grade audit trail — stored durably, tamper-evidently, queryable by user and time range — is deferred to v1.5. → [roadmap.md](../roadmap.md)
 
@@ -248,8 +250,8 @@ The solution is a **single-use WebSocket ticket**: a short-lived, opaque token t
 
 ### Ticket flow
 
-1. The frontend calls `POST /v1/auth/ws-ticket` with the access token in the `Authorization` header.
-2. The Auth service validates the access token, generates a 128-bit random ticket value, and stores `ws:ticket:<value> → <userId>` in Redis with a 30-second TTL.
+1. The frontend calls `POST /v1/auth/ws-ticket` with the access token in the `Authorization` header, same as any other authenticated request.
+2. The Auth service reads `userId` from the `X-User-Id` header forwarded by API Gateway after JWT validation — the service never parses the token itself (see [api-gateway-trust.md](../02-architecture/api-gateway-trust.md)) — generates a 128-bit random ticket value, and stores `ws:ticket:<value> → <userId>` in Redis with a 30-second TTL.
 3. The Auth service returns `{ ticket: "<value>" }`.
 4. The frontend opens a WebSocket connection to the Realtime Service: `wss://realtime.collabspace.io/ws?ticket=<value>`.
 5. The Realtime Service reads the ticket from the query string, performs Redis GET `ws:ticket:<value>` → `userId` (then DEL to invalidate), and registers the connection.

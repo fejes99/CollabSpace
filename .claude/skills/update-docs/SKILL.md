@@ -63,8 +63,8 @@ Auditing a README without reading its source produces inaccurate output.
 - `Current goal` — still accurate?
 - `Next milestone` — has this change completed part of it? Rewrite to show only what remains.
 - `Blocked on` — new blockers or resolved ones?
-- `Recent ADRs` — new ADR number listed?
 - `Layer 3 Pointers` — new file needs a pointer entry?
+- New ADR written this change? Cross-link it from the relevant plan doc / service README rather than a central list — there is no `Recent ADRs` line in `CLAUDE.md`.
 
 **docs/CHANGELOG.md** — completed stage milestones live here, not in CLAUDE.md.
 

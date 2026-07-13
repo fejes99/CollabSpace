@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Build out real functionality in auth-workspace — database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, and login endpoint (PR #20, pending merge + AWS verification) done; next: workspace endpoints.
+Current goal: Database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, login endpoint, and the internal token filter + header-based auth (Spring Security) are merged and verified on AWS. Next: workspace endpoints, now that every request is gated by a trustworthy `SecurityContext` and can be protected with @PreAuthorize.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Implement workspace endpoints.
+Next milestone: Implement workspace endpoints (CRUD + membership), protected with @PreAuthorize against the `WorkspaceAuthority` grants `HeaderAuthenticationFilter` now populates.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
@@ -106,3 +106,4 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Default exports in TypeScript
 - Mutable default arguments in Python
 - Resources in Terraform without tags
+- Code comments beyond what's much needed — write one only when the WHY is genuinely non-obvious (a hidden constraint, a workaround, a subtle invariant). Never restate what the code already says, and never re-derive reasoning that lives in a plan doc or ADR — reference it instead of repeating it

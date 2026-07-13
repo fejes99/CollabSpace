@@ -6,6 +6,9 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
+import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
+import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
+import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.exception.InvalidCredentialsException;
@@ -41,7 +44,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest
-@Import(JwtTestConfiguration.class)
+@Import({ JwtTestConfiguration.class, ProblemDetailsSecurityHandler.class })
 @DisplayName("GlobalExceptionHandler")
 class GlobalExceptionHandlerTest {
 
@@ -51,6 +54,16 @@ class GlobalExceptionHandlerTest {
 		@Bean
 		ThrowingController throwingController() {
 			return new ThrowingController();
+		}
+
+		@Bean
+		InternalTokenProperties internalTokenProperties() {
+			return new InternalTokenProperties("test-internal-token");
+		}
+
+		@Bean
+		TokenBlocklistRepository tokenBlocklistRepository() {
+			return jti -> false;
 		}
 
 	}
@@ -118,10 +131,17 @@ class GlobalExceptionHandlerTest {
 
 	private static final String VALIDATE_PATH = "/test/validate";
 
+	private static final String TEST_USER_ID = "test-user-id";
+
+	private static final String EMPTY_WORKSPACES = "[]";
+
 	private final ListAppender<ILoggingEvent> logCapture = new ListAppender<>();
 
 	@Autowired
 	MockMvc mvc;
+
+	@Autowired
+	InternalTokenProperties internalTokenProperties;
 
 	@MockitoBean
 	LoginUseCase loginUseCase;
@@ -146,7 +166,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("unhandled exception returns RFC 9457 problem detail with 500")
 	void returnsRfc9457ProblemDetail() throws Exception {
-		mvc.perform(get(BOOM_PATH))
+		mvc.perform(get(BOOM_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(status().isInternalServerError())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/internal-error"))
@@ -159,7 +181,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("unhandled exception is logged at ERROR level")
 	void logsExceptionAtErrorLevel() throws Exception {
-		mvc.perform(get(BOOM_PATH)).andReturn();
+		mvc.perform(get(BOOM_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES)).andReturn();
 
 		assertThat(logCapture.list)
 			.anyMatch(e -> e.getLevel() == Level.ERROR && e.getMessage().contains("event=unhandled_error"));
@@ -168,14 +192,19 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("internal exception message does not appear in response")
 	void internalExceptionMessageDoesNotLeakToResponse() throws Exception {
-		mvc.perform(get(BOOM_PATH))
+		mvc.perform(get(BOOM_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(content().string(not(containsString("internal details that must not leak"))));
 	}
 
 	@Test
 	@DisplayName("correlation ID from request header appears in error log")
 	void correlationIdAppearsInErrorLog() throws Exception {
-		mvc.perform(get(BOOM_PATH).header("X-Correlation-ID", "trace-123")).andReturn();
+		mvc.perform(get(BOOM_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES)
+			.header("X-Correlation-ID", "trace-123")).andReturn();
 
 		assertThat(logCapture.list).anyMatch(
 				e -> e.getLevel() == Level.ERROR && "trace-123".equals(e.getMDCPropertyMap().get("correlationId")));
@@ -184,7 +213,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("UnauthorizedException returns 401 with problem detail")
 	void unauthorizedExceptionReturns401() throws Exception {
-		mvc.perform(get(UNAUTHORIZED_PATH))
+		mvc.perform(get(UNAUTHORIZED_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(status().isUnauthorized())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/invalid-credentials"))
@@ -197,7 +228,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("UnauthorizedException is logged at WARN level")
 	void unauthorizedExceptionIsLoggedAtWarnLevel() throws Exception {
-		mvc.perform(get(UNAUTHORIZED_PATH)).andReturn();
+		mvc.perform(get(UNAUTHORIZED_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES)).andReturn();
 
 		assertThat(logCapture.list)
 			.anyMatch(e -> e.getLevel() == Level.WARN && e.getMessage().contains("event=unauthorized"));
@@ -206,7 +239,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("ConflictException returns 409 with problem detail")
 	void conflictExceptionReturns409() throws Exception {
-		mvc.perform(get(CONFLICT_PATH))
+		mvc.perform(get(CONFLICT_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(status().isConflict())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/auth/email-already-taken"))
@@ -218,7 +253,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("NotFoundException returns 404 with problem detail")
 	void notFoundExceptionReturns404() throws Exception {
-		mvc.perform(get(NOT_FOUND_PATH))
+		mvc.perform(get(NOT_FOUND_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(status().isNotFound())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/test/not-found"))
@@ -230,7 +267,9 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("DomainException returns 422 with problem detail")
 	void domainExceptionReturns422() throws Exception {
-		mvc.perform(get(DOMAIN_PATH))
+		mvc.perform(get(DOMAIN_PATH).header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
 			.andExpect(status().isUnprocessableEntity())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/test/domain"))
@@ -242,7 +281,11 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("validation failure returns 400 with errors array")
 	void validationFailureReturns400WithErrorsArray() throws Exception {
-		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON).content("{\"name\": \"\"}"))
+		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON)
+			.header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES)
+			.content("{\"name\": \"\"}"))
 			.andExpect(status().isBadRequest())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/validation/invalid-request"))
@@ -255,7 +298,11 @@ class GlobalExceptionHandlerTest {
 	@Test
 	@DisplayName("malformed JSON body returns 400 with problem detail")
 	void malformedJsonReturns400() throws Exception {
-		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON).content("{broken json"))
+		mvc.perform(post(VALIDATE_PATH).contentType(MediaType.APPLICATION_JSON)
+			.header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES)
+			.content("{broken json"))
 			.andExpect(status().isBadRequest())
 			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
 			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/validation/malformed-request"))

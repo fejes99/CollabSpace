@@ -41,7 +41,6 @@ Update this file whenever the project state changes. It is the source of truth f
 - [ ] **Current goal**: If the stage or goal has shifted, update the `Current goal:` line.
 - [ ] **Out of scope**: If the scope has been redefined, update it.
 - [ ] **Blocked on**: Add or remove blockers as they appear or are resolved.
-- [ ] **Recent ADRs**: If a new ADR was written, add it to the `Recent ADRs:` line.
 - [ ] **Pointers (Layer 3)**: If a new module, service, or doc file was created, add a pointer line so future sessions can navigate directly to it.
 
 ### Root README.md
@@ -100,7 +99,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] **ADR written**: Create `docs/06-decisions/adr-NNN-kebab-case-title.md` with the next sequential number. Required sections: Status, Date, Context, Decision, Alternatives Considered, Consequences (with + and − bullets), Revisit when.
 - [ ] **Adversarial review done**: Before committing the ADR, ask Claude Code to poke holes in the decision. Revise based on what that surfaces. Do not commit an ADR that has not been stress-tested.
 - [ ] **Status is correct**: `Proposed` if it has not been acted on yet. `Accepted` if it is implemented in this commit. If this commit supersedes an older decision, update the old ADR's status to `Superseded by ADR-NNN`.
-- [ ] **CLAUDE.md updated**: The new ADR number is added to `Recent ADRs:` in Layer 2.
+- [ ] **Cross-linked from relevant docs**: The ADR is linked from wherever the decision is actually discussed — the feature's plan doc, the affected service's README "Architecture decisions" section, or both. There is no central ADR list in `CLAUDE.md`; discoverability comes from contextual links plus the index in `docs/06-decisions/README.md`.
 - [ ] **Code cites the ADR**: If the decision is reflected in code (a lifecycle rule, a flag, a specific pattern), the relevant comment in the code should reference the ADR number.
 
 ---
@@ -128,6 +127,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] Controller inputs validated with `jakarta.validation` annotations — validation at the boundary, not inside service methods.
 - [ ] No direct database access from controllers. All persistence goes through the service layer.
 - [ ] New log statements use the project's structured logger (not `System.out.println`). Correlation ID is passed through if this is a request-scoped operation.
+- [ ] No `UnsupportedOperationException`/TODO stub left inside a `@Bean`, `@Component`, `@Service`, or `@Configuration` class. These are reachable the moment Spring wires them, not just when someone calls them directly — a `@ConditionalOnProperty` bean can activate silently once its trigger property is set elsewhere (e.g. by a Terraform change landing in the same PR), and the failure only surfaces at runtime, not at compile time. A stub is fine mid-feature; it is not fine still throwing when the feature is declared done.
 
 ---
 
@@ -141,6 +141,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] No `console.log`. Use `pino` logger.
 - [ ] All external input (request bodies, query params, env vars) validated with `zod` at the boundary. Types inferred from schemas, not written manually.
 - [ ] `async/await` used throughout. No raw `.then()/.catch()` chains.
+- [ ] No stub route handler (`throw new Error('not implemented')` or similar) left registered on a live route — Fastify serves it the moment a real request hits that path, not just when someone calls the handler directly.
 
 ---
 
@@ -153,6 +154,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] Request/response models use Pydantic. No raw dicts crossing API boundaries.
 - [ ] I/O-bound functions use `async def`.
 - [ ] No mutable default arguments (`def f(x=[])` — Python reuses the same list across calls).
+- [ ] No `raise NotImplementedError` left inside a FastAPI route handler or dependency-injected class — it's reachable the moment the route is called, not just when directly invoked.
 - [ ] New log statements use `structlog`, not `print()` or `logging.info()`.
 
 ---

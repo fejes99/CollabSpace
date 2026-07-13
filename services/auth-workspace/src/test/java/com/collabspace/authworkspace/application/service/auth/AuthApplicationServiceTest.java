@@ -6,6 +6,7 @@ import com.collabspace.authworkspace.application.port.in.auth.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterResult;
 import com.collabspace.authworkspace.application.port.out.auth.RefreshTokenRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
+import com.collabspace.authworkspace.application.service.AccessToken;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.service.RefreshTokenPair;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
@@ -68,7 +69,7 @@ class AuthApplicationServiceTest {
 				Optional.of(TEST_IP));
 		when(passwordEncoder.encode("password123")).thenReturn("hashed_pw");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("jwt.token");
+		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("jwt.token", "test-jti"));
 
 		RegisterResult result = service.register(command);
 
@@ -87,7 +88,7 @@ class AuthApplicationServiceTest {
 				Optional.of(TEST_IP));
 		when(passwordEncoder.encode(anyString())).thenReturn("hashed");
 		when(userRepository.save(any(User.class))).thenAnswer(inv -> inv.getArgument(0));
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("token");
+		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("token", "test-jti"));
 
 		RegisterResult result = service.register(command);
 
@@ -115,7 +116,7 @@ class AuthApplicationServiceTest {
 
 		when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existingUser));
 		when(passwordEncoder.matches("password123", "hashed_pw")).thenReturn(true);
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("jwt.token");
+		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("jwt.token", "test-jti"));
 		when(jwtService.issueRefreshToken()).thenReturn(new RefreshTokenPair("refresh_plaintext", "refresh_hash"));
 		when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
 
@@ -142,7 +143,7 @@ class AuthApplicationServiceTest {
 
 		when(userRepository.findByEmail("alice@example.com")).thenReturn(Optional.of(existingUser));
 		when(passwordEncoder.matches("password123", "hashed_pw")).thenReturn(true);
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn("jwt.token");
+		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("jwt.token", "test-jti"));
 		when(jwtService.issueRefreshToken()).thenReturn(new RefreshTokenPair("plaintext", "hash"));
 		when(refreshTokenRepository.save(any(RefreshToken.class))).thenAnswer(inv -> inv.getArgument(0));
 
