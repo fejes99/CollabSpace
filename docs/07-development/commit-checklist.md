@@ -127,6 +127,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] Controller inputs validated with `jakarta.validation` annotations — validation at the boundary, not inside service methods.
 - [ ] No direct database access from controllers. All persistence goes through the service layer.
 - [ ] New log statements use the project's structured logger (not `System.out.println`). Correlation ID is passed through if this is a request-scoped operation.
+- [ ] No `UnsupportedOperationException`/TODO stub left inside a `@Bean`, `@Component`, `@Service`, or `@Configuration` class. These are reachable the moment Spring wires them, not just when someone calls them directly — a `@ConditionalOnProperty` bean can activate silently once its trigger property is set elsewhere (e.g. by a Terraform change landing in the same PR), and the failure only surfaces at runtime, not at compile time. A stub is fine mid-feature; it is not fine still throwing when the feature is declared done.
 
 ---
 
@@ -140,6 +141,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] No `console.log`. Use `pino` logger.
 - [ ] All external input (request bodies, query params, env vars) validated with `zod` at the boundary. Types inferred from schemas, not written manually.
 - [ ] `async/await` used throughout. No raw `.then()/.catch()` chains.
+- [ ] No stub route handler (`throw new Error('not implemented')` or similar) left registered on a live route — Fastify serves it the moment a real request hits that path, not just when someone calls the handler directly.
 
 ---
 
@@ -152,6 +154,7 @@ A decision is non-trivial if any of these are true: it involves a trade-off with
 - [ ] Request/response models use Pydantic. No raw dicts crossing API boundaries.
 - [ ] I/O-bound functions use `async def`.
 - [ ] No mutable default arguments (`def f(x=[])` — Python reuses the same list across calls).
+- [ ] No `raise NotImplementedError` left inside a FastAPI route handler or dependency-injected class — it's reachable the moment the route is called, not just when directly invoked.
 - [ ] New log statements use `structlog`, not `print()` or `logging.info()`.
 
 ---
