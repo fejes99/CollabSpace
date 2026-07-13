@@ -106,3 +106,4 @@ Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 - Default exports in TypeScript
 - Mutable default arguments in Python
 - Resources in Terraform without tags
+- Code comments beyond what's much needed — write one only when the WHY is genuinely non-obvious (a hidden constraint, a workaround, a subtle invariant). Never restate what the code already says, and never re-derive reasoning that lives in a plan doc or ADR — reference it instead of repeating it
