@@ -5,11 +5,9 @@ import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.jwk.RSAKey;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.util.StringUtils;
 
 import java.security.KeyFactory;
 import java.security.NoSuchAlgorithmException;
@@ -27,34 +25,15 @@ public class JwtKeyConfig {
 
 	private static final Logger log = LoggerFactory.getLogger(JwtKeyConfig.class);
 
-	private final SsmConfigLoader ssm;
+	private final StartupSsmValues values;
 
-	private final String privateKeySsmPath;
-
-	private final String issuerSsmPath;
-
-	private final String audienceSsmPath;
-
-	private final String jwksUriSsmPath;
-
-	public JwtKeyConfig(SsmConfigLoader ssm, @Value("${JWT_PRIVATE_KEY_SSM_PATH:}") String privateKeySsmPath,
-			@Value("${JWT_ISSUER_SSM_PATH:}") String issuerSsmPath,
-			@Value("${JWT_AUDIENCE_SSM_PATH:}") String audienceSsmPath,
-			@Value("${JWT_JWKS_URI_SSM_PATH:}") String jwksUriSsmPath) {
-		this.ssm = ssm;
-		this.privateKeySsmPath = privateKeySsmPath;
-		this.issuerSsmPath = issuerSsmPath;
-		this.audienceSsmPath = audienceSsmPath;
-		this.jwksUriSsmPath = jwksUriSsmPath;
+	public JwtKeyConfig(StartupSsmValues values) {
+		this.values = values;
 	}
 
 	@Bean
 	public RSAKey rsaKey() throws NoSuchAlgorithmException, InvalidKeySpecException, JOSEException {
-		if (!StringUtils.hasText(this.privateKeySsmPath)) {
-			throw new IllegalStateException("JWT_PRIVATE_KEY_SSM_PATH is not configured");
-		}
-		String pem = this.ssm.getParameter(this.privateKeySsmPath);
-		RSAPrivateKey privateKey = parsePrivateKey(pem);
+		RSAPrivateKey privateKey = parsePrivateKey(values.privateKey());
 		RSAPublicKey publicKey = derivePublicKey(privateKey);
 		RSAKey key = new RSAKey.Builder(publicKey).privateKey(privateKey).keyIDFromThumbprint().build();
 		log.info("JWT key loaded, kid={}", key.getKeyID());
@@ -63,10 +42,8 @@ public class JwtKeyConfig {
 
 	@Bean
 	public JwtProperties jwtProperties() {
-		String jwksUri = StringUtils.hasText(this.jwksUriSsmPath) ? this.ssm.getParameter(this.jwksUriSsmPath)
-				: "http://localhost:8080/.well-known/jwks.json";
-		return new JwtProperties(this.ssm.getParameter(this.issuerSsmPath), this.ssm.getParameter(this.audienceSsmPath),
-				jwksUri);
+		String jwksUri = values.jwksUri() != null ? values.jwksUri() : "http://localhost:8080/.well-known/jwks.json";
+		return new JwtProperties(values.issuer(), values.audience(), jwksUri);
 	}
 
 	private RSAPrivateKey parsePrivateKey(String pem) throws NoSuchAlgorithmException, InvalidKeySpecException {
