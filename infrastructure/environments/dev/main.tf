@@ -352,9 +352,14 @@ module "auth_workspace" {
     SPRING_DATA_REDIS_URL      = aws_ssm_parameter.redis_url.arn
   }
 
-  # Measured cold start (JPA + Flyway + JWT key load + Tomcat) took ~122s in
-  # practice — start_period must clear that comfortably or ECS will kill a
-  # task that's still legitimately starting. See ADR-031.
+  # Measured cold start (JPA + Flyway + JWT key load + Tomcat) took ~122s when
+  # ADR-031 was written — start_period=150 cleared that with margin. Cold start
+  # has since regressed to ~180-191s (measured directly via CloudWatch logs
+  # while diagnosing a live incident where the deployment circuit breaker
+  # killed every task before it passed its first readiness check), so 150s no
+  # longer clears it. Root cause of the regression itself is still open --
+  # this bump only widens the budget to match reality, it doesn't fix why
+  # startup got slower. See ADR-031.
   #
   # interval/timeout/retries tightened below the module default (15s/5s/3)
   # to 5s/3s/2. Verified live this does NOT shrink the startup-transition
@@ -364,7 +369,7 @@ module "auth_workspace" {
   # unhealthy after a successful deploy, where start_period no longer
   # applies. See ADR-031's Empirical results section.
   health_check_command      = ["CMD-SHELL", "curl -f http://localhost:8080/actuator/health/readiness || exit 1"]
-  health_check_start_period = 150
+  health_check_start_period = 240
   health_check_interval     = 5
   health_check_timeout      = 3
   health_check_retries      = 2
