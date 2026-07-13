@@ -50,9 +50,7 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 
 		String internalToken = request.getHeader("X-Internal-Token");
 		if (!internalTokenProperties.token().equals(internalToken)) {
-			// No userId available yet at this point in the chain --
-			// HeaderAuthenticationFilter
-			// runs after this one. See plan security-filter.md §4.
+			// No userId yet -- HeaderAuthenticationFilter runs after this one.
 			log.warn("event=internal_token_invalid ip={} correlationId={} path={}", request.getRemoteAddr(),
 					MDC.get("correlationId"), request.getRequestURI());
 			problemDetailsSecurityHandler.commence(request, response,
@@ -62,9 +60,8 @@ public class InternalTokenFilter extends OncePerRequestFilter {
 		filterChain.doFilter(request, response);
 	}
 
-	// Path AND origin, not path alone -- see plan security-filter.md §3. Reads the raw
-	// socket address via IpAddressMatcher, never X-Forwarded-For, which a client can
-	// forge; server.forward-headers-strategy must stay NONE for this to be trustworthy.
+	// Path AND origin, not path alone -- raw socket address, never X-Forwarded-For
+	// (spoofable). See ADR-033.
 	private boolean isLoopbackExempt(HttpServletRequest request) {
 		return LOOPBACK_EXEMPT_PATHS.contains(request.getRequestURI())
 				&& (IPV4_LOOPBACK.matches(request) || IPV6_LOOPBACK.matches(request));

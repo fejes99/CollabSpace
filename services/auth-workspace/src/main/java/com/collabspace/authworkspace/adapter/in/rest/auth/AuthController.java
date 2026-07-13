@@ -46,11 +46,8 @@ public class AuthController {
 		this.cookieSecure = cookieSecure;
 	}
 
-	// Overrides OpenApiConfig's global security requirement (X-Internal-Token +
-	// X-User-Id + X-User-Workspaces) down to just X-Internal-Token -- register is an
-	// anonymous route, and HeaderAuthenticationFilter fails closed if identity headers
-	// are present here (security-filter.md §3). Without this override, Swagger UI would
-	// attach whatever's set in the Authorize dialog for the other two schemes too.
+	// Scopes down from OpenApiConfig's global requirement -- register fails closed on
+	// identity headers, so Swagger's Authorize dialog can't attach them here.
 	@SecurityRequirement(name = OpenApiConfig.INTERNAL_TOKEN_SCHEME)
 	@Operation(summary = "Register a new user",
 			description = "Creates a user account and returns a JWT access token. The user is logged in immediately after registration.")

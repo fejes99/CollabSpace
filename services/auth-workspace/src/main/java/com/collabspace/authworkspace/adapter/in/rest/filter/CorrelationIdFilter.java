@@ -16,10 +16,8 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 import java.util.UUID;
 
-// Must run before Spring Security's filter chain (registered at
-// SecurityProperties.DEFAULT_FILTER_ORDER = HIGHEST_PRECEDENCE + 100), so that
-// correlationId is already in MDC when the security filters log rejections --
-// see authentication.md's audit events table, which requires it.
+// Must run before Spring Security's filter chain so correlationId is already in MDC
+// when the security filters log rejections.
 @Component
 @Order(Ordered.HIGHEST_PRECEDENCE)
 class CorrelationIdFilter extends OncePerRequestFilter {

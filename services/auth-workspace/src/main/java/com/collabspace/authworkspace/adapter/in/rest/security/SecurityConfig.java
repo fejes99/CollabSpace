@@ -45,11 +45,8 @@ public class SecurityConfig {
 			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
 			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
 				.accessDeniedHandler(problemDetailsSecurityHandler))
-			// Mirrors SecurityExemptPaths so this authorization layer can't drift
-			// from the filters' own path exemptions once anyRequest() is tightened
-			// for @PreAuthorize (PR 8) -- until then, anyRequest().permitAll()
-			// covers these anyway, so this line only guards against future drift,
-			// not current behavior.
+			// Mirrors SecurityExemptPaths, guarding against drift once @PreAuthorize
+			// (PR 8) tightens anyRequest() below -- see ADR-033.
 			.authorizeHttpRequests(auth -> auth.requestMatchers("/.well-known/**", "/swagger-ui/**", "/v3/api-docs/**")
 				.permitAll()
 				.anyRequest()

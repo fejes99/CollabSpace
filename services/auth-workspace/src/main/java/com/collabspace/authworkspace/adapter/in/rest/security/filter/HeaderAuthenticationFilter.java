@@ -41,12 +41,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
 	private static final int MAX_WORKSPACES_HEADER_BYTES = 4096;
 
-	// Reduced from the plan's original 200: at ~38 bytes for a realistic minimal entry,
-	// 200 entries (~7.6KB) would always exceed MAX_WORKSPACES_HEADER_BYTES first, making
-	// this check unreachable dead code. 100 entries (~3.9KB at minimum size) stays under
-	// the byte limit, so this check is the one that actually fires for a too-long list of
-	// small memberships -- still generous for how many workspaces one user plausibly
-	// belongs to in a v1 product.
+	// Reduced from the plan's original 200 -- see security-filter.md §4 for why 200 was
+	// unreachable dead code behind the byte-size check above.
 	private static final int MAX_WORKSPACES_ENTRIES = 100;
 
 	private final ProblemDetailsSecurityHandler problemDetailsSecurityHandler;
@@ -79,10 +75,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 		filterChain.doFilter(request, response);
 	}
 
-	// Returns true when this request should proceed with no identity -- an anonymous
-	// route with neither header present. Throws on every invalid combination described
-	// in plan security-filter.md §4's validation table; a normal return means "userId
-	// and workspacesHeader are both present and this is a route that expects them."
+	// false means both headers are present and expected; throws on every invalid
+	// combination -- see plan security-filter.md §4's validation table.
 	private boolean isAnonymousRequest(HttpServletRequest request, String userId, String workspacesHeader) {
 		boolean userIdPresent = userId != null;
 		boolean workspacesPresent = workspacesHeader != null;
