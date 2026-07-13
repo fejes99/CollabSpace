@@ -22,9 +22,7 @@ public class InternalTokenSsmConfig {
 
 	@Bean
 	public InternalTokenProperties internalTokenProperties() {
-		// TODO: return new
-		// InternalTokenProperties(ssm.getParameter(internalTokenSsmPath));
-		throw new UnsupportedOperationException("TODO: load internal token from SSM");
+		return new InternalTokenProperties(ssm.getParameter(internalTokenSsmPath));
 	}
 
 }
