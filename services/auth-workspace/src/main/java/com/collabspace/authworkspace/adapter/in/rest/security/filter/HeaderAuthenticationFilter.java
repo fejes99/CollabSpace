@@ -2,11 +2,11 @@ package com.collabspace.authworkspace.adapter.in.rest.security.filter;
 
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.adapter.in.rest.security.SecurityExemptPaths;
+import com.collabspace.authworkspace.adapter.in.rest.security.MembershipClaim;
 import com.collabspace.authworkspace.adapter.in.rest.security.WorkspaceAuthority;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.MalformedIdentityHeadersException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.SecurityAuthenticationException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.UnexpectedIdentityException;
-import com.collabspace.authworkspace.domain.model.auth.WorkspaceMembership;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -61,7 +61,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
 		try {
 			if (!isAnonymousRequest(request, userId, workspacesHeader)) {
-				List<WorkspaceMembership> memberships = parseWorkspaces(workspacesHeader);
+				List<MembershipClaim> memberships = parseWorkspaces(workspacesHeader);
 				SecurityContextHolder.getContext()
 					.setAuthentication(
 							new PreAuthenticatedAuthenticationToken(userId, null, toAuthorities(memberships)));
@@ -107,7 +107,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 
 	// Size limits enforced before parsing (byte length) and after (entry count, which
 	// can only be known once parsed) -- see plan §4.
-	private List<WorkspaceMembership> parseWorkspaces(String workspacesHeader) {
+	private List<MembershipClaim> parseWorkspaces(String workspacesHeader) {
 		if (!StringUtils.hasText(workspacesHeader)) {
 			throw new MalformedIdentityHeadersException("X-User-Workspaces must not be blank");
 		}
@@ -115,7 +115,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 			throw new MalformedIdentityHeadersException("X-User-Workspaces exceeds the 4KB size limit");
 		}
 
-		List<WorkspaceMembership> memberships;
+		List<MembershipClaim> memberships;
 		try {
 			memberships = objectMapper.readValue(workspacesHeader, new TypeReference<>() {
 			});
@@ -130,7 +130,7 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 		return memberships;
 	}
 
-	private List<GrantedAuthority> toAuthorities(List<WorkspaceMembership> memberships) {
+	private List<GrantedAuthority> toAuthorities(List<MembershipClaim> memberships) {
 		return memberships.stream()
 			.map(membership -> (GrantedAuthority) new WorkspaceAuthority(membership.workspaceId(), membership.role()))
 			.toList();

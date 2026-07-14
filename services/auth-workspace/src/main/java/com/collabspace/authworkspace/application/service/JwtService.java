@@ -1,7 +1,7 @@
 package com.collabspace.authworkspace.application.service;
 
 import com.collabspace.authworkspace.application.util.CryptoUtils;
-import com.collabspace.authworkspace.domain.model.auth.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
 import com.nimbusds.jose.JOSEException;
 import com.nimbusds.jose.JWSAlgorithm;
 import com.nimbusds.jose.JWSHeader;
@@ -48,7 +48,7 @@ public class JwtService {
 		Instant now = clock.instant();
 		String jti = UUID.randomUUID().toString();
 		List<Map<String, String>> membershipClaims = memberships.stream()
-			.map(m -> Map.of("workspaceId", m.workspaceId(), "role", m.role()))
+			.map(m -> Map.of("workspaceId", m.workspaceId().toString(), "role", m.role().getValue()))
 			.toList();
 
 		// Serialized to a JSON string, not a nested array claim: API Gateway's JWT

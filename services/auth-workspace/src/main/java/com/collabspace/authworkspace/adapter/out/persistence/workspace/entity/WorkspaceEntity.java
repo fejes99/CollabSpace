@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.adapter.out.persistence.auth.entity;
+package com.collabspace.authworkspace.adapter.out.persistence.workspace.entity;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,21 +13,21 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "users")
+@Table(name = "workspaces")
 @EntityListeners(AuditingEntityListener.class)
-public class UserEntity {
+public class WorkspaceEntity {
 
 	@Id
 	private UUID id;
 
-	@Column(name = "name", nullable = false, length = 255)
+	@Column(name = "name", nullable = false)
 	private String name;
 
-	@Column(name = "email", nullable = false, unique = true, length = 320)
-	private String email;
+	@Column(name = "description", length = 2000)
+	private String description;
 
-	@Column(name = "password_hash")
-	private String passwordHash;
+	@Column(name = "created_by_user_id", nullable = false)
+	private UUID createdByUserId;
 
 	@CreatedDate
 	@Column(name = "created_at", nullable = false, updatable = false)
@@ -37,14 +37,14 @@ public class UserEntity {
 	@Column(name = "updated_at", nullable = false)
 	private Instant updatedAt;
 
-	protected UserEntity() {
+	public WorkspaceEntity() {
 	}
 
-	public UserEntity(UUID id, String name, String email, String passwordHash) {
+	public WorkspaceEntity(UUID id, String name, String description, UUID createdByUserId) {
 		this.id = id;
 		this.name = name;
-		this.email = email;
-		this.passwordHash = passwordHash;
+		this.description = description;
+		this.createdByUserId = createdByUserId;
 	}
 
 	public UUID getId() {
@@ -55,12 +55,12 @@ public class UserEntity {
 		return name;
 	}
 
-	public String getEmail() {
-		return email;
+	public String getDescription() {
+		return description;
 	}
 
-	public String getPasswordHash() {
-		return passwordHash;
+	public UUID getCreatedByUserId() {
+		return createdByUserId;
 	}
 
 	public Instant getCreatedAt() {
