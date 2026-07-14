@@ -5,6 +5,7 @@ import com.collabspace.authworkspace.adapter.in.rest.security.filter.InternalTok
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.JwtBlocklistFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -14,6 +15,7 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
 
 @Configuration
 @EnableWebSecurity
+@EnableMethodSecurity
 public class SecurityConfig {
 
 	private final InternalTokenFilter internalTokenFilter;
@@ -45,12 +47,17 @@ public class SecurityConfig {
 			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
 			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
 				.accessDeniedHandler(problemDetailsSecurityHandler))
-			// Mirrors SecurityExemptPaths, guarding against drift once @PreAuthorize
-			// (PR 8) tightens anyRequest() below -- see ADR-033.
-			.authorizeHttpRequests(auth -> auth.requestMatchers("/.well-known/**", "/swagger-ui/**", "/v3/api-docs/**")
+			// Every path HeaderAuthenticationFilter treats as anonymous (its
+			// ANONYMOUS_PATHS set) must also be permitAll() here, or tightening
+			// anyRequest() below breaks it -- Spring Security's own authorization stage
+			// has no visibility into that filter's per-route exemption logic. See
+			// ADR-033.
+			.authorizeHttpRequests(auth -> auth
+				.requestMatchers("/.well-known/**", "/swagger-ui/**", "/v3/api-docs/**", "/v1/auth/register",
+						"/v1/auth/login", "/actuator/health/**")
 				.permitAll()
 				.anyRequest()
-				.permitAll())
+				.authenticated())
 			.build();
 	}
 
