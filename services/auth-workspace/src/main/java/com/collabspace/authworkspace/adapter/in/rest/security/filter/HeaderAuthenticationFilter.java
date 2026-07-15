@@ -101,9 +101,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 		return false;
 	}
 
-	// Public and static so SecurityConfig can use this as the single source of truth for
-	// its own permitAll() matcher -- two independently-maintained path lists drift apart
-	// silently (see the /swagger-ui.html incident this replaced).
+	// Public/static: also used by SecurityConfig's permitAll() matcher -- see the comment
+	// there for why.
 	public static boolean isAnonymousRoute(HttpServletRequest request) {
 		return ANONYMOUS_PATHS.contains(request.getRequestURI()) || SecurityExemptPaths.isPathExempt(request);
 	}

@@ -47,13 +47,9 @@ public class SecurityConfig {
 			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
 			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
 				.accessDeniedHandler(problemDetailsSecurityHandler))
-			// Delegates to HeaderAuthenticationFilter.isAnonymousRoute -- the single
-			// source
-			// of truth for "does this route need identity headers" -- rather than
-			// re-encoding an equivalent path-pattern list here. Two independently
-			// maintained lists silently drifted apart once (SecurityExemptPaths' boundary
-			// logic treats /swagger-ui.html as exempt; the equivalent /swagger-ui/**
-			// pattern here did not, since a '.' boundary isn't a '/').
+			// Delegates to HeaderAuthenticationFilter.isAnonymousRoute rather than
+			// re-encoding an equivalent path-pattern list -- the two already drifted once
+			// (the /swagger-ui.html 500).
 			.authorizeHttpRequests(auth -> auth.requestMatchers(HeaderAuthenticationFilter::isAnonymousRoute)
 				.permitAll()
 				.anyRequest()
