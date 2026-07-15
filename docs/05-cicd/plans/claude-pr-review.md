@@ -105,9 +105,17 @@ No correlation ID — this is CI, not a service request path.
 
 ## 10. Cross-document amendments included in this PR
 
+Original 2026-05-14 launch:
+
 - [docs/07-development/feature-workflow.md](../../07-development/feature-workflow.md) Phase 5 (Polish) — add a bullet describing the Claude review trigger.
 - [.github/pull_request_template.md](../../../.github/pull_request_template.md) — add a test-plan checkbox: `[ ] Claude review addressed or explicitly accepted as-is`.
 - [CLAUDE.md](../../../CLAUDE.md) Layer 3 — pointers for `.github/workflows/claude-review.yml` and the new ADR-024.
+
+2026-07-15 revision (comment-only trigger):
+
+- [docs/06-decisions/adr-024-claude-pr-review.md](../../06-decisions/adr-024-claude-pr-review.md) — Decision, Alternatives, and Consequences amended in place to record the reversal.
+- [docs/07-development/feature-workflow.md](../../07-development/feature-workflow.md) Phase 6 — reworded to describe `@claude` as a manual trigger, not automatic.
+- [.github/pull_request_template.md](../../../.github/pull_request_template.md) — checklist item reworded to match.
 
 ## 11. Open items to verify post-launch
 
