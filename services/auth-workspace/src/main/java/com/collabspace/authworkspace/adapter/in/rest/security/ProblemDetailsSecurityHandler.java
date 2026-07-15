@@ -29,13 +29,8 @@ public class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, 
 			AuthenticationException authException) throws IOException, ServletException {
 		ProblemDetail problem = ProblemDetail.forStatus(401);
 
-		// authException is one of our own SecurityAuthenticationException subtypes when a
-		// security filter
-		// (InternalTokenFilter/HeaderAuthenticationFilter/JwtBlocklistFilter)
-		// rejected the request explicitly. It can also be a plain Spring Security
-		// AuthenticationException (e.g. InsufficientAuthenticationException) when
-		// anyRequest().authenticated() itself rejects a request none of our filters
-		// treated as anonymous but also never populated -- that path carries no `type`.
+		// See error-catalog.md's auth/insufficient-authentication row for why the else
+		// branch exists.
 		if (authException instanceof SecurityAuthenticationException securityException) {
 			problem.setType(securityException.getType());
 			problem.setTitle(securityException.getTitle());
@@ -44,10 +39,11 @@ public class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, 
 					request.getRequestURI());
 		}
 		else {
+			URI type = URI.create("https://errors.collabspace.io/auth/insufficient-authentication");
+			problem.setType(type);
 			problem.setTitle("Unauthorized");
 			problem.setDetail(authException.getMessage());
-			log.warn("event=authentication_rejected type={} uri={}", authException.getClass().getSimpleName(),
-					request.getRequestURI());
+			log.warn("event=authentication_rejected type={} uri={}", type, request.getRequestURI());
 		}
 		problem.setInstance(URI.create(request.getRequestURI()));
 
@@ -57,8 +53,16 @@ public class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, 
 	@Override
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException, ServletException {
-		// Nothing throws AccessDeniedException yet -- PR 8's @PreAuthorize checks are the
-		// first caller.
+		URI type = URI.create("https://errors.collabspace.io/auth/access-denied");
+		ProblemDetail problem = ProblemDetail.forStatus(403);
+		problem.setType(type);
+		problem.setTitle("Forbidden");
+		problem.setDetail(accessDeniedException.getMessage());
+		problem.setInstance(URI.create(request.getRequestURI()));
+
+		log.warn("event=authorization_denied type={} uri={}", type, request.getRequestURI());
+
+		writeProblemDetail(response, problem);
 	}
 
 	private void writeProblemDetail(HttpServletResponse response, ProblemDetail problem) throws IOException {

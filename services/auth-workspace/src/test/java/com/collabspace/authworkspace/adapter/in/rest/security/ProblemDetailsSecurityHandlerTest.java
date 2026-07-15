@@ -11,6 +11,7 @@ import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.mock.web.MockHttpServletResponse;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.when;
@@ -70,12 +71,33 @@ class ProblemDetailsSecurityHandlerTest {
 	}
 
 	@Test
-	@DisplayName("handle does nothing yet -- no @PreAuthorize caller exists until PR 8")
-	void handleDoesNothingYet() throws Exception {
+	@DisplayName("commence writes a 401 RFC 9457 body with a catalog type for a plain AuthenticationException")
+	void commenceWritesProblemDetailForGenericAuthenticationException() throws Exception {
+		when(request.getRequestURI()).thenReturn("/v1/workspaces");
+
+		handler.commence(request, response, new InsufficientAuthenticationException("Full authentication is required"));
+
+		assertThat(response.getStatus()).isEqualTo(401);
+		String body = response.getContentAsString();
+		assertThat(body).contains("\"type\":\"https://errors.collabspace.io/auth/insufficient-authentication\"");
+		assertThat(body).contains("\"title\":\"Unauthorized\"");
+		assertThat(body).contains("\"detail\":\"Full authentication is required\"");
+	}
+
+	@Test
+	@DisplayName("handle writes a 403 RFC 9457 body for a denied request")
+	void handleWritesProblemDetailForAccessDenied() throws Exception {
+		when(request.getRequestURI()).thenReturn("/v1/workspaces");
+
 		handler.handle(request, response, new AccessDeniedException("denied"));
 
-		assertThat(response.getStatus()).isEqualTo(200);
-		assertThat(response.getContentAsString()).isEmpty();
+		assertThat(response.getStatus()).isEqualTo(403);
+		assertThat(response.getContentType()).isEqualTo("application/problem+json");
+		String body = response.getContentAsString();
+		assertThat(body).contains("\"type\":\"https://errors.collabspace.io/auth/access-denied\"");
+		assertThat(body).contains("\"title\":\"Forbidden\"");
+		assertThat(body).contains("\"detail\":\"denied\"");
+		assertThat(body).contains("\"instance\":\"/v1/workspaces\"");
 	}
 
 }
