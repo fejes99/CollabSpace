@@ -18,7 +18,7 @@ The cost dimension is real. The project has an explicit ~$5/month operational bu
 
 ## Decision
 
-Add a GitHub Action that invokes `anthropics/claude-code-action` on `pull_request` (`ready_for_review` and `opened` with a draft guard) and on `issue_comment` events containing `@claude` from the repository `OWNER`. Use the `claude-sonnet-4-6` model, configured via `claude_args` (the action does not expose `model` as a top-level input). Skip `[fast]`-prefixed PRs (case-insensitive), fork PRs, and PRs exceeding 100 changed files or 5,000 line changes.
+Add a GitHub Action that invokes `anthropics/claude-code-action` on `issue_comment` events containing `@claude` from the repository `OWNER`. This is the only trigger — there is no automatic run on PR open or ready-for-review (revised 2026-07-15; the original decision did include that auto-trigger, see Alternatives). Use the `claude-sonnet-4-6` model, configured via `claude_args` (the action does not expose `model` as a top-level input). Skip `[fast]`-prefixed PRs (case-insensitive), fork PRs, draft PRs, PRs that are not open, and PRs exceeding 100 changed files or 5,000 line changes.
 
 **Cost caps.** The action does not expose an output-token cap. The bounds in force are:
 - `--max-turns 15` on `claude_args` — limits the agent loop iterations (each turn is one model call). Typical reviews complete in 3–5 turns.
@@ -35,7 +35,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 
 ## Alternatives considered
 
-- **`@claude` mention only, no auto-trigger.** Cheapest option. Rejected because the discipline burden of "remember to ask for review" falls on the author, and the author is the failure point this mechanism exists to compensate for.
+- **Auto-trigger on PR open/ready-for-review, in addition to `@claude` comments.** This was the original decision. Reversed 2026-07-15: PR volume in Stage 2 makes a review on every ready-for-review PR material against the ~$5/month budget, and comment-only triggering lets the author choose which PRs are actually worth paying for. This knowingly re-accepts the discipline-burden risk the auto-trigger was originally meant to compensate for — see Consequences.
 - **Auto-trigger on every PR push (every commit).** Maximum coverage. Rejected because solo development is iterative — pushing a fix every few minutes during edge-case work would burn the budget in a single afternoon.
 - **Opus 4.7 for review.** ~5× cost of Sonnet. Reasonable if Sonnet starts missing things that matter; not the starting choice.
 - **Haiku 4.5 for review.** ~1/5 cost but noticeably lower quality on complex review reasoning. Skipped — saving small amounts is bad math when output quality drops disproportionately.
@@ -50,7 +50,7 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 
 **+**
 
-- Every ready-for-review PR receives a fresh, model-driven review without scheduling a human.
+- Review cost is opt-in: the author decides which PRs are worth spending budget on, instead of every ready-for-review PR triggering a paid run automatically.
 - Per-run cost is bounded by `--max-turns 15` (typical $0.15–$0.35) and `timeout-minutes: 10` (worst case ~$1.00 in a runaway-agent scenario, dominated by output tokens at $15/MTok).
 - The `[fast]` skip, fork skip, and size guard prevent obvious cost-burn vectors.
 - The `OWNER`-only `@claude` guard prevents cost attack via comments on a public repo.
@@ -59,8 +59,9 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 
 **−**
 
-- Monthly spend depends on PR volume. At current cost estimates, $4 buys 16–30 reviews; if Stage 2 generates more PRs than expected, the budget runs out before the month ends.
+- Monthly spend now depends on how often the author remembers to comment `@claude`, not on PR volume — comment-only triggering makes cost more predictable, but the cap is enforced by human discipline rather than an automatic mechanism.
 - The action's output is advisory only — the workflow does not block merges based on review feedback. A junior author might ignore valid feedback if discipline slips.
+- Comment-only triggering re-introduces the exact discipline burden the original auto-trigger alternative was rejected for: nothing stops a PR from merging without any model review if the author forgets to comment `@claude`. There is no CI enforcement of this step — feature-workflow.md Phase 6 documents it as a manual habit only.
 - The `OWNER`-only restriction blocks future collaborators from triggering `@claude` until this ADR is revisited.
 - SHA pinning means upstream patches (security, bug fixes) are NOT picked up automatically. The rotation cadence (every 3 months, or sooner on disclosed CVE) is the mitigation; if forgotten, the workflow runs on an older action than upstream considers current.
 - The size guard (100 files / 5,000 lines) is a hard cutoff. Large legitimate PRs (e.g., a generated SDK update) will be skipped without review.
@@ -77,3 +78,4 @@ Full design rationale and implementation details live in [docs/05-cicd/plans/cla
 - `anthropics/claude-code-action` releases a `v2` (breaking) — evaluate the upgrade alongside a rotation.
 - This repo is made public — re-verify the `OWNER`-only check and consider tightening further (e.g., spend rate limiting).
 - The Claude review feedback is consistently ignored by the author — review whether the integration is providing value or just generating noise.
+- PRs are consistently merging without a `@claude` comment ever being posted — the discipline burden re-accepted in the 2026-07-15 revision is failing in practice; reconsider a lighter auto-trigger (e.g., once per PR, not on every draft→ready flip) as a middle ground.

@@ -119,7 +119,7 @@ Run `/pre-commit` to walk the existing checklist. Then:
 
 ### Phase 6 — Deploy and verify
 
-Mark the PR ready for review. This triggers the Claude PR review workflow (see [ADR-024](../06-decisions/adr-024-claude-pr-review.md)) — wait for the review comment to appear, then address each point or explicitly note "accepted as-is, reason: …" in a reply. Re-trigger with a comment containing `@claude` after revisions if needed. CI must be green. Squash-merge to main.
+Mark the PR ready for review. Comment `@claude` on the PR to trigger the Claude PR review workflow (see [ADR-024](../06-decisions/adr-024-claude-pr-review.md)) — it does not run automatically on ready-for-review, so this is a manual step, not something to wait for passively. Once the review comment appears, address each point or explicitly note "accepted as-is, reason: …" in a reply. Comment `@claude` again after revisions if you want a re-review. CI must be green. Squash-merge to main.
 
 ```bash
 make dev-up   # if the dev environment is destroyed
