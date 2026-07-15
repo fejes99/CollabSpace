@@ -47,14 +47,14 @@ public class SecurityConfig {
 			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
 			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
 				.accessDeniedHandler(problemDetailsSecurityHandler))
-			// Every path HeaderAuthenticationFilter treats as anonymous (its
-			// ANONYMOUS_PATHS set) must also be permitAll() here, or tightening
-			// anyRequest() below breaks it -- Spring Security's own authorization stage
-			// has no visibility into that filter's per-route exemption logic. See
-			// ADR-033.
-			.authorizeHttpRequests(auth -> auth
-				.requestMatchers("/.well-known/**", "/swagger-ui/**", "/v3/api-docs/**", "/v1/auth/register",
-						"/v1/auth/login", "/actuator/health/**")
+			// Delegates to HeaderAuthenticationFilter.isAnonymousRoute -- the single
+			// source
+			// of truth for "does this route need identity headers" -- rather than
+			// re-encoding an equivalent path-pattern list here. Two independently
+			// maintained lists silently drifted apart once (SecurityExemptPaths' boundary
+			// logic treats /swagger-ui.html as exempt; the equivalent /swagger-ui/**
+			// pattern here did not, since a '.' boundary isn't a '/').
+			.authorizeHttpRequests(auth -> auth.requestMatchers(HeaderAuthenticationFilter::isAnonymousRoute)
 				.permitAll()
 				.anyRequest()
 				.authenticated())

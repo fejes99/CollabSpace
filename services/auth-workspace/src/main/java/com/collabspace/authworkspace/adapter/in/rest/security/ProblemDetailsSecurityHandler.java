@@ -27,15 +27,29 @@ public class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, 
 	@Override
 	public void commence(HttpServletRequest request, HttpServletResponse response,
 			AuthenticationException authException) throws IOException, ServletException {
-		SecurityAuthenticationException securityException = (SecurityAuthenticationException) authException;
-
 		ProblemDetail problem = ProblemDetail.forStatus(401);
-		problem.setType(securityException.getType());
-		problem.setTitle(securityException.getTitle());
-		problem.setDetail(securityException.getMessage());
-		problem.setInstance(URI.create(request.getRequestURI()));
 
-		log.warn("event=authentication_rejected type={} uri={}", securityException.getType(), request.getRequestURI());
+		// authException is one of our own SecurityAuthenticationException subtypes when a
+		// security filter
+		// (InternalTokenFilter/HeaderAuthenticationFilter/JwtBlocklistFilter)
+		// rejected the request explicitly. It can also be a plain Spring Security
+		// AuthenticationException (e.g. InsufficientAuthenticationException) when
+		// anyRequest().authenticated() itself rejects a request none of our filters
+		// treated as anonymous but also never populated -- that path carries no `type`.
+		if (authException instanceof SecurityAuthenticationException securityException) {
+			problem.setType(securityException.getType());
+			problem.setTitle(securityException.getTitle());
+			problem.setDetail(securityException.getMessage());
+			log.warn("event=authentication_rejected type={} uri={}", securityException.getType(),
+					request.getRequestURI());
+		}
+		else {
+			problem.setTitle("Unauthorized");
+			problem.setDetail(authException.getMessage());
+			log.warn("event=authentication_rejected type={} uri={}", authException.getClass().getSimpleName(),
+					request.getRequestURI());
+		}
+		problem.setInstance(URI.create(request.getRequestURI()));
 
 		writeProblemDetail(response, problem);
 	}
