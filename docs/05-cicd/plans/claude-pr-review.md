@@ -7,11 +7,10 @@
 
 ## 1. Slice statement
 
-Every PR opened as ready-for-review receives a Claude code review comment.
+A PR receives a Claude code review comment only when the author explicitly requests one by commenting `@claude` (revised 2026-07-15 — see ADR-024; originally every PR opened as ready-for-review received one automatically).
 
 ## 2. User-visible behavior
 
-- Within a couple of minutes of setting a PR from draft to ready, a single comment appears with the review.
 - Posting a comment containing `@claude` on a PR triggers a code review.
 - PRs whose titles start with `[fast]` (case-insensitive) do not trigger a review.
 
@@ -19,13 +18,12 @@ Every PR opened as ready-for-review receives a Claude code review comment.
 
 **Triggers**
 
-- `pull_request: types: [opened, ready_for_review]` with `if: !github.event.pull_request.draft`
-- `issue_comment: types: [created]` with multi-guard condition (see Skip)
+- `issue_comment: types: [created]` with multi-guard condition (see Skip). This is the only trigger — no `pull_request` event trigger (removed 2026-07-15, see ADR-024).
 
 **Skip conditions (job-level `if:`)**
 
 - PR title prefix `[fast]` (case-insensitive)
-- PR from fork (`github.event.pull_request.head.repo.fork == true`)
+- PR from fork (checked via `pulls.get` after the comment fires, since there is no `pull_request` event context to read `head.repo.fork` from directly)
 - For `@claude` trigger: PR state is not `open`
 - For `@claude` trigger: comment author type is `Bot`
 - For `@claude` trigger: comment author login is `github-actions[bot]` (self-loop guard)
@@ -34,7 +32,7 @@ Every PR opened as ready-for-review receives a Claude code review comment.
 
 **Concurrency**
 
-- `group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}`
+- `group: claude-review-${{ github.event.issue.number }}`
 - `cancel-in-progress: true`
 
 **Permissions**
@@ -69,7 +67,6 @@ Folded into §3. All input validation is event-filter logic in workflow `if:` cl
 
 | Scenario | Behavior |
 |---|---|
-| Draft PR (no @claude) | Workflow does not run (event filter) |
 | Draft PR + `@claude` comment | Workflow exits early — draft guard on comment job |
 | Fork PR | Exit early with log: "Fork PR — review skipped" |
 | `[fast]` / `[FAST]` / `[Fast]` PR title | Exit early |
@@ -86,7 +83,7 @@ Folded into §3. All input validation is event-filter logic in workflow `if:` cl
 
 ## 7. Authorization
 
-`pull_request` events follow GitHub's standard fork-secret isolation. `issue_comment` events do NOT — they run with full secret access regardless of commenter, which is a documented cost-attack vector if the repo is or becomes public.
+`issue_comment` events run with full secret access regardless of commenter, which is a documented cost-attack vector if the repo is or becomes public. (This is the only event this workflow listens to — see §3.)
 
 Mitigation: the workflow's `@claude` job checks `github.event.comment.author_association` and only proceeds if the value is `OWNER`. Today that means only `fejes99` can trigger via `@claude`. Adding collaborators later requires an explicit decision — extend the allow-list to `MEMBER` / `COLLABORATOR` and accept that each collaborator can spend the budget, or keep `OWNER`-only and require re-trigger by the owner — recorded in a future ADR.
 
@@ -102,14 +99,23 @@ No correlation ID — this is CI, not a service request path.
 ## 9. Out of scope
 
 - Auto-trigger on draft PRs (manual `@claude` on draft also blocked by the §3 guard).
+- Auto-trigger on PR open/ready-for-review (removed 2026-07-15 for cost control — see ADR-024).
 - Auto-approval or auto-merge based on review (review is advisory only).
 - Multi-model selection (Sonnet 4.6 only for v1).
 
 ## 10. Cross-document amendments included in this PR
 
+Original 2026-05-14 launch:
+
 - [docs/07-development/feature-workflow.md](../../07-development/feature-workflow.md) Phase 5 (Polish) — add a bullet describing the Claude review trigger.
 - [.github/pull_request_template.md](../../../.github/pull_request_template.md) — add a test-plan checkbox: `[ ] Claude review addressed or explicitly accepted as-is`.
 - [CLAUDE.md](../../../CLAUDE.md) Layer 3 — pointers for `.github/workflows/claude-review.yml` and the new ADR-024.
+
+2026-07-15 revision (comment-only trigger):
+
+- [docs/06-decisions/adr-024-claude-pr-review.md](../../06-decisions/adr-024-claude-pr-review.md) — Decision, Alternatives, and Consequences amended in place to record the reversal.
+- [docs/07-development/feature-workflow.md](../../07-development/feature-workflow.md) Phase 6 — reworded to describe `@claude` as a manual trigger, not automatic.
+- [.github/pull_request_template.md](../../../.github/pull_request_template.md) — checklist item reworded to match.
 
 ## 11. Open items to verify post-launch
 

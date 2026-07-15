@@ -1,16 +1,18 @@
 # Claude PR Review
 #
-# Posts a single review comment on a PR when:
-#   1. The PR is opened as non-draft or flipped from draft to ready, OR
-#   2. An OWNER comment containing "@claude" is posted on an open PR.
+# Posts a single review comment on a PR when an OWNER comment containing "@claude"
+# is posted on an open PR. There is no auto-trigger on PR open/ready-for-review —
+# removed 2026-07-15 for cost control; see ADR-024.
 #
 # Skip conditions (handled by the `gate` step):
+#   - Not a PR comment
+#   - No "@claude" mention
+#   - Comment author_association != OWNER
+#   - Bot-authored comment / self-loop from github-actions[bot]
+#   - Closed/merged PR
 #   - Draft PR
 #   - Fork PR
 #   - PR title starts with "[fast]" (case-insensitive)
-#   - Closed/merged PR for @claude trigger
-#   - Bot-authored comment / self-loop from github-actions[bot]
-#   - Comment author_association != OWNER
 #   - Oversized PR (>100 changed files OR >5000 line changes) — posts a polite skip comment
 #
 # Cost caps:
@@ -24,13 +26,11 @@
 name: Claude PR Review
 
 on:
-  pull_request:
-    types: [opened, reopened, ready_for_review]
   issue_comment:
     types: [created]
 
 concurrency:
-  group: claude-review-${{ github.event.pull_request.number || github.event.issue.number }}
+  group: claude-review-${{ github.event.issue.number }}
   cancel-in-progress: true
 
 permissions:
@@ -49,9 +49,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const evt = context.eventName;
             const payload = context.payload;
-            let pr;
 
             const skip = (reason, opts = {}) => {
               core.info(`Skip: ${reason}`);
@@ -64,33 +62,24 @@ jobs:
               }
             };
 
-            if (evt === 'pull_request') {
-              pr = payload.pull_request;
-              if (pr.draft) return skip('Draft PR');
-              if (pr.head.repo.fork) return skip('Fork PR');
-            } else if (evt === 'issue_comment') {
-              if (!payload.issue.pull_request) return skip('Not a PR comment');
-              if (!payload.comment.body.includes('@claude')) return skip('No @claude mention');
-              if (payload.comment.author_association !== 'OWNER') {
-                return skip(`Commenter is ${payload.comment.author_association}, not OWNER`);
-              }
-              if (payload.comment.user.type === 'Bot') return skip('Bot author');
-              if (payload.comment.user.login === 'github-actions[bot]') {
-                return skip('Self-loop from github-actions[bot]');
-              }
-              if (payload.issue.state !== 'open') return skip(`PR is ${payload.issue.state}, not open`);
-
-              const { data: prData } = await github.rest.pulls.get({
-                owner: context.repo.owner,
-                repo: context.repo.repo,
-                pull_number: payload.issue.number,
-              });
-              if (prData.draft) return skip('Draft PR');
-              if (prData.head.repo.fork) return skip('Fork PR');
-              pr = prData;
-            } else {
-              return skip(`Unsupported event: ${evt}`);
+            if (!payload.issue.pull_request) return skip('Not a PR comment');
+            if (!payload.comment.body.includes('@claude')) return skip('No @claude mention');
+            if (payload.comment.author_association !== 'OWNER') {
+              return skip(`Commenter is ${payload.comment.author_association}, not OWNER`);
             }
+            if (payload.comment.user.type === 'Bot') return skip('Bot author');
+            if (payload.comment.user.login === 'github-actions[bot]') {
+              return skip('Self-loop from github-actions[bot]');
+            }
+            if (payload.issue.state !== 'open') return skip(`PR is ${payload.issue.state}, not open`);
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: payload.issue.number,
+            });
+            if (pr.draft) return skip('Draft PR');
+            if (pr.head.repo.fork) return skip('Fork PR');
 
             if ((pr.title || '').toLowerCase().startsWith('[fast]')) {
               return skip('[fast] PR — review skipped');
@@ -115,7 +104,7 @@ jobs:
         uses: actions/github-script@v7
         with:
           script: |
-            const prNumber = context.payload.pull_request?.number || context.payload.issue?.number;
+            const prNumber = context.payload.issue.number;
             const changedFiles = '${{ steps.gate.outputs.changed-files }}';
             const totalLines = '${{ steps.gate.outputs.total-lines }}';
             await github.rest.issues.createComment({
@@ -136,7 +125,7 @@ jobs:
           # actions/checkout defaults to github.sha, which for issue_comment
           # events is main's HEAD, not the PR's code. Force the PR's head
           # commit explicitly so Claude has an actual diff to review.
-          ref: ${{ github.event.pull_request.head.sha || format('refs/pull/{0}/head', github.event.issue.number) }}
+          ref: refs/pull/${{ github.event.issue.number }}/head
 
       # SHA-pinned (GitHub Actions security best practice — see ADR-024).
       # Resolve a new SHA via: `git ls-remote https://github.com/anthropics/claude-code-action.git refs/tags/v1`
