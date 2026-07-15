@@ -1,5 +1,6 @@
 package com.collabspace.authworkspace.adapter.in.rest.auth;
 
+import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
 import com.collabspace.authworkspace.application.port.in.auth.LoginCommand;
 import com.collabspace.authworkspace.application.port.in.auth.LoginResult;
 import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
@@ -63,9 +64,7 @@ public class AuthController {
 	@PostMapping("/register")
 	public ResponseEntity<RegisterResponse> register(@RequestBody @Valid RegisterRequest request,
 			HttpServletRequest httpRequest) {
-		String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
-		String ipAddress = (forwardedFor != null && !forwardedFor.isBlank()) ? forwardedFor.split(",")[0].trim()
-				: httpRequest.getRemoteAddr();
+		String ipAddress = ClientIpResolver.resolve(httpRequest);
 
 		var command = new RegisterCommand(request.name(), request.email(), request.password(), Optional.of(ipAddress));
 
@@ -84,12 +83,11 @@ public class AuthController {
 	@PostMapping("/login")
 	public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
-		String forwardedFor = httpRequest.getHeader("X-Forwarded-For");
-		String ipAddress = (forwardedFor != null && !forwardedFor.isBlank()) ? forwardedFor.split(",")[0].trim()
-				: httpRequest.getRemoteAddr();
+		String ipAddress = ClientIpResolver.resolve(httpRequest);
+		String userAgent = httpRequest.getHeader("User-Agent");
 
-		LoginCommand command = new LoginCommand(request.email(), request.password(),
-				Optional.ofNullable(httpRequest.getHeader("User-Agent")), Optional.of(ipAddress));
+		LoginCommand command = new LoginCommand(request.email(), request.password(), Optional.ofNullable(userAgent),
+				Optional.of(ipAddress));
 
 		LoginResult result = loginUseCase.login(command);
 

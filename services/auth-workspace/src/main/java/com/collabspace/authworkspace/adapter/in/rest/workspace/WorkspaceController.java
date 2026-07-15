@@ -1,18 +1,28 @@
 package com.collabspace.authworkspace.adapter.in.rest.workspace;
 
+import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
+import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/workspaces")
@@ -34,13 +44,25 @@ public class WorkspaceController {
 	@ApiResponse(responseCode = "401", description = "Invalid credentials",
 			content = @Content(mediaType = "application/problem+json"))
 	@PostMapping()
-	public ResponseEntity<CreateWorkspaceResponse> createWorkspace(
-			@RequestBody @Valid CreateWorkspaceRequest createWorkspaceRequest) {
-		// Extract ip address
-		// Create CreateWorkspaceCommand
-		// Call CreateWorkspaceUseCase
-		// Return response
-		throw new UnsupportedOperationException("Not supported yet.");
+	public ResponseEntity<CreateWorkspaceResponse> createWorkspace(@RequestBody @Valid CreateWorkspaceRequest request,
+			HttpServletRequest httpRequest) {
+		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+		if (authentication == null) {
+			// SecurityConfig's anyRequest().authenticated() guarantees this never fires
+			// --
+			// if it does, the security config itself is broken, not this request.
+			throw new IllegalStateException(
+					"Authenticated request reached the controller with no Authentication in the SecurityContext");
+		}
+		String userId = authentication.getName();
+		String ipAddress = ClientIpResolver.resolve(httpRequest);
+
+		CreateWorkspaceCommand command = new CreateWorkspaceCommand(request.name(), request.description(),
+				UUID.fromString(userId), Optional.of(ipAddress));
+
+		CreateWorkspaceResult result = createWorkspaceUseCase.create(command);
+
+		return ResponseEntity.status(HttpStatus.CREATED).body(CreateWorkspaceResponse.from(result));
 	}
 
 }

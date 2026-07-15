@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.transaction.annotation.Transactional;
 import tools.jackson.core.type.TypeReference;
 import tools.jackson.databind.ObjectMapper;
@@ -22,8 +23,7 @@ import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @AutoConfigureMockMvc
@@ -39,6 +39,16 @@ class CreateWorkspaceIntegrationTest {
 	private static final String USER_ID_HEADER = "X-User-Id";
 
 	private static final String WORKSPACES_HEADER = "X-User-Workspaces";
+
+	private static final String ERRORS_FIELD_PATH = "$.errors[0].field";
+
+	private static final String FIELD_NAME = "name";
+
+	private static final String FIELD_DESCRIPTION = "description";
+
+	private static final String VALID_REQUEST_BODY = """
+			{ "name": "Engineering", "description": "Engineering workspace containing engineering documents" }
+			""";
 
 	private final ObjectMapper objectMapper = new ObjectMapper();
 
@@ -56,14 +66,7 @@ class CreateWorkspaceIntegrationTest {
 	void createWorkspaceValidRequestReturns201WithTokenAndWorkspaceAndRole() throws Exception {
 		String userId = registerUser();
 
-		MvcResult result = mvc.perform(post(WORKSPACE_URL).header("X-Internal-Token", internalToken)
-			.header(USER_ID_HEADER, userId)
-			.header(WORKSPACES_HEADER, "[]")
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("""
-					{ "name": "Engineering", "description": "Engineering workspace containing engineering documents" }
-					"""))
-			.andExpect(status().isCreated())
+		MvcResult result = performCreateWorkspace(userId, VALID_REQUEST_BODY).andExpect(status().isCreated())
 			.andExpect(jsonPath("$.accessToken").isNotEmpty())
 			.andExpect(jsonPath("$.workspace.id").isNotEmpty())
 			.andExpect(jsonPath("$.workspace.name").value("Engineering"))
@@ -88,6 +91,107 @@ class CreateWorkspaceIntegrationTest {
 			assertThat(membership).containsEntry("workspaceId", workspaceId);
 			assertThat(membership).containsEntry("role", "admin");
 		});
+	}
+
+	@Test
+	@DisplayName("trims leading and trailing whitespace from name")
+	void createWorkspaceTrimsWhitespaceFromName() throws Exception {
+		String userId = registerUser();
+
+		performCreateWorkspace(userId, """
+				{ "name": "  Engineering  ", "description": "Engineering workspace containing engineering documents" }
+				""").andExpect(status().isCreated()).andExpect(jsonPath("$.workspace.name").value("Engineering"));
+	}
+
+	@Test
+	@DisplayName("returns 400 with errors array when name is blank")
+	void createWorkspaceBlankNameReturns400WithErrorsArray() throws Exception {
+		String userId = registerUser();
+
+		performCreateWorkspace(userId, """
+				{ "name": "", "description": "Engineering workspace containing engineering documents" }
+				""").andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
+	}
+
+	@Test
+	@DisplayName("returns 400 with errors array when name is missing")
+	void createWorkspaceMissingNameReturns400WithErrorsArray() throws Exception {
+		String userId = registerUser();
+
+		performCreateWorkspace(userId, """
+				{ "description": "Engineering workspace containing engineering documents" }
+				""").andExpect(status().isBadRequest()).andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
+	}
+
+	@Test
+	@DisplayName("returns 400 with problem detail when name exceeds limit")
+	void createWorkspaceInvalidNameRequestReturns400WithProblemDetails() throws Exception {
+		String tooLongName = "A".repeat(256);
+		String body = String.format("""
+				{ "name": "%s", "description": "Engineering workspace containing engineering documents" }
+				""", tooLongName);
+		String userId = registerUser();
+
+		performCreateWorkspace(userId, body).andExpect(status().isBadRequest())
+			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
+	}
+
+	@Test
+	@DisplayName("returns 400 with problem detail when description exceeds limit")
+	void createWorkspaceInvalidDescriptionRequestReturns400WithProblemDetails() throws Exception {
+		String tooLongDescription = "A".repeat(2001);
+		String body = String.format("""
+				{ "name": "Engineering", "description": "%s" }
+				""", tooLongDescription);
+		String userId = registerUser();
+
+		performCreateWorkspace(userId, body).andExpect(status().isBadRequest())
+			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_DESCRIPTION));
+	}
+
+	@Test
+	@DisplayName("returns 401 when identity headers are missing")
+	void createWorkspaceMissingIdentityHeadersReturns401() throws Exception {
+		mvc.perform(post(WORKSPACE_URL).header("X-Internal-Token", internalToken)
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(VALID_REQUEST_BODY)).andExpect(status().isUnauthorized());
+	}
+
+	@Test
+	@DisplayName("returns 400 with problem detail when request body is missing")
+	void createWorkspaceMissingBodyReturns400WithProblemDetails() throws Exception {
+		String userId = registerUser();
+
+		mvc.perform(post(WORKSPACE_URL).header("X-Internal-Token", internalToken)
+			.header(USER_ID_HEADER, userId)
+			.header(WORKSPACES_HEADER, "[]")
+			.contentType(MediaType.APPLICATION_JSON))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON));
+	}
+
+	@Test
+	@DisplayName("creates two separate workspaces on double-submit with identical name and description")
+	void createWorkspaceDoubleSubmitCreatesTwoSeparateWorkspaces() throws Exception {
+		String userId = registerUser();
+
+		MvcResult first = performCreateWorkspace(userId, VALID_REQUEST_BODY).andExpect(status().isCreated())
+			.andReturn();
+		MvcResult second = performCreateWorkspace(userId, VALID_REQUEST_BODY).andExpect(status().isCreated())
+			.andReturn();
+
+		String firstId = JsonPath.read(first.getResponse().getContentAsString(), "$.workspace.id");
+		String secondId = JsonPath.read(second.getResponse().getContentAsString(), "$.workspace.id");
+
+		assertThat(firstId).isNotEqualTo(secondId);
+	}
+
+	private ResultActions performCreateWorkspace(String userId, String body) throws Exception {
+		return mvc.perform(post(WORKSPACE_URL).header("X-Internal-Token", internalToken)
+			.header(USER_ID_HEADER, userId)
+			.header(WORKSPACES_HEADER, "[]")
+			.contentType(MediaType.APPLICATION_JSON)
+			.content(body));
 	}
 
 	private String registerUser() throws Exception {
