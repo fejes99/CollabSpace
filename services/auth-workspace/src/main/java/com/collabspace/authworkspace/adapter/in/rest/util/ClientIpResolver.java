@@ -9,8 +9,13 @@ public final class ClientIpResolver {
 
 	public static String resolve(HttpServletRequest request) {
 		String forwardedFor = request.getHeader("X-Forwarded-For");
-		return (forwardedFor != null && !forwardedFor.isBlank()) ? forwardedFor.split(",")[0].trim()
-				: request.getRemoteAddr();
+		if (forwardedFor != null) {
+			String firstHop = forwardedFor.split(",")[0].trim();
+			if (!firstHop.isBlank()) {
+				return firstHop;
+			}
+		}
+		return request.getRemoteAddr();
 	}
 
 }

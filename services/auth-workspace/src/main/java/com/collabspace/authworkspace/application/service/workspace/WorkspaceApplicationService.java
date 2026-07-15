@@ -55,18 +55,26 @@ public class WorkspaceApplicationService implements CreateWorkspaceUseCase {
 		WorkspaceMembership workspaceMembership = new WorkspaceMembership(UUID.randomUUID(), workspace.id(),
 				command.userId(), WorkspaceRole.ADMIN, now, now);
 
+		// Captured via array since CommitThenAction's `writes` is a Runnable, not a
+		// Supplier -- and captured at all (rather than reusing the locals above) since
+		// JPA
+		// auditing sets createdAt/updatedAt from its own clock, not `now`.
+		Workspace[] persistedWorkspace = new Workspace[1];
+		WorkspaceMembership[] persistedMembership = new WorkspaceMembership[1];
+
 		AccessToken accessToken = commitThenAction.run(() -> {
-			workspaceRepository.save(workspace);
-			workspaceMembershipRepository.save(workspaceMembership);
+			persistedWorkspace[0] = workspaceRepository.save(workspace);
+			persistedMembership[0] = workspaceMembershipRepository.save(workspaceMembership);
 		}, () -> {
 			List<WorkspaceMembership> userWorkspaces = workspaceMembershipRepository.findByUserId(command.userId());
 			return jwtService.issueAccessToken(command.userId().toString(), userWorkspaces);
 		});
 
 		log.info("event=workspace_created userId={} workspaceId={} name={} ip={} jti={}", command.userId(),
-				workspace.id(), workspace.name(), command.ipAddress().orElse(null), accessToken.jti());
+				persistedWorkspace[0].id(), persistedWorkspace[0].name(), command.ipAddress().orElse(null),
+				accessToken.jti());
 
-		return new CreateWorkspaceResult(workspace, workspaceMembership.role(), accessToken.token());
+		return new CreateWorkspaceResult(persistedWorkspace[0], persistedMembership[0].role(), accessToken.token());
 	}
 
 }
