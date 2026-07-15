@@ -538,18 +538,38 @@ resource "aws_apigatewayv2_integration" "auth_workspace_protected" {
   request_parameters = {
     "overwrite:header.x-internal-token"  = "$stageVariables.internalToken"
     "overwrite:header.x-correlation-id"  = "$context.requestId"
-    "overwrite:header.x-user-id"         = "$context.authorizer.jwt.claims.userId"
-    "overwrite:header.x-user-workspaces" = "$context.authorizer.jwt.claims.memberships"
-    "overwrite:header.x-jwt-jti"         = "$context.authorizer.jwt.claims.jti"
+    "overwrite:header.x-user-id"         = "$context.authorizer.claims.userId"
+    "overwrite:header.x-user-workspaces" = "$context.authorizer.claims.memberships"
+    "overwrite:header.x-jwt-jti"         = "$context.authorizer.claims.jti"
   }
 }
 
 # Protected routes — JWT required. Any request without a valid token is
 # rejected by the JWT Authorizer with 401 before reaching the service.
+#
+# Each resource gets a route pair, not just {proxy+} alone: HTTP API's greedy
+# path variable requires at least one segment after the prefix, so it cannot
+# match a bare collection path like `POST /v1/workspaces`. See ADR-035.
+
+resource "aws_apigatewayv2_route" "auth_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/auth"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace_protected.id}"
+}
 
 resource "aws_apigatewayv2_route" "auth_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /v1/auth/{proxy+}"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.auth_workspace_protected.id}"
+}
+
+resource "aws_apigatewayv2_route" "workspaces_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/workspaces"
   authorization_type = "JWT"
   authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
   target             = "integrations/${aws_apigatewayv2_integration.auth_workspace_protected.id}"
@@ -612,6 +632,14 @@ resource "aws_apigatewayv2_integration" "realtime_service" {
   }
 }
 
+resource "aws_apigatewayv2_route" "realtime_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/realtime"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.realtime_service.id}"
+}
+
 resource "aws_apigatewayv2_route" "realtime_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /v1/realtime/{proxy+}"
@@ -665,6 +693,14 @@ resource "aws_apigatewayv2_integration" "ai_assistant" {
     "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
     "overwrite:header.x-correlation-id" = "$context.requestId"
   }
+}
+
+resource "aws_apigatewayv2_route" "assistant_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/assistant"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.ai_assistant.id}"
 }
 
 resource "aws_apigatewayv2_route" "assistant_proxy" {
@@ -722,6 +758,14 @@ resource "aws_apigatewayv2_route" "notifications_health" {
   target    = "integrations/${aws_apigatewayv2_integration.notification.id}"
 }
 
+resource "aws_apigatewayv2_route" "notifications_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/notifications"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.notification.id}"
+}
+
 resource "aws_apigatewayv2_route" "notifications_proxy" {
   api_id             = module.api_gateway.api_id
   route_key          = "ANY /v1/notifications/{proxy+}"
@@ -775,6 +819,14 @@ resource "aws_apigatewayv2_integration" "document_service" {
     "overwrite:header.x-internal-token" = "$stageVariables.internalToken"
     "overwrite:header.x-correlation-id" = "$context.requestId"
   }
+}
+
+resource "aws_apigatewayv2_route" "documents_root" {
+  api_id             = module.api_gateway.api_id
+  route_key          = "ANY /v1/documents"
+  authorization_type = "JWT"
+  authorizer_id      = aws_apigatewayv2_authorizer.jwt.id
+  target             = "integrations/${aws_apigatewayv2_integration.document_service.id}"
 }
 
 resource "aws_apigatewayv2_route" "documents_proxy" {
