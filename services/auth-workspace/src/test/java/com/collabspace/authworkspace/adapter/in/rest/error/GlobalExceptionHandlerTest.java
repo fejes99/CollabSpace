@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
 import com.collabspace.authworkspace.application.service.InternalTokenProperties;
@@ -148,6 +149,9 @@ class GlobalExceptionHandlerTest {
 
 	@MockitoBean
 	RegisterUseCase registerUseCase;
+
+	@MockitoBean
+	CreateWorkspaceUseCase createWorkspaceUseCase;
 
 	@BeforeEach
 	void attachLogger() {

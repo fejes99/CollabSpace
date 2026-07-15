@@ -2,7 +2,7 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030). `JwtBlocklistFilter` checks the `jti` blocklist in Redis on every authenticated request (fail-open on Redis errors); the write side (setting a `jti` on logout) lands in a later PR.
+**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030). `JwtBlocklistFilter` checks the `jti` blocklist in Redis on every authenticated request (fail-open on Redis errors); the write side (setting a `jti` on logout) lands in a later PR. Workspace creation is live — any authenticated user can create a workspace and becomes its first admin; the response reissues a fresh access token whose `memberships` claim reflects it immediately, per ADR-032.
 
 Every request is additionally gated by three Spring Security filters — internal-token validation, identity-header population, and the JWT blocklist check. See "Trust model" below and [docs/03-services/auth-workspace/plans/security-filter.md](../../docs/03-services/auth-workspace/plans/security-filter.md).
 
@@ -14,6 +14,7 @@ Every request is additionally gated by three Spring Security filters — interna
 - `GET /.well-known/jwks.json` and `GET /.well-known/openid-configuration` — RS256 public key set and OIDC discovery document. **Must remain public** — called by API Gateway's own infrastructure (JWKS fetch, OIDC discovery), never routed through the VPC Link, never carries `X-Internal-Token`. Exempt from the token check unconditionally by path. See ADR-026.
 - `POST /v1/auth/register` — public route. No JWT required. Returns `201` with access token and user summary on success; `400` for validation errors; `409` if the email is already registered.
 - `POST /v1/auth/login` — public route. No JWT required. Returns `200` with access token and user on success; sets an HttpOnly `refresh_token` cookie (`Path=/auth`, `Max-Age=604800`, `Secure`, `SameSite=Strict`). Returns `400` for validation errors; `401` for invalid credentials.
+- `POST /v1/workspaces` — protected route. Any authenticated user may call it — creation is not role-gated (`authorization.md`). Returns `201` with the created workspace, the caller's role (`admin`), and a fresh access token embedding the new membership; `400` for validation errors; `401` if unauthenticated.
 - `GET /v3/api-docs` — OpenAPI 3.x JSON spec (internal tooling only, not routed through API Gateway).
 - `GET /swagger-ui.html` — interactive Swagger UI for local development.
 
@@ -32,6 +33,8 @@ Requests arriving from API Gateway carry four injected headers:
 | `X-Correlation-ID` | API Gateway `$context.requestId` | Overwritten by `CorrelationIdFilter` into MDC — runs before the security filter chain so `correlationId` is available in their rejection logs |
 
 `X-User-Id`/`X-User-Workspaces` are expected to be absent on `/v1/auth/register` and `/v1/auth/login` (and the exempt routes above) — present there, they fail closed instead of being treated as harmless extra data, since it would mean the API Gateway header-stripping guarantee has regressed. The service must **not** re-validate the JWT signature. See [api-gateway-trust.md](../../docs/02-architecture/api-gateway-trust.md) and [the security-filter plan](../../docs/03-services/auth-workspace/plans/security-filter.md).
+
+`SecurityConfig`'s `authorizeHttpRequests` now requires authentication (`anyRequest().authenticated()`) for every route not explicitly listed as `permitAll()` — that list must stay in sync with `HeaderAuthenticationFilter.ANONYMOUS_PATHS`, or a route that filter treats as anonymous will be rejected by Spring Security's own authorization stage before it even reaches the filter's logic. `@EnableMethodSecurity` is also on, ahead of the first endpoint that will actually need `@PreAuthorize` (a role-gated one, e.g. member removal) — workspace creation itself needs no method-level annotation, since it isn't role-gated.
 
 The JWT issuer (`iss`) and audience (`aud`) the service sets in issued tokens are read from SSM at startup:
 - `/collabspace/dev/jwt/issuer` → `https://auth.dev.collabspace.io`
@@ -129,6 +132,7 @@ Flyway runs migrations automatically on startup. Migration files live in `src/ma
 | V1 | `V1__create_users.sql` | Creates `users` table: `id UUID PK`, `name VARCHAR(255)`, `email VARCHAR(320)`, `password_hash TEXT` (nullable), `created_at`/`updated_at TIMESTAMPTZ` |
 | V2 | `V2__name_email_constraint.sql` | Renames the email unique constraint from the Postgres auto-generated `users_email_key` to the explicit `users_email_unique` |
 | V3 | `V3__create_refresh_tokens.sql` | Creates `refresh_tokens` table: `id UUID PK`, `user_id UUID FK → users.id ON DELETE CASCADE`, `token_hash TEXT UNIQUE`, `created_at TIMESTAMPTZ`, `expires_at TIMESTAMPTZ`, `user_agent TEXT` (nullable), `ip_address TEXT` (nullable). Includes index on `user_id`. |
+| V4 | `V4__create_workspaces_and_memberships.sql` | Creates `workspaces` table: `id UUID PK`, `name VARCHAR(255)`, `description TEXT` (nullable), `created_by_user_id UUID FK → users.id`, `created_at`/`updated_at TIMESTAMPTZ`. Creates `workspace_memberships` table: `id UUID PK`, `workspace_id UUID FK → workspaces.id ON DELETE CASCADE`, `user_id UUID FK → users.id ON DELETE CASCADE`, `role VARCHAR(20)` (named `CHECK` constraint, `admin`\|`member`), `created_at`/`updated_at TIMESTAMPTZ`, named `UNIQUE(workspace_id, user_id)`. Includes index on `user_id`. |
 
 ## Deployment
 

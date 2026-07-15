@@ -52,7 +52,7 @@ Out of scope: frontend, full inter-service event flows, production hardening, mo
 
 Blocked on: nothing
 
-Next milestone: Implement workspace endpoints (CRUD + membership), protected with @PreAuthorize against the `WorkspaceAuthority` grants `HeaderAuthenticationFilter` now populates.
+Next milestone: Implement workspace endpoints (CRUD + membership), protected with @PreAuthorize against the `WorkspaceAuthority` grants `HeaderAuthenticationFilter` now populates. `POST /v1/workspaces` (create) is fully implemented and tested (PR #45, draft — happy path + all plan edge cases green locally, manually smoke-tested, not yet merged or verified on AWS). Remaining before this milestone is done: merge PR #45, verify on AWS, then the rest of workspace CRUD (list/get/update/delete) and membership endpoints (invite/remove/change-role).
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

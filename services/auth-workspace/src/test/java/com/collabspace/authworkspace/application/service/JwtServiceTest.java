@@ -1,7 +1,8 @@
 package com.collabspace.authworkspace.application.service;
 
 import com.collabspace.authworkspace.application.util.CryptoUtils;
-import com.collabspace.authworkspace.domain.model.auth.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.workspace.WorkspaceRole;
 import com.nimbusds.jose.crypto.RSASSAVerifier;
 import com.nimbusds.jose.jwk.RSAKey;
 import com.nimbusds.jwt.SignedJWT;
@@ -17,9 +18,11 @@ import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
 import java.time.Clock;
+import java.time.Instant;
 import java.util.Base64;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -55,7 +58,10 @@ class JwtServiceTest {
 	@Test
 	@DisplayName("access token contains correct claims and 15-minute TTL")
 	void issueAccessTokenClaimsAreCorrect() throws Exception {
-		List<WorkspaceMembership> memberships = List.of(new WorkspaceMembership("ws-1", "admin"));
+		UUID workspaceId = UUID.randomUUID();
+		Instant now = Instant.now();
+		List<WorkspaceMembership> memberships = List.of(new WorkspaceMembership(UUID.randomUUID(), workspaceId,
+				UUID.randomUUID(), WorkspaceRole.ADMIN, now, now));
 
 		AccessToken accessToken = jwtService.issueAccessToken(TEST_USER_ID, memberships);
 
@@ -75,7 +81,8 @@ class JwtServiceTest {
 		List<Map<String, Object>> membershipsInToken = objectMapper.readValue(membershipsClaim, new TypeReference<>() {
 		});
 		assertThat(membershipsInToken).hasSize(1);
-		assertThat(membershipsInToken.get(0)).containsEntry("workspaceId", "ws-1").containsEntry("role", "admin");
+		assertThat(membershipsInToken.get(0)).containsEntry("workspaceId", workspaceId.toString())
+			.containsEntry("role", "admin");
 	}
 
 	@Test
