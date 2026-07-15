@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, login endpoint, and the internal token filter + header-based auth (Spring Security) are merged and verified on AWS. Next: workspace endpoints, now that every request is gated by a trustworthy `SecurityContext` and can be protected with @PreAuthorize.
+Current goal: Database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, login endpoint, and the internal token filter + header-based auth (Spring Security) are merged and verified on AWS. Workspace creation (`POST /v1/workspaces`, PR #45) is merged and verified end-to-end on AWS (2026-07-15) — this also required two infra fixes uncovered during verification: ADR-035 (API Gateway `{proxy+}` routes can't match bare collection paths — every resource now has a paired exact-path route) and ADR-036 (the JWT-claim-to-header mapping used the wrong `$context.authorizer.jwt.claims.*` syntax — corrected to `$context.authorizer.claims.*` — meaning `X-User-Id`/`X-User-Workspaces`/`X-JWT-Jti` had never actually worked since PR #41/#42). Next: the rest of workspace CRUD and membership endpoints, now that the identity-header pipeline is confirmed working live, not just locally.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: Implement workspace endpoints (CRUD + membership), protected with @PreAuthorize against the `WorkspaceAuthority` grants `HeaderAuthenticationFilter` now populates. `POST /v1/workspaces` (create) is fully implemented and tested (PR #45, draft — happy path + all plan edge cases green locally, manually smoke-tested, not yet merged or verified on AWS). Remaining before this milestone is done: merge PR #45, verify on AWS, then the rest of workspace CRUD (list/get/update/delete) and membership endpoints (invite/remove/change-role).
+Next milestone: PR 9 — `POST /v1/workspaces/{id}/members` (invite member by email, admin-only, publishes a domain event for future Notification integration; plan doc at `docs/03-services/auth-workspace/plans/invite-member.md`). After that: the rest of workspace CRUD (list/get/update/delete — `GET /v1/workspaces` list is PR 10) and remaining membership endpoints (remove/change-role, currently unscheduled — see `notes/auth-workspace-prs.md`).
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
