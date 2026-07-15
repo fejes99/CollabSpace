@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.auth;
 
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
+import com.collabspace.authworkspace.support.TestUsers;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,8 +24,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 class LoginIntegrationTest {
 
 	private static final String LOGIN_URL = "/v1/auth/login";
-
-	private static final String REGISTER_URL = "/v1/auth/register";
 
 	private static final String REFRESH_TOKEN_COOKIE = "refresh_token";
 
@@ -169,11 +168,7 @@ class LoginIntegrationTest {
 	}
 
 	private void registerAlice() throws Exception {
-		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
-			.contentType(MediaType.APPLICATION_JSON)
-			.content("""
-					{ "name": "Alice", "email": "alice@example.com", "password": "password123" }
-					"""));
+		TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 	}
 
 }

@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.in.rest.workspace;
 
 import com.collabspace.authworkspace.support.TestContainersConfiguration;
+import com.collabspace.authworkspace.support.TestUsers;
 import com.jayway.jsonpath.JsonPath;
 import com.nimbusds.jwt.SignedJWT;
 import org.junit.jupiter.api.DisplayName;
@@ -34,8 +35,6 @@ class CreateWorkspaceIntegrationTest {
 
 	private static final String WORKSPACE_URL = "/v1/workspaces";
 
-	private static final String REGISTER_URL = "/v1/auth/register";
-
 	private static final String USER_ID_HEADER = "X-User-Id";
 
 	private static final String WORKSPACES_HEADER = "X-User-Workspaces";
@@ -64,7 +63,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("returns 201 with access token, workspace and role for a valid request")
 	void createWorkspaceValidRequestReturns201WithTokenAndWorkspaceAndRole() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		MvcResult result = performCreateWorkspace(userId, VALID_REQUEST_BODY).andExpect(status().isCreated())
 			.andExpect(jsonPath("$.accessToken").isNotEmpty())
@@ -96,7 +95,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("trims leading and trailing whitespace from name")
 	void createWorkspaceTrimsWhitespaceFromName() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		performCreateWorkspace(userId, """
 				{ "name": "  Engineering  ", "description": "Engineering workspace containing engineering documents" }
@@ -106,7 +105,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("returns 400 with errors array when name is blank")
 	void createWorkspaceBlankNameReturns400WithErrorsArray() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		performCreateWorkspace(userId, """
 				{ "name": "", "description": "Engineering workspace containing engineering documents" }
@@ -116,7 +115,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("returns 400 with errors array when name is missing")
 	void createWorkspaceMissingNameReturns400WithErrorsArray() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		performCreateWorkspace(userId, """
 				{ "description": "Engineering workspace containing engineering documents" }
@@ -130,7 +129,7 @@ class CreateWorkspaceIntegrationTest {
 		String body = String.format("""
 				{ "name": "%s", "description": "Engineering workspace containing engineering documents" }
 				""", tooLongName);
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		performCreateWorkspace(userId, body).andExpect(status().isBadRequest())
 			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_NAME));
@@ -143,7 +142,7 @@ class CreateWorkspaceIntegrationTest {
 		String body = String.format("""
 				{ "name": "Engineering", "description": "%s" }
 				""", tooLongDescription);
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		performCreateWorkspace(userId, body).andExpect(status().isBadRequest())
 			.andExpect(jsonPath(ERRORS_FIELD_PATH).value(FIELD_DESCRIPTION));
@@ -160,7 +159,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("returns 400 with problem detail when request body is missing")
 	void createWorkspaceMissingBodyReturns400WithProblemDetails() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		mvc.perform(post(WORKSPACE_URL).header("X-Internal-Token", internalToken)
 			.header(USER_ID_HEADER, userId)
@@ -173,7 +172,7 @@ class CreateWorkspaceIntegrationTest {
 	@Test
 	@DisplayName("creates two separate workspaces on double-submit with identical name and description")
 	void createWorkspaceDoubleSubmitCreatesTwoSeparateWorkspaces() throws Exception {
-		String userId = registerUser();
+		String userId = TestUsers.registerAndGetUserId(mvc, internalToken, "Alice", "alice@example.com");
 
 		MvcResult first = performCreateWorkspace(userId, VALID_REQUEST_BODY).andExpect(status().isCreated())
 			.andReturn();
@@ -192,18 +191,6 @@ class CreateWorkspaceIntegrationTest {
 			.header(WORKSPACES_HEADER, "[]")
 			.contentType(MediaType.APPLICATION_JSON)
 			.content(body));
-	}
-
-	private String registerUser() throws Exception {
-		MvcResult result = mvc
-			.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
-				.contentType(MediaType.APPLICATION_JSON)
-				.content("""
-						{ "name": "Alice", "email": "alice@example.com", "password": "password123" }
-						"""))
-			.andReturn();
-
-		return JsonPath.read(result.getResponse().getContentAsString(), "$.user.id");
 	}
 
 }
