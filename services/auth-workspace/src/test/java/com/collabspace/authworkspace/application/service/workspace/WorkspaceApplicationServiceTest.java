@@ -3,6 +3,7 @@ package com.collabspace.authworkspace.application.service.workspace;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRepository;
+import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
@@ -63,7 +64,7 @@ class WorkspaceApplicationServiceTest {
 	void setup() {
 		when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
 		service = new WorkspaceApplicationService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC), workspaceRepository,
-				workspaceMembershipRepository, jwtService, transactionManager);
+				workspaceMembershipRepository, jwtService, new CommitThenAction(transactionManager));
 	}
 
 	@Test

@@ -6,6 +6,7 @@ import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspa
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRepository;
 import com.collabspace.authworkspace.application.service.AccessToken;
+import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
@@ -13,8 +14,6 @@ import com.collabspace.authworkspace.domain.model.workspace.WorkspaceRole;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.PlatformTransactionManager;
-import org.springframework.transaction.support.TransactionTemplate;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -34,16 +33,16 @@ public class WorkspaceApplicationService implements CreateWorkspaceUseCase {
 
 	private final Clock clock;
 
-	private final TransactionTemplate transactionTemplate;
+	private final CommitThenAction commitThenAction;
 
 	public WorkspaceApplicationService(Clock clock, WorkspaceRepository workspaceRepository,
 			WorkspaceMembershipRepository workspaceMembershipRepository, JwtService jwtService,
-			PlatformTransactionManager transactionManager) {
+			CommitThenAction commitThenAction) {
 		this.clock = clock;
 		this.workspaceRepository = workspaceRepository;
 		this.workspaceMembershipRepository = workspaceMembershipRepository;
 		this.jwtService = jwtService;
-		this.transactionTemplate = new TransactionTemplate(transactionManager);
+		this.commitThenAction = commitThenAction;
 	}
 
 	@Override
@@ -56,17 +55,14 @@ public class WorkspaceApplicationService implements CreateWorkspaceUseCase {
 		WorkspaceMembership workspaceMembership = new WorkspaceMembership(UUID.randomUUID(), workspace.id(),
 				command.userId(), WorkspaceRole.ADMIN, now, now);
 
-		// Own, self-contained transaction: commits when executeWithoutResult returns,
-		// before the token below is minted -- see plan §3, "commit before mint".
-		// @Transactional on this method wouldn't achieve that, since it only commits
-		// after the whole method (including minting) returns.
-		transactionTemplate.executeWithoutResult(status -> {
+		AccessToken accessToken = commitThenAction.run(() -> {
 			workspaceRepository.save(workspace);
 			workspaceMembershipRepository.save(workspaceMembership);
+		}, () -> {
+			List<WorkspaceMembership> userWorkspaces = workspaceMembershipRepository.findByUserId(command.userId());
+			return jwtService.issueAccessToken(command.userId().toString(), userWorkspaces);
 		});
 
-		List<WorkspaceMembership> userWorkspaces = workspaceMembershipRepository.findByUserId(command.userId());
-		AccessToken accessToken = jwtService.issueAccessToken(command.userId().toString(), userWorkspaces);
 		log.info("event=workspace_created userId={} workspaceId={} name={} ip={} jti={}", command.userId(),
 				workspace.id(), workspace.name(), command.ipAddress().orElse(null), accessToken.jti());
 
