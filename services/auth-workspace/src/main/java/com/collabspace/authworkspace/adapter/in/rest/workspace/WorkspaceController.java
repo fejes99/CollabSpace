@@ -4,6 +4,7 @@ import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
+import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -35,6 +36,8 @@ public class WorkspaceController {
 		this.createWorkspaceUseCase = createWorkspaceUseCase;
 	}
 
+	@Operation(summary = "Create a new workspace",
+			description = "Creates a workspace and its first membership (the caller, as admin). Returns a fresh access token whose memberships claim reflects the new workspace, per ADR-032.")
 	@ApiResponse(responseCode = "201", description = "Workspace creation successful",
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = CreateWorkspaceResponse.class)))
