@@ -94,6 +94,10 @@
       <groupId>software.amazon.awssdk</groupId>
       <artifactId>ssm</artifactId>
     </dependency>
+    <dependency>
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sns</artifactId>
+    </dependency>
 
     <!-- Runtime -->
     <dependency>
@@ -126,6 +130,29 @@
     <dependency>
       <groupId>org.testcontainers</groupId>
       <artifactId>testcontainers-postgresql</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-localstack</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- @Testcontainers/@Container: the other integration tests all go through
+           Spring Boot's own container lifecycle (@Bean + @ServiceConnection), which
+           doesn't need this. SnsWorkspaceEventPublisherIntegrationTest is a plain
+           JUnit 5 test with no Spring context, so it needs the raw JUnit 5 extension
+           module directly. -->
+      <groupId>org.testcontainers</groupId>
+      <artifactId>testcontainers-junit-jupiter</artifactId>
+      <scope>test</scope>
+    </dependency>
+    <dependency>
+      <!-- Test-only: SnsWorkspaceEventPublisherIntegrationTest sets up a subscribed SQS
+           queue against LocalStack to observe a real SNS publish. Main code only ever
+           publishes to SNS; it has no SQS dependency of its own. -->
+      <groupId>software.amazon.awssdk</groupId>
+      <artifactId>sqs</artifactId>
       <scope>test</scope>
     </dependency>
     <dependency>

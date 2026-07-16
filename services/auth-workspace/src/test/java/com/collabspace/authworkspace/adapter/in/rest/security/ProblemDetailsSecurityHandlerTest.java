@@ -1,7 +1,10 @@
 package com.collabspace.authworkspace.adapter.in.rest.security;
 
+import com.collabspace.authworkspace.adapter.in.rest.security.exception.ClaimsStaleException;
+import com.collabspace.authworkspace.adapter.in.rest.security.exception.InsufficientRoleException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.InvalidInternalTokenException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.MalformedIdentityHeadersException;
+import com.collabspace.authworkspace.adapter.in.rest.security.exception.NotAMemberException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.TokenRevokedException;
 import jakarta.servlet.http.HttpServletRequest;
 import org.junit.jupiter.api.DisplayName;
@@ -71,6 +74,20 @@ class ProblemDetailsSecurityHandlerTest {
 	}
 
 	@Test
+	@DisplayName("writes a 401 RFC 9457 body for stale membership claims")
+	void commenceWritesProblemDetailForClaimsStale() throws Exception {
+		when(request.getRequestURI()).thenReturn("/v1/workspaces");
+
+		handler.commence(request, response, new ClaimsStaleException("Token issued before the last membership change"));
+
+		assertThat(response.getStatus()).isEqualTo(401);
+		String body = response.getContentAsString();
+		assertThat(body).contains("\"type\":\"https://errors.collabspace.io/auth/claims-stale\"");
+		assertThat(body).contains("\"title\":\"Claims stale\"");
+		assertThat(body).contains("\"detail\":\"Token issued before the last membership change\"");
+	}
+
+	@Test
 	@DisplayName("commence writes a 401 RFC 9457 body with a catalog type for a plain AuthenticationException")
 	void commenceWritesProblemDetailForGenericAuthenticationException() throws Exception {
 		when(request.getRequestURI()).thenReturn("/v1/workspaces");
@@ -98,6 +115,42 @@ class ProblemDetailsSecurityHandlerTest {
 		assertThat(body).contains("\"title\":\"Forbidden\"");
 		assertThat(body).contains("\"detail\":\"denied\"");
 		assertThat(body).contains("\"instance\":\"/v1/workspaces\"");
+	}
+
+	// The two tests below exist specifically to guard against the missing-else bug
+	// found this session: handle() originally set the polymorphic type/title from the
+	// `if` branch, then unconditionally overwrote them with the generic
+	// auth/access-denied fallback right after, since there was no `else`. The test
+	// above (a plain AccessDeniedException) can't catch that regression -- it would
+	// pass either way. Only asserting a SecurityAccessDeniedException subtype's
+	// specific type/title actually exercises the polymorphic branch.
+
+	@Test
+	@DisplayName("handle writes the specific not-a-member type, not the generic access-denied fallback")
+	void handleWritesSpecificTypeForNotAMemberException() throws Exception {
+		when(request.getRequestURI()).thenReturn("/v1/workspaces/123/members");
+
+		handler.handle(request, response, new NotAMemberException("Not a member of workspace 123"));
+
+		assertThat(response.getStatus()).isEqualTo(403);
+		String body = response.getContentAsString();
+		assertThat(body).contains("\"type\":\"https://errors.collabspace.io/authorization/not-a-member\"");
+		assertThat(body).contains("\"title\":\"Not a member\"");
+		assertThat(body).doesNotContain("auth/access-denied");
+	}
+
+	@Test
+	@DisplayName("handle writes the specific insufficient-role type, not the generic access-denied fallback")
+	void handleWritesSpecificTypeForInsufficientRoleException() throws Exception {
+		when(request.getRequestURI()).thenReturn("/v1/workspaces/123/members");
+
+		handler.handle(request, response, new InsufficientRoleException("Requires role admin in workspace 123"));
+
+		assertThat(response.getStatus()).isEqualTo(403);
+		String body = response.getContentAsString();
+		assertThat(body).contains("\"type\":\"https://errors.collabspace.io/authorization/insufficient-role\"");
+		assertThat(body).contains("\"title\":\"Insufficient role\"");
+		assertThat(body).doesNotContain("auth/access-denied");
 	}
 
 }

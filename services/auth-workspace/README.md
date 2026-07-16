@@ -2,7 +2,7 @@
 
 Authentication and workspace management service. Handles user registration, login, JWT issuance, and workspace RBAC. Built with Java 25 + Spring Boot 4.
 
-**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030). `JwtBlocklistFilter` checks the `jti` blocklist in Redis on every authenticated request (fail-open on Redis errors); the write side (setting a `jti` on logout) lands in a later PR. Workspace creation is live — any authenticated user can create a workspace and becomes its first admin; the response reissues a fresh access token whose `memberships` claim reflects it immediately, per ADR-032.
+**Current state:** Registration and login endpoints live. Refresh tokens stored in Postgres. JWT issued on register (access token) and login (access token + HttpOnly refresh cookie). Redis client wired and reporting health (ADR-030). `JwtBlocklistFilter` checks the `jti` blocklist in Redis on every authenticated request (fail-open on Redis errors); the write side (setting a `jti` on logout) lands in a later PR. Workspace creation is live — any authenticated user can create a workspace and becomes its first admin; the response reissues a fresh access token whose `memberships` claim reflects it immediately, per ADR-032. Inviting a member by email (`POST /v1/workspaces/{workspaceId}/members`, admin-only) is implemented and tested; publishes a `member.invited` event to SNS (ADR-037) and writes a `membership-changed-at` Redis marker so the invited user's and any other member's stale tokens are rejected until they refresh (ADR-032) — see `MembershipStalenessFilter` below.
 
 Every request is additionally gated by three Spring Security filters — internal-token validation, identity-header population, and the JWT blocklist check. See "Trust model" below and [docs/03-services/auth-workspace/plans/security-filter.md](../../docs/03-services/auth-workspace/plans/security-filter.md).
 
@@ -15,6 +15,7 @@ Every request is additionally gated by three Spring Security filters — interna
 - `POST /v1/auth/register` — public route. No JWT required. Returns `201` with access token and user summary on success; `400` for validation errors; `409` if the email is already registered.
 - `POST /v1/auth/login` — public route. No JWT required. Returns `200` with access token and user on success; sets an HttpOnly `refresh_token` cookie (`Path=/auth`, `Max-Age=604800`, `Secure`, `SameSite=Strict`). Returns `400` for validation errors; `401` for invalid credentials.
 - `POST /v1/workspaces` — protected route. Any authenticated user may call it — creation is not role-gated (`authorization.md`). Returns `201` with the created workspace, the caller's role (`admin`), and a fresh access token embedding the new membership; `400` for validation errors; `401` if unauthenticated.
+- `POST /v1/workspaces/{workspaceId}/members` — protected route, admin-only (`@PreAuthorize("hasWorkspaceRole(#workspaceId, 'admin')")`). Invites a registered user into the workspace by email. Returns `201` with the new membership; `400` for validation errors; `401` if unauthenticated; `403` if the caller isn't an admin member of the workspace (`authorization/not-a-member` or `authorization/insufficient-role`); `404` if no registered user matches the email; `409` if already a member. Publishes `member.invited` to the `workspace-events` SNS topic (ADR-037) and writes the invited user's `membership-changed-at` Redis marker (ADR-032) — both fail open (logged, response still succeeds) since neither has a consumer relying on synchronous delivery yet.
 - `GET /v3/api-docs` — OpenAPI 3.x JSON spec (internal tooling only, not routed through API Gateway).
 - `GET /swagger-ui.html` — interactive Swagger UI for local development.
 
@@ -30,11 +31,12 @@ Requests arriving from API Gateway carry four injected headers:
 | `X-User-Id` | JWT `userId` claim | Populated into `SecurityContextHolder` by `HeaderAuthenticationFilter` as a `PreAuthenticatedAuthenticationToken` principal |
 | `X-User-Workspaces` | JWT `memberships` claim | Parsed by `HeaderAuthenticationFilter` into `WorkspaceAuthority` grants (4KB / 100-entry limits enforced before parsing) |
 | `X-JWT-Jti` | JWT `jti` claim | Checked against the Redis blocklist by `JwtBlocklistFilter` — rejects 401 if revoked; fails open (passes through, logs WARN) if Redis is unreachable |
+| `X-JWT-Iat` | JWT `iat` claim | Compared by `MembershipStalenessFilter` against the per-user `membership-changed-at` Redis marker — rejects 401 (`auth/claims-stale`) if the token was issued before an other-directed membership change; fails open if Redis is unreachable. See ADR-032 |
 | `X-Correlation-ID` | API Gateway `$context.requestId` | Overwritten by `CorrelationIdFilter` into MDC — runs before the security filter chain so `correlationId` is available in their rejection logs |
 
 `X-User-Id`/`X-User-Workspaces` are expected to be absent on `/v1/auth/register` and `/v1/auth/login` (and the exempt routes above) — present there, they fail closed instead of being treated as harmless extra data, since it would mean the API Gateway header-stripping guarantee has regressed. The service must **not** re-validate the JWT signature. See [api-gateway-trust.md](../../docs/02-architecture/api-gateway-trust.md) and [the security-filter plan](../../docs/03-services/auth-workspace/plans/security-filter.md).
 
-`SecurityConfig`'s `authorizeHttpRequests` now requires authentication (`anyRequest().authenticated()`) for every route not explicitly listed as `permitAll()` — that list must stay in sync with `HeaderAuthenticationFilter.ANONYMOUS_PATHS`, or a route that filter treats as anonymous will be rejected by Spring Security's own authorization stage before it even reaches the filter's logic. `@EnableMethodSecurity` is also on, ahead of the first endpoint that will actually need `@PreAuthorize` (a role-gated one, e.g. member removal) — workspace creation itself needs no method-level annotation, since it isn't role-gated.
+`SecurityConfig`'s `authorizeHttpRequests` now requires authentication (`anyRequest().authenticated()`) for every route not explicitly listed as `permitAll()` — that list must stay in sync with `HeaderAuthenticationFilter.ANONYMOUS_PATHS`, or a route that filter treats as anonymous will be rejected by Spring Security's own authorization stage before it even reaches the filter's logic. `@EnableMethodSecurity` gates the invite-member endpoint via `@PreAuthorize("hasWorkspaceRole(#workspaceId, 'admin')")`, a custom SpEL expression resolved by `WorkspaceSecurityExpressionRoot`/`WorkspaceMethodSecurityExpressionHandler` — workspace creation itself needs no method-level annotation, since it isn't role-gated.
 
 The JWT issuer (`iss`) and audience (`aud`) the service sets in issued tokens are read from SSM at startup:
 - `/collabspace/dev/jwt/issuer` → `https://auth.dev.collabspace.io`
@@ -106,6 +108,8 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_AUDIENCE` | Yes | JWT `aud` claim, e.g. `collabspace-api` |
 | `INTERNAL_TOKEN` | Yes | Fixed shared-secret value `InternalTokenFilter` compares `X-Internal-Token` against. No API Gateway locally, so send this value by hand on every request (register/login included — they're not exempt) |
 | `SPRING_DATA_REDIS_URL` | No | `redis://localhost:16379` when running via Docker Compose. If unset, falls back to Spring's own default (`localhost:6379`) and logs a startup WARN. `JwtBlocklistFilter` fails open if unreachable, so the app still starts and serves traffic either way |
+| `SNS_WORKSPACE_EVENTS_TOPIC_ARN` | Yes | Topic ARN `SnsWorkspaceEventPublisher` publishes `member.invited` to (ADR-037). No default — the app fails to start without it. LocalStack ARNs are deterministic (`arn:aws:sns:{region}:000000000000:{topic-name}`); requires the `localstack` docker-compose service (`make up`) and its topic created (`make setup-local`) |
+| `AWS_SNS_ENDPOINT_OVERRIDE` | No | LocalStack endpoint (`http://localhost:4566`). Unset means the real AWS SNS endpoint is used, so leaving this unset locally without LocalStack running means every publish attempt fails — `SnsWorkspaceEventPublisher`'s caller fails open (logs, doesn't reject the request) |
 
 **AWS dev environment** (set `JWT_PRIVATE_KEY_SSM_PATH` to activate this mode — requires AWS credentials):
 
@@ -120,6 +124,7 @@ docker run -p 8080:8080 auth-workspace:local
 | `JWT_JWKS_URI_SSM_PATH` | No | SSM path for JWKS URI (`/collabspace/dev/jwt/jwks-uri`) — defaults to `http://localhost:8080/.well-known/jwks.json` if unset |
 | `INTERNAL_TOKEN_SSM_PATH` | Yes | SSM path to the shared internal-token secret (`/collabspace/dev/api/internal-token`), generated by Terraform and injected by API Gateway as `X-Internal-Token` on every forwarded request |
 | `SPRING_DATA_REDIS_URL` | No | Upstash `rediss://` TLS URL, injected directly as an ECS task secret (not an SSM-path env var like the JWT_*/INTERNAL_TOKEN rows above) from `/collabspace/dev/redis/url` — see ADR-030 |
+| `SNS_WORKSPACE_EVENTS_TOPIC_ARN` | Yes | Injected directly as an ECS task secret (same mechanism as `SPRING_DATASOURCE_PASSWORD`/`SPRING_DATA_REDIS_URL` above, not an SSM-path env var) from `/collabspace/dev/sns/workspace-events-topic-arn`, which Terraform populates with the `workspace-events` SNS topic's ARN — see ADR-037 |
 
 Set variables via IntelliJ run configuration or an `.env` file (gitignored). See `.env.example` for a template.
 
@@ -155,4 +160,6 @@ terraform output alb_dns_name
 - [ADR-002](../../docs/06-decisions/adr-002-auth-workspace-combined.md) — auth and workspace combined into one service
 - [ADR-012](../../docs/06-decisions/adr-012-terraform-cicd-task-definition-ownership.md) — Terraform owns initial task definition; CI/CD manages revisions
 - [ADR-025](../../docs/06-decisions/adr-025-hexagonal-architecture.md) — hexagonal architecture (ports and adapters)
+- [ADR-032](../../docs/06-decisions/adr-032-membership-claims-staleness-and-revocation.md) — membership claims staleness/revocation via `membership-changed-at` Redis marker + `X-JWT-Iat` comparison
 - [ADR-033](../../docs/06-decisions/adr-033-loopback-health-probe-exemption.md) — loopback-only exemption for `/actuator/health/readiness`\|`liveness` from the internal-token check
+- [ADR-037](../../docs/06-decisions/adr-037-separate-sns-topic-for-workspace-events.md) — separate `workspace-events` SNS topic for workspace domain events

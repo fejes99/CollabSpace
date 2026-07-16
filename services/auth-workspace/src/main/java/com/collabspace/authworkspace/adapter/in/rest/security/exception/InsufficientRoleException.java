@@ -1,24 +1,23 @@
 package com.collabspace.authworkspace.adapter.in.rest.security.exception;
 
 import com.collabspace.authworkspace.domain.exception.DomainException;
-import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 
-public class TokenRevokedException extends SecurityAuthenticationException {
+public class InsufficientRoleException extends SecurityAccessDeniedException {
 
-	public TokenRevokedException(@Nullable String msg) {
+	public InsufficientRoleException(String msg) {
 		super(msg);
 	}
 
 	@Override
 	public URI getType() {
-		return DomainException.errorType("auth/token-revoked");
+		return DomainException.errorType("authorization/insufficient-role");
 	}
 
 	@Override
 	public String getTitle() {
-		return "Token revoked";
+		return "Insufficient role";
 	}
 
 }

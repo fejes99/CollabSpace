@@ -3,8 +3,10 @@ package com.collabspace.authworkspace.adapter.in.rest.security;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.HeaderAuthenticationFilter;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.InternalTokenFilter;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.JwtBlocklistFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.MembershipStalenessFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
@@ -24,15 +26,24 @@ public class SecurityConfig {
 
 	private final JwtBlocklistFilter jwtBlocklistFilter;
 
+	private final MembershipStalenessFilter membershipStalenessFilter;
+
 	private final ProblemDetailsSecurityHandler problemDetailsSecurityHandler;
 
 	public SecurityConfig(InternalTokenFilter internalTokenFilter,
 			HeaderAuthenticationFilter headerAuthenticationFilter, JwtBlocklistFilter jwtBlocklistFilter,
+			MembershipStalenessFilter membershipStalenessFilter,
 			ProblemDetailsSecurityHandler problemDetailsSecurityHandler) {
 		this.internalTokenFilter = internalTokenFilter;
 		this.headerAuthenticationFilter = headerAuthenticationFilter;
 		this.jwtBlocklistFilter = jwtBlocklistFilter;
+		this.membershipStalenessFilter = membershipStalenessFilter;
 		this.problemDetailsSecurityHandler = problemDetailsSecurityHandler;
+	}
+
+	@Bean
+	public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+		return new WorkspaceMethodSecurityExpressionHandler();
 	}
 
 	@Bean
@@ -41,10 +52,12 @@ public class SecurityConfig {
 			.httpBasic(AbstractHttpConfigurer::disable)
 			.sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
 			// Order per plan §4: InternalTokenFilter -> HeaderAuthenticationFilter
-			// -> JwtBlocklistFilter.
+			// -> JwtBlocklistFilter -> MembershipStalenessFilter (added in
+			// invite-member.md).
 			.addFilterBefore(internalTokenFilter, UsernamePasswordAuthenticationFilter.class)
 			.addFilterAfter(headerAuthenticationFilter, InternalTokenFilter.class)
 			.addFilterAfter(jwtBlocklistFilter, HeaderAuthenticationFilter.class)
+			.addFilterAfter(membershipStalenessFilter, JwtBlocklistFilter.class)
 			.exceptionHandling(handling -> handling.authenticationEntryPoint(problemDetailsSecurityHandler)
 				.accessDeniedHandler(problemDetailsSecurityHandler))
 			// Delegates to HeaderAuthenticationFilter.isAnonymousRoute rather than

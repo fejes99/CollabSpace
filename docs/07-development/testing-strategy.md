@@ -266,7 +266,7 @@ Decision table for everything that lives outside the service-under-test.
 | Redis (Upstash in prod) | Real (Testcontainer) | Upstash is Redis-compatible; `FLUSHALL` between tests |
 | SSM Parameter Store | Stub (env vars in tests) | Tests inject config via env vars; same interface as prod |
 | JWKS endpoint | Real (own service) | The Auth service exposes its own JWKS; tests call it via the integration harness |
-| SNS / SQS | LocalStack (later) | Deferred until notification SNS/SQS wiring starts |
+| SNS / SQS | Real (LocalStack Testcontainer) | `org.testcontainers:testcontainers-localstack`; proves `SnsWorkspaceEventPublisher`'s actual publish call (PR 9, invite-member) against a real SNS topic + subscribed SQS queue |
 | SES (email, v1.5) | Mock | True external; mock the sender interface |
 | API Gateway | Stub | Tests bypass API Gateway and call the service directly with a forged-but-valid JWT signed by the test fixture key |
 | Time / Clock | Stub (fixed Clock) | Injectable `Clock` interface — see §7 |
@@ -524,7 +524,6 @@ Documented here so you do not invent justification later. Each row has a trigger
 |---|---|---|
 | Browser E2E (Playwright) | Deferred | Frontend exists and has a stable UI |
 | Multi-service backend E2E | Deferred | ≥2 services have stable contracts and interact in dev |
-| LocalStack for AWS services | Deferred | Notification SNS/SQS wiring starts |
 | Contract testing (Pact) | Deferred | Multi-service E2E proves insufficient |
 | Property-based testing | Deferred | Validators get genuinely complex (e.g., custom date parsing, intricate state machines) |
 | Mutation testing | Deferred | Coverage becomes a concern (it is not now) |

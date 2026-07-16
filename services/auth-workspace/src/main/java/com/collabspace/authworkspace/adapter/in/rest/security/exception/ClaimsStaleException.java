@@ -5,20 +5,20 @@ import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
 
-public class UnexpectedIdentityException extends SecurityAuthenticationException {
+public class ClaimsStaleException extends SecurityAuthenticationException {
 
-	public UnexpectedIdentityException(@Nullable String msg) {
+	public ClaimsStaleException(@Nullable String msg) {
 		super(msg);
 	}
 
 	@Override
 	public URI getType() {
-		return DomainException.errorType("auth/unexpected-identity");
+		return DomainException.errorType("auth/claims-stale");
 	}
 
 	@Override
 	public String getTitle() {
-		return "Unexpected identity headers";
+		return "Claims stale";
 	}
 
 }

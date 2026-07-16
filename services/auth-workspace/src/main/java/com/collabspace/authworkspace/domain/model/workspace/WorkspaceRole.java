@@ -15,8 +15,13 @@ public enum WorkspaceRole {
 	}
 
 	public static WorkspaceRole fromString(String value) {
+		if (value == null) {
+			throw new IllegalArgumentException("Workspace role must not be null");
+		}
+
+		String normalized = value.trim();
 		for (WorkspaceRole workspaceRole : WorkspaceRole.values()) {
-			if (workspaceRole.getValue().equals(value)) {
+			if (workspaceRole.getValue().equalsIgnoreCase(normalized)) {
 				return workspaceRole;
 			}
 		}

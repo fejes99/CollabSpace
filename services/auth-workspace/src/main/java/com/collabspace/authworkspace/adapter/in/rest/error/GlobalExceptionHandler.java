@@ -9,10 +9,13 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
 import java.net.URI;
 import java.util.List;
@@ -93,6 +96,36 @@ class GlobalExceptionHandler {
 		problem.setInstance(URI.create(request.getRequestURI()));
 		log.warn("event=malformed_request uri={}", request.getRequestURI());
 		return problem;
+	}
+
+	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
+	ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+		ProblemDetail problem = ProblemDetail.forStatus(400);
+		problem.setType(DomainException.errorType("validation/invalid-path-parameter"));
+		problem.setTitle("Invalid path parameter");
+		problem.setDetail("Parameter '" + ex.getName() + "' has an invalid value.");
+		problem.setInstance(URI.create(request.getRequestURI()));
+		log.warn("event=invalid_path_parameter uri={} parameter={}", request.getRequestURI(), ex.getName());
+		return problem;
+	}
+
+	/**
+	 * @PreAuthorize-thrown AccessDeniedException/AuthenticationException are raised
+	 * inside DispatcherServlet's own handler invocation, so this @RestControllerAdvice's
+	 * resolvers see them first -- before they'd ever reach ExceptionTranslationFilter, a
+	 * servlet filter wrapping the *outside* of DispatcherServlet. Without these two
+	 * handlers, the catch-all below swallows them as a generic 500 instead of letting
+	 * ProblemDetailsSecurityHandler render the correct 401/403 body. Re-throwing here
+	 * lets them propagate out of DispatcherServlet to the filter chain where they belong.
+	 */
+	@ExceptionHandler(AccessDeniedException.class)
+	void rethrowAccessDenied(AccessDeniedException ex) {
+		throw ex;
+	}
+
+	@ExceptionHandler(AuthenticationException.class)
+	void rethrowAuthentication(AuthenticationException ex) {
+		throw ex;
 	}
 
 	@ExceptionHandler(Exception.class)

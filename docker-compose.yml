@@ -2,7 +2,7 @@
 #
 # Default (no profile): starts infrastructure dependencies only.
 #   `docker compose up -d` — starts postgres and redis for auth-workspace (Stage 2).
-#   Add mongo, localstack, kafka by uncommenting as each service is implemented.
+#   Add mongo, kafka by uncommenting as each service is implemented.
 #
 # Services profile:
 #   `docker compose --profile services up` — also builds and starts application
@@ -153,25 +153,25 @@ services:
       timeout: 5s
       retries: 5
 
-  # localstack:
-  #   image: localstack/localstack:3
-  #   restart: unless-stopped
-  #   environment:
-  #     SERVICES: sqs,sns,ssm,lambda
-  #     DEFAULT_REGION: eu-central-1
-  #     LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
-  #   ports:
-  #     - "4566:4566"
-  #   volumes:
-  #     - localstack_data:/var/lib/localstack
-  #     - /var/run/docker.sock:/var/run/docker.sock
-  #   networks:
-  #     - collabspace
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"running\"'"]
-  #     interval: 15s
-  #     timeout: 10s
-  #     retries: 5
+  localstack:
+    image: localstack/localstack:3
+    restart: unless-stopped
+    environment:
+      SERVICES: sqs,sns,ssm,lambda
+      DEFAULT_REGION: eu-central-1
+      LOCALSTACK_AUTH_TOKEN: ${LOCALSTACK_AUTH_TOKEN:-}
+    ports:
+      - "4566:4566"
+    volumes:
+      - localstack_data:/var/lib/localstack
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - collabspace
+    healthcheck:
+      test: ["CMD-SHELL", "curl -sf http://localhost:4566/_localstack/health | grep -q '\"running\"'"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
 
   # zookeeper:
   #   image: bitnami/zookeeper:3.9
@@ -207,5 +207,5 @@ services:
 volumes:
   postgres_data:
   redis_data:
+  localstack_data:
   # mongo_data:
-  # localstack_data:

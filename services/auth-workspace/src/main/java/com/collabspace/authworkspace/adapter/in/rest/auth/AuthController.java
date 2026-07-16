@@ -77,9 +77,11 @@ public class AuthController {
 			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
 					schema = @Schema(implementation = LoginResponse.class)))
 	@ApiResponse(responseCode = "400", description = "Validation failed",
-			content = @Content(mediaType = "application/problem+json"))
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
 	@ApiResponse(responseCode = "401", description = "Invalid credentials",
-			content = @Content(mediaType = "application/problem+json"))
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
 	@PostMapping("/login")
 	public ResponseEntity<LoginResponse> login(@RequestBody @Valid LoginRequest request, HttpServletRequest httpRequest,
 			HttpServletResponse httpResponse) {
