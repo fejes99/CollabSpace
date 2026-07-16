@@ -17,7 +17,7 @@ API Gateway is configured with a **JWT Authorizer** that runs on every inbound r
 5. Validates `iss` — must match the configured issuer string (e.g., `https://auth.collabspace.io`).
 6. Validates `aud` — must match the configured audience string (e.g., `collabspace-api`).
 7. If all checks pass: extracts the JWT claims and makes them available as request context variables (`$context.authorizer.claims.sub`, `$context.authorizer.claims.userId`, etc.).
-8. Maps context variables to HTTP headers on the forwarded request: `X-User-Id`, `X-User-Workspaces`.
+8. Maps context variables to HTTP headers on the forwarded request: `X-User-Id`, `X-User-Workspaces`, `X-JWT-Jti`, `X-JWT-Iat`.
 
 API Gateway does **not** validate:
 
@@ -37,10 +37,12 @@ For every authenticated request that passes API Gateway validation, the downstre
 | ------------------- | ------------------------------- | ----------------------------------------- |
 | `X-User-Id`         | The `userId` claim from the JWT | `$context.authorizer.claims.userId`       |
 | `X-User-Workspaces` | JSON-encoded memberships array  | `$context.authorizer.claims.memberships`  |
+| `X-JWT-Jti`         | The `jti` claim from the JWT    | `$context.authorizer.claims.jti`          |
+| `X-JWT-Iat`         | The `iat` claim from the JWT    | `$context.authorizer.claims.iat`          |
 | `X-Correlation-ID`  | Request ID for tracing          | `$context.requestId` (or client-supplied) |
 | `X-Internal-Token`  | Shared secret (see below)       | API Gateway stage variable                |
 
-Downstream services read `X-User-Id` and `X-User-Workspaces` to make authorization decisions. They do not parse or validate the JWT itself.
+Downstream services read `X-User-Id` and `X-User-Workspaces` to make authorization decisions. `X-JWT-Jti` is checked against the Redis blocklist on every authenticated request (see [authentication.md](authentication.md) §Token revocation); `X-JWT-Iat` is compared against the per-user `membership-changed-at` Redis marker to detect a token issued before an other-directed membership change (see §Membership and role change invalidation, and [ADR-032](../06-decisions/adr-032-membership-claims-staleness-and-revocation.md)). Services do not parse or validate the JWT itself.
 
 ---
 
@@ -81,6 +83,7 @@ Downstream services:
 - **Do** read `X-User-Id` and `X-User-Workspaces` and trust them.
 - **Do** check the `X-Internal-Token` header and reject requests where it is missing or wrong.
 - **Do** check the Redis JWT blocklist for `jti` on every request (the blocklist check is a service responsibility, not API Gateway's).
+- **Do** compare `X-JWT-Iat` against the `membership-changed-at:<userId>` Redis marker on every authenticated request (also a service responsibility — see ADR-032).
 - **Do not** validate the JWT signature. The JWT is not forwarded to downstream services — only the extracted claims are.
 - **Do not** call the Auth service to validate the user's identity per request.
 
