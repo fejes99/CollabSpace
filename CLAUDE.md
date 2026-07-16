@@ -52,7 +52,7 @@ Out of scope: frontend, full inter-service event flows, production hardening, mo
 
 Blocked on: nothing
 
-Next milestone: PR 9 — `POST /v1/workspaces/{id}/members` (invite member by email, admin-only, publishes a domain event for future Notification integration; plan doc at `docs/03-services/auth-workspace/plans/invite-member.md`). After that: the rest of workspace CRUD (list/get/update/delete — `GET /v1/workspaces` list is PR 10) and remaining membership endpoints (remove/change-role, currently unscheduled — see `notes/auth-workspace-prs.md`).
+Next milestone: PR 9 — `POST /v1/workspaces/{id}/members` (invite member by email, admin-only, publishes a domain event for future Notification integration; plan doc at `docs/03-services/auth-workspace/plans/invite-member.md`). Implementation and tests are complete on `feat/auth/invite-member`, including a test-coverage review pass that fixed two bugs (a malformed-`workspaceId` path segment returning 500 instead of 400; an SNS-serialization failure escaping the invite endpoint's fail-open isolation) and wired LocalStack (`org.testcontainers:testcontainers-localstack`, docker-compose, `make setup-local`) for real SNS/SQS integration testing. Not yet committed, merged, or verified on AWS. After that: change-member-role and remove-member (PR 10, PR 11 — reprioritized ahead of list-workspaces on 2026-07-16 so PR 9's RBAC machinery stays fresh context) and `GET /v1/workspaces` list (PR 12) — see `notes/auth-workspace-prs.md`.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
