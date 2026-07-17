@@ -278,7 +278,10 @@ resource "aws_ssm_parameter" "jwks_uri" {
 
 resource "aws_sns_topic" "workspace_events" {
   name = "${var.project_name}-${var.environment}-workspace-events"
-  tags = { Name = "${var.project_name}-${var.environment}-workspace-events" }
+  # AWS-managed key -- free, satisfies encryption-at-rest (SonarCloud terraform:S6327)
+  # without the ~$1/month a customer-managed CMK would add.
+  kms_master_key_id = "alias/aws/sns"
+  tags              = { Name = "${var.project_name}-${var.environment}-workspace-events" }
 }
 
 resource "aws_ssm_parameter" "workspace_events_topic_arn" {
