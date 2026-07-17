@@ -58,6 +58,8 @@ mode — is itself what is being learned.
 
 ### Messaging Topology
 
+> **Update:** the single `document-events` topic shown below carrying both `member.invited` and `document.updated` was never actually implemented before it was reconsidered. [ADR-037](adr-037-separate-sns-topic-for-workspace-events.md) splits these into separate topics (`document-events`, `workspace-events`) instead — this diagram is accurate for the SNS-vs-Kafka broker-technology decision this ADR makes, but stale on topic count. See ADR-037 for the current topology.
+
 ```mermaid
 flowchart LR
     AW[Auth & Workspace]

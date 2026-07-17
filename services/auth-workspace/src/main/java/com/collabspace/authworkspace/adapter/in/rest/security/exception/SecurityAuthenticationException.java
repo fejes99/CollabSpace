@@ -15,8 +15,4 @@ public abstract class SecurityAuthenticationException extends AuthenticationExce
 
 	public abstract String getTitle();
 
-	protected static URI errorType(String path) {
-		return URI.create("https://errors.collabspace.io/" + path);
-	}
-
 }

@@ -54,6 +54,7 @@ down-all: ## Stop all containers including application services
 setup-local: ## Provision LocalStack resources — idempotent, safe to re-run
 	@echo "==> Creating SNS topics..."
 	@$(AWS_LOCAL) sns create-topic --name document-events --region $(DEV_REGION) > /dev/null
+	@$(AWS_LOCAL) sns create-topic --name workspace-events --region $(DEV_REGION) > /dev/null
 	@echo "==> Creating SQS queues..."
 	@$(AWS_LOCAL) sqs create-queue --queue-name notifications-dlq --region $(DEV_REGION) > /dev/null
 	@$(AWS_LOCAL) sqs create-queue --queue-name notifications \
@@ -73,6 +74,11 @@ setup-local: ## Provision LocalStack resources — idempotent, safe to re-run
 		--topic-arn arn:aws:sns:$(DEV_REGION):000000000000:document-events \
 		--protocol sqs \
 		--notification-endpoint arn:aws:sqs:$(DEV_REGION):000000000000:realtime-updates \
+		--region $(DEV_REGION) > /dev/null
+	@$(AWS_LOCAL) sns subscribe \
+		--topic-arn arn:aws:sns:$(DEV_REGION):000000000000:workspace-events \
+		--protocol sqs \
+		--notification-endpoint arn:aws:sqs:$(DEV_REGION):000000000000:notifications \
 		--region $(DEV_REGION) > /dev/null
 	@echo "==> LocalStack resources ready."
 

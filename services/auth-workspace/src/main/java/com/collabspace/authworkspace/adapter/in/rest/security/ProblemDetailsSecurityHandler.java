@@ -1,5 +1,6 @@
 package com.collabspace.authworkspace.adapter.in.rest.security;
 
+import com.collabspace.authworkspace.adapter.in.rest.security.exception.SecurityAccessDeniedException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.SecurityAuthenticationException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.ServletException;
@@ -53,14 +54,22 @@ public class ProblemDetailsSecurityHandler implements AuthenticationEntryPoint, 
 	@Override
 	public void handle(HttpServletRequest request, HttpServletResponse response,
 			AccessDeniedException accessDeniedException) throws IOException, ServletException {
-		URI type = URI.create("https://errors.collabspace.io/auth/access-denied");
 		ProblemDetail problem = ProblemDetail.forStatus(403);
-		problem.setType(type);
-		problem.setTitle("Forbidden");
-		problem.setDetail(accessDeniedException.getMessage());
-		problem.setInstance(URI.create(request.getRequestURI()));
 
-		log.warn("event=authorization_denied type={} uri={}", type, request.getRequestURI());
+		if (accessDeniedException instanceof SecurityAccessDeniedException securityException) {
+			problem.setType(securityException.getType());
+			problem.setTitle(securityException.getTitle());
+			problem.setDetail(securityException.getMessage());
+			log.warn("event=authorization_denied type={} uri={}", securityException.getType(), request.getRequestURI());
+		}
+		else {
+			URI type = URI.create("https://errors.collabspace.io/auth/access-denied");
+			problem.setType(type);
+			problem.setTitle("Forbidden");
+			problem.setDetail(accessDeniedException.getMessage());
+			log.warn("event=authorization_denied type={} uri={}", type, request.getRequestURI());
+		}
+		problem.setInstance(URI.create(request.getRequestURI()));
 
 		writeProblemDetail(response, problem);
 	}

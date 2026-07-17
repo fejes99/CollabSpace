@@ -5,8 +5,10 @@ import com.collabspace.authworkspace.adapter.in.rest.security.SecurityConfig;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.HeaderAuthenticationFilter;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.InternalTokenFilter;
 import com.collabspace.authworkspace.adapter.in.rest.security.filter.JwtBlocklistFilter;
+import com.collabspace.authworkspace.adapter.in.rest.security.filter.MembershipStalenessFilter;
 import com.collabspace.authworkspace.adapter.in.rest.wellknown.WellKnownController;
 import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
+import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.application.service.JwtProperties;
 import com.nimbusds.jose.jwk.RSAKey;
@@ -22,6 +24,9 @@ import java.security.KeyPair;
 import java.security.KeyPairGenerator;
 import java.security.interfaces.RSAPrivateKey;
 import java.security.interfaces.RSAPublicKey;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -29,7 +34,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 @org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest(WellKnownController.class)
 @Import({ SecurityConfig.class, InternalTokenFilter.class, HeaderAuthenticationFilter.class, JwtBlocklistFilter.class,
-		ProblemDetailsSecurityHandler.class, WellKnownControllerTest.TestConfig.class })
+		MembershipStalenessFilter.class, ProblemDetailsSecurityHandler.class,
+		WellKnownControllerTest.TestConfig.class })
 @DisplayName("GET /.well-known")
 class WellKnownControllerTest {
 
@@ -90,6 +96,22 @@ class WellKnownControllerTest {
 		@Bean
 		TokenBlocklistRepository tokenBlocklistRepository() {
 			return jti -> false;
+		}
+
+		@Bean
+		MembershipStalenessRepository membershipStalenessRepository() {
+			return new MembershipStalenessRepository() {
+				@Override
+				public void markMembershipChanged(UUID userId, Instant changedAt) {
+					// no-op: this test class doesn't exercise membership staleness, just
+					// satisfies MembershipStalenessFilter's constructor dependency.
+				}
+
+				@Override
+				public Optional<Instant> findMembershipChangedAt(UUID userId) {
+					return Optional.empty();
+				}
+			};
 		}
 
 	}

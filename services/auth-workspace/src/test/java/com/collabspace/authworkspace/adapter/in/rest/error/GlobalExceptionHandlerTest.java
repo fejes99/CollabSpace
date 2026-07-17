@@ -7,8 +7,10 @@ import ch.qos.logback.core.read.ListAppender;
 import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
+import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
@@ -28,16 +30,23 @@ import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
+import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.authentication.InsufficientAuthenticationException;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.net.URI;
+import java.time.Instant;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -65,6 +74,22 @@ class GlobalExceptionHandlerTest {
 		@Bean
 		TokenBlocklistRepository tokenBlocklistRepository() {
 			return jti -> false;
+		}
+
+		@Bean
+		MembershipStalenessRepository membershipStalenessRepository() {
+			return new MembershipStalenessRepository() {
+				@Override
+				public void markMembershipChanged(UUID userId, Instant changedAt) {
+					// no-op: this test class doesn't exercise membership staleness, just
+					// satisfies MembershipStalenessFilter's constructor dependency.
+				}
+
+				@Override
+				public Optional<Instant> findMembershipChangedAt(UUID userId) {
+					return Optional.empty();
+				}
+			};
 		}
 
 	}
@@ -115,6 +140,11 @@ class GlobalExceptionHandlerTest {
 			return "ok";
 		}
 
+		@GetMapping(TYPE_MISMATCH_PATH + "/{id}")
+		String typeMismatch(@PathVariable UUID id) {
+			return "ok";
+		}
+
 		record ValidatedBody(@NotBlank String name) {
 		}
 
@@ -131,6 +161,8 @@ class GlobalExceptionHandlerTest {
 	private static final String DOMAIN_PATH = "/test/domain";
 
 	private static final String VALIDATE_PATH = "/test/validate";
+
+	private static final String TYPE_MISMATCH_PATH = "/test/type-mismatch";
 
 	private static final String TEST_USER_ID = "test-user-id";
 
@@ -152,6 +184,9 @@ class GlobalExceptionHandlerTest {
 
 	@MockitoBean
 	CreateWorkspaceUseCase createWorkspaceUseCase;
+
+	@MockitoBean
+	InviteMemberUseCase inviteMemberUseCase;
 
 	@BeforeEach
 	void attachLogger() {
@@ -313,6 +348,46 @@ class GlobalExceptionHandlerTest {
 			.andExpect(jsonPath("$.title").value("Malformed request"))
 			.andExpect(jsonPath("$.status").value(400))
 			.andExpect(jsonPath("$.detail").value("The request body could not be parsed."));
+	}
+
+	@Test
+	@DisplayName("path variable type mismatch returns 400 with validation/invalid-path-parameter")
+	void pathVariableTypeMismatchReturns400() throws Exception {
+		mvc.perform(get(TYPE_MISMATCH_PATH + "/not-a-uuid").header("X-Internal-Token", internalTokenProperties.token())
+			.header("X-User-Id", TEST_USER_ID)
+			.header("X-User-Workspaces", EMPTY_WORKSPACES))
+			.andExpect(status().isBadRequest())
+			.andExpect(content().contentTypeCompatibleWith(MediaType.APPLICATION_PROBLEM_JSON))
+			.andExpect(jsonPath("$.type").value("https://errors.collabspace.io/validation/invalid-path-parameter"))
+			.andExpect(jsonPath("$.title").value("Invalid path parameter"))
+			.andExpect(jsonPath("$.status").value(400))
+			.andExpect(jsonPath("$.detail").value("Parameter 'id' has an invalid value."));
+	}
+
+	// These two verify the fix from earlier this session directly, at the unit level --
+	// GlobalExceptionHandler's own @WebMvcTest context here doesn't wire in the real
+	// SecurityConfig/ExceptionTranslationFilter, so "did it reach the filter chain" isn't
+	// observable through MockMvc in this test class. What's directly, unambiguously
+	// verifiable is the one thing that matters: does the handler method rethrow the same
+	// exception rather than swallow it, same as GlobalExceptionHandler is package-private
+	// and directly instantiable here (same package, no constructor dependencies).
+
+	@Test
+	@DisplayName("rethrowAccessDenied re-throws the same AccessDeniedException instead of handling it")
+	void rethrowAccessDeniedRethrowsSameException() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		AccessDeniedException original = new AccessDeniedException("denied");
+
+		assertThatThrownBy(() -> handler.rethrowAccessDenied(original)).isSameAs(original);
+	}
+
+	@Test
+	@DisplayName("rethrowAuthentication re-throws the same AuthenticationException instead of handling it")
+	void rethrowAuthenticationRethrowsSameException() {
+		GlobalExceptionHandler handler = new GlobalExceptionHandler();
+		InsufficientAuthenticationException original = new InsufficientAuthenticationException("auth required");
+
+		assertThatThrownBy(() -> handler.rethrowAuthentication(original)).isSameAs(original);
 	}
 
 }

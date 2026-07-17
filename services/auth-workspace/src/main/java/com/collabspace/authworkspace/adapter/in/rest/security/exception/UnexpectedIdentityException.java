@@ -1,5 +1,6 @@
 package com.collabspace.authworkspace.adapter.in.rest.security.exception;
 
+import com.collabspace.authworkspace.domain.exception.DomainException;
 import org.jspecify.annotations.Nullable;
 
 import java.net.URI;
@@ -12,7 +13,7 @@ public class UnexpectedIdentityException extends SecurityAuthenticationException
 
 	@Override
 	public URI getType() {
-		return errorType("auth/unexpected-identity");
+		return DomainException.errorType("auth/unexpected-identity");
 	}
 
 	@Override

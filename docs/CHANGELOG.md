@@ -8,6 +8,13 @@ New entries go at the top. Each entry names the stage, the date completed, and b
 
 ## Stage 2 — Service Implementation (in progress, 2026-05)
 
+### auth-workspace: create-workspace (2026-07)
+
+- `POST /v1/workspaces` — any authenticated user creates a workspace and becomes its first admin; membership row inserted in the same transaction as the workspace row (`CommitThenAction`, ADR-034). Response reissues a fresh access token whose `memberships` claim reflects the new workspace immediately (ADR-032).
+- Merged and verified end-to-end on AWS (2026-07-15) — verification surfaced two infra bugs, both fixed and documented:
+  - [ADR-035](06-decisions/adr-035-paired-exact-and-proxy-api-gateway-routes.md): API Gateway `{proxy+}` routes can't match bare collection paths (`/v1/workspaces` with no trailing segment) — every resource now has a paired exact-path route alongside its `{proxy+}` route.
+  - [ADR-036](06-decisions/adr-036-authorizer-claims-context-variable-syntax.md): the JWT-claim-to-header mapping used the wrong `$context.authorizer.jwt.claims.*` syntax; corrected to `$context.authorizer.claims.*` — meaning `X-User-Id`/`X-User-Workspaces`/`X-JWT-Jti` had never actually worked since PR #41/#42, undetected until this verification.
+
 ### auth-workspace: security-filter (2026-07)
 
 - Three Spring Security filters, ordered `InternalTokenFilter` → `HeaderAuthenticationFilter` → `JwtBlocklistFilter`, run on every request ahead of the eventual `@PreAuthorize` work: `InternalTokenFilter` validates `X-Internal-Token` (SSM-backed in AWS, `.env`-backed locally); `HeaderAuthenticationFilter` populates `SecurityContextHolder` from `X-User-Id`/`X-User-Workspaces` as a `PreAuthenticatedAuthenticationToken`, fail-closed on malformed/unexpected headers; `JwtBlocklistFilter` checks `X-JWT-Jti` against a Redis-backed blocklist (`TokenBlocklistRepository`/`TokenBlocklistRedisAdapter`), fail-open if Redis is unreachable.

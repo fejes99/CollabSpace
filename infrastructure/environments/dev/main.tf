@@ -272,6 +272,25 @@ resource "aws_ssm_parameter" "jwks_uri" {
   tags  = { Name = "/collabspace/${var.environment}/jwt/jwks-uri" }
 }
 
+# ── SNS topic — workspace events ──────────────────────────────────────────────
+# ADR-037: auth-workspace publishes workspace domain events (starting with
+# member.invited, PR 9) to its own topic, separate from document-events.
+
+resource "aws_sns_topic" "workspace_events" {
+  name = "${var.project_name}-${var.environment}-workspace-events"
+  # AWS-managed key -- free, satisfies encryption-at-rest (SonarCloud terraform:S6327)
+  # without the ~$1/month a customer-managed CMK would add.
+  kms_master_key_id = "alias/aws/sns"
+  tags              = { Name = "${var.project_name}-${var.environment}-workspace-events" }
+}
+
+resource "aws_ssm_parameter" "workspace_events_topic_arn" {
+  name  = "/collabspace/${var.environment}/sns/workspace-events-topic-arn"
+  type  = "String"
+  value = aws_sns_topic.workspace_events.arn
+  tags  = { Name = "/collabspace/${var.environment}/sns/workspace-events-topic-arn" }
+}
+
 # ── auth-workspace ────────────────────────────────────────────────────────────
 #
 # Task role SSM policy: auth-workspace calls SsmConfigLoader at startup to read
@@ -296,6 +315,25 @@ resource "aws_iam_role_policy" "auth_workspace_ssm" {
         Effect   = "Allow"
         Action   = ["kms:Decrypt"]
         Resource = ["arn:aws:kms:${var.aws_region}:${data.aws_caller_identity.current.account_id}:key/alias/aws/ssm"]
+      }
+    ]
+  })
+
+  depends_on = [module.iam_ecs]
+}
+
+resource "aws_iam_role_policy" "auth_workspace_sns" {
+  name = "sns-publish"
+  role = "${var.project_name}-${var.environment}-auth-workspace-task"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid      = "SNSPublishWorkspaceEvents"
+        Effect   = "Allow"
+        Action   = ["sns:Publish"]
+        Resource = [aws_sns_topic.workspace_events.arn]
       }
     ]
   })
@@ -348,8 +386,9 @@ module "auth_workspace" {
   }
 
   secrets = {
-    SPRING_DATASOURCE_PASSWORD = aws_ssm_parameter.db_password.arn
-    SPRING_DATA_REDIS_URL      = aws_ssm_parameter.redis_url.arn
+    SPRING_DATASOURCE_PASSWORD     = aws_ssm_parameter.db_password.arn
+    SPRING_DATA_REDIS_URL          = aws_ssm_parameter.redis_url.arn
+    SNS_WORKSPACE_EVENTS_TOPIC_ARN = aws_ssm_parameter.workspace_events_topic_arn.arn
   }
 
   # Measured cold start (JPA + Flyway + JWT key load + Tomcat) took ~122s when
@@ -526,6 +565,11 @@ resource "aws_apigatewayv2_route" "auth_health" {
 #   X-JWT-Jti: the jti claim, forwarded so each service can check it against
 #     the Redis blocklist on logout. See docs/02-architecture/authentication.md
 #     §Token revocation.
+#   X-JWT-Iat: the iat claim, forwarded so each service can compare it against
+#     the per-user membership-changed-at Redis marker (ADR-032) to detect a
+#     token issued before an other-directed membership change. See
+#     docs/02-architecture/authentication.md §Membership and role change
+#     invalidation.
 
 resource "aws_apigatewayv2_integration" "auth_workspace_protected" {
   api_id             = module.api_gateway.api_id
@@ -541,6 +585,7 @@ resource "aws_apigatewayv2_integration" "auth_workspace_protected" {
     "overwrite:header.x-user-id"         = "$context.authorizer.claims.userId"
     "overwrite:header.x-user-workspaces" = "$context.authorizer.claims.memberships"
     "overwrite:header.x-jwt-jti"         = "$context.authorizer.claims.jti"
+    "overwrite:header.x-jwt-iat"         = "$context.authorizer.claims.iat"
   }
 }
 

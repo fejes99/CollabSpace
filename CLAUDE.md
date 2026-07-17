@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Database connection, Flyway migration, JWT infrastructure, UserJpaAdapter, user registration, login endpoint, and the internal token filter + header-based auth (Spring Security) are merged and verified on AWS. Workspace creation (`POST /v1/workspaces`, PR #45) is merged and verified end-to-end on AWS (2026-07-15) — this also required two infra fixes uncovered during verification: ADR-035 (API Gateway `{proxy+}` routes can't match bare collection paths — every resource now has a paired exact-path route) and ADR-036 (the JWT-claim-to-header mapping used the wrong `$context.authorizer.jwt.claims.*` syntax — corrected to `$context.authorizer.claims.*` — meaning `X-User-Id`/`X-User-Workspaces`/`X-JWT-Jti` had never actually worked since PR #41/#42). Next: the rest of workspace CRUD and membership endpoints, now that the identity-header pipeline is confirmed working live, not just locally.
+Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), and workspace creation (`POST /v1/workspaces`, PR #45) are merged and verified on AWS — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. Next: the rest of workspace CRUD and membership endpoints.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: PR 9 — `POST /v1/workspaces/{id}/members` (invite member by email, admin-only, publishes a domain event for future Notification integration; plan doc at `docs/03-services/auth-workspace/plans/invite-member.md`). After that: the rest of workspace CRUD (list/get/update/delete — `GET /v1/workspaces` list is PR 10) and remaining membership endpoints (remove/change-role, currently unscheduled — see `notes/auth-workspace-prs.md`).
+Next milestone: PR 9 — `POST /v1/workspaces/{id}/members` (invite member by email, admin-only, publishes a domain event for future Notification integration; plan doc at `docs/03-services/auth-workspace/plans/invite-member.md`). Implementation, tests, and a code-review pass (adapter-layer exception translation for the unique-constraint check, malformed-header handling and missing-header observability in `MembershipStalenessFilter`, SNS-topic encryption for SonarCloud) are complete, plus LocalStack wired for real SNS/SQS integration testing. [PR #48](https://github.com/fejes99/CollabSpace/pull/48) is open with CI green, ready to merge — not yet verified on AWS. After that: change-member-role and remove-member (PR 10, PR 11 — reprioritized ahead of list-workspaces on 2026-07-16 so PR 9's RBAC machinery stays fresh context) and `GET /v1/workspaces` list (PR 12) — see `notes/auth-workspace-prs.md`.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
