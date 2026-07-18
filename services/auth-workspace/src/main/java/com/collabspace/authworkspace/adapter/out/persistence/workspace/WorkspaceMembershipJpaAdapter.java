@@ -43,6 +43,11 @@ public class WorkspaceMembershipJpaAdapter implements WorkspaceMembershipReposit
 	}
 
 	@Override
+	public int deleteByWorkspaceIdAndUserId(UUID workspaceId, UUID userId) {
+		return jpaRepository.deleteByWorkspaceIdAndUserId(workspaceId, userId);
+	}
+
+	@Override
 	public Optional<WorkspaceMembership> findById(UUID id) {
 		return jpaRepository.findById(id).map(WorkspaceMembershipJpaAdapter::toDomain);
 	}

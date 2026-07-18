@@ -9,8 +9,11 @@ import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspa
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberUseCase;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberInvitedEvent;
+import com.collabspace.authworkspace.application.port.out.workspace.MemberRemovedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
@@ -21,6 +24,7 @@ import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
 import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
+import com.collabspace.authworkspace.domain.exception.CreatorSelfRemovalException;
 import com.collabspace.authworkspace.domain.exception.InvitedUserNotFoundException;
 import com.collabspace.authworkspace.domain.exception.LastAdminInvariantException;
 import com.collabspace.authworkspace.domain.exception.TargetNotMemberException;
@@ -42,9 +46,11 @@ import java.util.UUID;
 
 @Service
 public class WorkspaceApplicationService
-		implements CreateWorkspaceUseCase, InviteMemberUseCase, ChangeMemberRoleUseCase {
+		implements CreateWorkspaceUseCase, InviteMemberUseCase, ChangeMemberRoleUseCase, RemoveMemberUseCase {
 
 	private static final Logger log = LoggerFactory.getLogger(WorkspaceApplicationService.class);
+
+	private static final String EVENT_MARKER_WRITE_FAILED = "membership_marker_write_failed";
 
 	private final WorkspaceRepository workspaceRepository;
 
@@ -127,7 +133,7 @@ public class WorkspaceApplicationService
 		try {
 			inviteMemberResult = commitThenAction
 				.run(() -> persistedMembership[0] = workspaceMembershipRepository.save(workspaceMembership), () -> {
-					logAndContinueOnFailure("membership_marker_write_failed", persistedMembership[0].userId(),
+					logAndContinueOnFailure(EVENT_MARKER_WRITE_FAILED, persistedMembership[0].userId(),
 							() -> membershipStalenessRepository.markMembershipChanged(persistedMembership[0].userId(),
 									persistedMembership[0].createdAt()));
 
@@ -174,48 +180,115 @@ public class WorkspaceApplicationService
 					currentMembership.role(), currentMembership.updatedAt(), Optional.empty());
 		}
 
+		WorkspaceMembership[] persistedMembership = new WorkspaceMembership[1];
 		boolean isDemotion = currentMembership.role() == WorkspaceRole.ADMIN && role == WorkspaceRole.MEMBER;
 
-		WorkspaceMembership[] persistedMembership = new WorkspaceMembership[1];
+		try {
+			return commitThenAction.run(() -> {
+				WorkspaceMembership target = isDemotion ? verifyAdminInvariant(currentMembership) : currentMembership;
+				persistedMembership[0] = target.role().equals(role) ? target
+						: workspaceMembershipRepository.save(target.changeRole(role));
+			}, () -> changeMemberRoleAfterCommit(command, currentMembership, persistedMembership));
+		}
+		catch (LastAdminInvariantException ex) {
+			log.warn("event=member_role_change_rejected reason=last_admin_invariant workspaceId={} memberId={}",
+					command.workspaceId(), command.memberId());
+			throw ex;
+		}
+	}
 
-		return commitThenAction.run(() -> {
-			WorkspaceMembership target = ensureAdminInvariant(isDemotion, currentMembership, command.workspaceId(),
-					command.memberId());
-			persistedMembership[0] = target.role().equals(role) ? target
-					: workspaceMembershipRepository.save(target.changeRole(role));
-		}, () -> {
-			boolean isSelf = command.adminId().equals(command.memberId());
-			Optional<String> accessToken = Optional.empty();
-			String jti = null;
+	private ChangeMemberRoleResult changeMemberRoleAfterCommit(ChangeMemberRoleCommand command,
+			WorkspaceMembership currentMembership, WorkspaceMembership[] persistedMembership) {
+		boolean isSelf = command.adminId().equals(command.memberId());
+		Optional<String> accessToken = Optional.empty();
+		String jti = null;
 
-			if (isSelf) {
-				AccessToken token = mintAccessToken(command.adminId());
-				accessToken = Optional.of(token.token());
-				jti = token.jti();
+		if (isSelf) {
+			AccessToken token = mintAccessToken(command.adminId());
+			accessToken = Optional.of(token.token());
+			jti = token.jti();
+		}
+		else {
+			logAndContinueOnFailure(EVENT_MARKER_WRITE_FAILED, persistedMembership[0].userId(),
+					() -> membershipStalenessRepository.markMembershipChanged(persistedMembership[0].userId(),
+							persistedMembership[0].updatedAt()));
+
+			logAndContinueOnFailure("member_role_changed_publish_failed", persistedMembership[0].userId(), () -> {
+				MemberRoleChangedEvent event = new MemberRoleChangedEvent(command.adminId(),
+						persistedMembership[0].workspaceId(), persistedMembership[0].userId(), currentMembership.role(),
+						persistedMembership[0].role(), command.correlationId().orElse(null));
+				workspaceEventPublisher.publishRoleChanged(event);
+			});
+		}
+
+		log.info(
+				"event=member_role_changed adminId={} memberId={} workspaceId={} previousRole={} newRole={} ip={} correlationId={} jti={}",
+				command.adminId(), persistedMembership[0].userId(), persistedMembership[0].workspaceId(),
+				currentMembership.role(), persistedMembership[0].role(), command.ipAddress().orElse(null),
+				command.correlationId().orElse(null), jti);
+
+		return new ChangeMemberRoleResult(persistedMembership[0].workspaceId(), persistedMembership[0].userId(),
+				persistedMembership[0].role(), persistedMembership[0].updatedAt(), accessToken);
+	}
+
+	@Override
+	public void removeMember(RemoveMemberCommand command) {
+		Instant now = clock.instant();
+
+		WorkspaceMembership currentMembership = workspaceMembershipRepository
+			.findByWorkspaceIdAndUserId(command.workspaceId(), command.memberId())
+			.orElseThrow(() -> {
+				log.warn("event=member_removal_rejected reason=target_not_member workspaceId={} memberId={}",
+						command.workspaceId(), command.memberId());
+				return new TargetNotMemberException();
+			});
+
+		if (command.adminId().equals(command.memberId())) {
+			Workspace currentWorkspace = workspaceRepository.findById(command.workspaceId())
+				.orElseThrow(() -> new IllegalStateException("WorkspaceMembership " + currentMembership.id()
+						+ " references workspace " + command.workspaceId() + ", which does not exist"));
+
+			if (command.adminId().equals(currentWorkspace.createdByUserId())) {
+				log.warn("event=member_removal_rejected reason=creator_self_removal workspaceId={} memberId={}",
+						command.workspaceId(), command.memberId());
+				throw new CreatorSelfRemovalException();
 			}
-			else {
-				logAndContinueOnFailure("membership_marker_write_failed", persistedMembership[0].userId(),
-						() -> membershipStalenessRepository.markMembershipChanged(persistedMembership[0].userId(),
-								persistedMembership[0].updatedAt()));
+		}
 
-				logAndContinueOnFailure("member_role_changed_publish_failed", persistedMembership[0].userId(), () -> {
-					MemberRoleChangedEvent event = new MemberRoleChangedEvent(command.adminId(),
-							persistedMembership[0].workspaceId(), persistedMembership[0].userId(),
-							currentMembership.role(), persistedMembership[0].role(),
-							command.correlationId().orElse(null));
-					workspaceEventPublisher.publishRoleChanged(event);
+		boolean targetIsAdmin = currentMembership.role() == WorkspaceRole.ADMIN;
+
+		try {
+			commitThenAction.run(() -> {
+				if (targetIsAdmin) {
+					verifyAdminInvariant(currentMembership);
+				}
+
+				int changedRows = workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(command.workspaceId(),
+						command.memberId());
+				if (changedRows == 0) {
+					throw new TargetNotMemberException();
+				}
+			}, () -> {
+				logAndContinueOnFailure(EVENT_MARKER_WRITE_FAILED, command.memberId(),
+						() -> membershipStalenessRepository.markMembershipChanged(command.memberId(), now));
+				logAndContinueOnFailure("member_removed_publish_failed", command.memberId(), () -> {
+					MemberRemovedEvent event = new MemberRemovedEvent(command.adminId(), command.workspaceId(),
+							command.memberId(), command.correlationId().orElse(null));
+					workspaceEventPublisher.publishMemberRemoved(event);
 				});
-			}
 
-			log.info(
-					"event=member_role_changed adminId={} memberId={} workspaceId={} previousRole={} newRole={} ip={} correlationId={} jti={}",
-					command.adminId(), persistedMembership[0].userId(), persistedMembership[0].workspaceId(),
-					currentMembership.role(), persistedMembership[0].role(), command.ipAddress().orElse(null),
-					command.correlationId().orElse(null), jti);
-
-			return new ChangeMemberRoleResult(persistedMembership[0].workspaceId(), persistedMembership[0].userId(),
-					persistedMembership[0].role(), persistedMembership[0].updatedAt(), accessToken);
-		});
+				log.info(
+						"event=member_removed adminId={} targetUserId={} workspaceId={} previousRole={} ip={} correlationId={}",
+						command.adminId(), command.memberId(), command.workspaceId(), currentMembership.role(),
+						command.ipAddress().orElse(null), command.correlationId().orElse(null));
+				return null;
+			});
+		}
+		catch (LastAdminInvariantException ex) {
+			log.warn("event=member_removal_rejected reason=last_admin_invariant workspaceId={} memberId={}",
+					command.workspaceId(), command.memberId());
+			throw ex;
+		}
 	}
 
 	private AccessToken mintAccessToken(UUID userId) {
@@ -240,26 +313,14 @@ public class WorkspaceApplicationService
 		}
 	}
 
-	private WorkspaceMembership ensureAdminInvariant(boolean isDemotion, WorkspaceMembership currentMembership,
-			UUID workspaceId, UUID memberId) {
-		if (!isDemotion) {
-			return currentMembership;
-		}
+	private WorkspaceMembership verifyAdminInvariant(WorkspaceMembership membership) {
+		int adminCount = workspaceMembershipRepository.countAdminsForUpdate(membership.workspaceId());
 
-		int adminCount = workspaceMembershipRepository.countAdminsForUpdate(workspaceId);
-
-		// Re-read after the blocking call above: a concurrent request may have already
-		// changed this member's role while this call was waiting on the lock (e.g. a
-		// client
-		// retry). Only a read taken here -- after the wait -- is guaranteed to see that
-		// change; the pre-lock `currentMembership` snapshot the caller holds is not. See
-		// ADR-038.
-		WorkspaceMembership latest = workspaceMembershipRepository.findByWorkspaceIdAndUserId(workspaceId, memberId)
+		WorkspaceMembership latest = workspaceMembershipRepository
+			.findByWorkspaceIdAndUserId(membership.workspaceId(), membership.userId())
 			.orElseThrow(TargetNotMemberException::new);
 
 		if (adminCount == 1 && latest.role() == WorkspaceRole.ADMIN) {
-			log.warn("event=member_role_change_rejected reason=last_admin_invariant workspaceId={} memberId={}",
-					workspaceId, memberId);
 			throw new LastAdminInvariantException();
 		}
 		return latest;

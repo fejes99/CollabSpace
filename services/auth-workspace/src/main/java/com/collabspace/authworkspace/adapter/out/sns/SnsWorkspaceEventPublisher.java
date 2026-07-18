@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.out.sns;
 
 import com.collabspace.authworkspace.application.port.out.workspace.MemberInvitedEvent;
+import com.collabspace.authworkspace.application.port.out.workspace.MemberRemovedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,6 +26,8 @@ public class SnsWorkspaceEventPublisher implements WorkspaceEventPublisher {
 	private static final String EVENT_TYPE_MEMBER_INVITED = "member.invited";
 
 	private static final String EVENT_TYPE_MEMBER_ROLE_CHANGED = "member.role_changed";
+
+	private static final String EVENT_TYPE_MEMBER_REMOVED = "member.removed";
 
 	private final SnsClient snsClient;
 
@@ -56,6 +59,12 @@ public class SnsWorkspaceEventPublisher implements WorkspaceEventPublisher {
 	@Override
 	public void publishRoleChanged(MemberRoleChangedEvent event) {
 		snsClient.publish(buildRequest(event, EVENT_TYPE_MEMBER_ROLE_CHANGED));
+	}
+
+	@Override
+	public void publishMemberRemoved(MemberRemovedEvent event) {
+		snsClient.publish(buildRequest(event, EVENT_TYPE_MEMBER_REMOVED));
+
 	}
 
 	private PublishRequest buildRequest(Object event, String eventType) {
