@@ -6,7 +6,7 @@ A learning project: a five-service real-time collaboration platform built on AWS
 
 **Stage 2 — Service Implementation, in progress**
 
-Stage 1 complete: infrastructure live in AWS dev (`eu-central-1`), all five services deployed to ECS Fargate (or Lambda for notification), health endpoints return `200 OK`. Now building real functionality — starting with `auth-workspace`: service baseline, database connection, Flyway migration, JWT infrastructure, header-based auth (Spring Security), user registration (`POST /v1/auth/register`), login (`POST /v1/auth/login`), and workspace creation (`POST /v1/workspaces`) are done and verified on AWS. Next: workspace membership endpoints, starting with inviting a member by email.
+Stage 1 complete: infrastructure live in AWS dev (`eu-central-1`), all five services deployed to ECS Fargate (or Lambda for notification), health endpoints return `200 OK`. Now building real functionality — starting with `auth-workspace`: service baseline, database connection, Flyway migration, JWT infrastructure, header-based auth (Spring Security), user registration (`POST /v1/auth/register`), login (`POST /v1/auth/login`), and workspace creation (`POST /v1/workspaces`) are done and verified on AWS. Inviting a member by email (`POST /v1/workspaces/{id}/members`) is also done, not yet verified on AWS. Next: the rest of workspace membership endpoints, starting with changing a member's role.
 
 ## Tech Stack
 
