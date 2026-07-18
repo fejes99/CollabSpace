@@ -9,6 +9,7 @@ import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberUseCase;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
@@ -191,6 +192,9 @@ class GlobalExceptionHandlerTest {
 
 	@MockitoBean
 	ChangeMemberRoleUseCase changeMemberRoleUseCase;
+
+	@MockitoBean
+	RemoveMemberUseCase removeMemberUseCase;
 
 	@BeforeEach
 	void attachLogger() {
