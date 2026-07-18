@@ -1,6 +1,9 @@
 package com.collabspace.authworkspace.adapter.in.rest.workspace;
 
 import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
+import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleResult;
+import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
@@ -22,6 +25,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
@@ -40,7 +44,11 @@ public class WorkspaceController {
 
 	private final InviteMemberUseCase inviteMemberUseCase;
 
-	public WorkspaceController(CreateWorkspaceUseCase createWorkspaceUseCase, InviteMemberUseCase inviteMemberUseCase) {
+	private final ChangeMemberRoleUseCase changeMemberRoleUseCase;
+
+	public WorkspaceController(ChangeMemberRoleUseCase changeMemberRoleUseCase,
+			CreateWorkspaceUseCase createWorkspaceUseCase, InviteMemberUseCase inviteMemberUseCase) {
+		this.changeMemberRoleUseCase = changeMemberRoleUseCase;
 		this.createWorkspaceUseCase = createWorkspaceUseCase;
 		this.inviteMemberUseCase = inviteMemberUseCase;
 	}
@@ -101,6 +109,40 @@ public class WorkspaceController {
 		InviteMemberResult result = inviteMemberUseCase.invite(command);
 
 		return ResponseEntity.status(HttpStatus.CREATED).body(InviteMemberResponse.from(result));
+	}
+
+	@Operation(summary = "Change member role in workspace",
+			description = "Admin changes members role in workspace to 'member' or 'admin'. Returns a new record of workspace information and users role information")
+	@ApiResponse(responseCode = "200", description = "Change role successful",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = ChangeMemberRoleResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Validation failed",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "401", description = "Invalid credentials",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "403",
+			description = "Caller is not a member of the workspace, or is a member without the admin role",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "404", description = "The user has no membership in this workspace",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "422", description = "Cannot leave workspace without admins",
+			content = @Content(mediaType = "application/problem+json"))
+	@PreAuthorize("hasWorkspaceRole(#workspaceId, 'admin')")
+	@PatchMapping("/{workspaceId}/members/{memberId}")
+	public ResponseEntity<ChangeMemberRoleResponse> changeMemberRole(@PathVariable UUID workspaceId,
+			@PathVariable UUID memberId, @RequestBody @Valid ChangeMemberRoleRequest request,
+			HttpServletRequest httpRequest) {
+		UUID adminId = currentUserId();
+		String ipAddress = ClientIpResolver.resolve(httpRequest);
+		String correlationId = MDC.get("correlationId");
+
+		ChangeMemberRoleCommand command = new ChangeMemberRoleCommand(adminId, workspaceId, memberId, request.role(),
+				Optional.ofNullable(correlationId), Optional.of(ipAddress));
+
+		ChangeMemberRoleResult result = changeMemberRoleUseCase.changeMemberRole(command);
+
+		return ResponseEntity.ok(ChangeMemberRoleResponse.from(result));
 	}
 
 	private static UUID currentUserId() {
