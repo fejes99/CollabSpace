@@ -20,4 +20,6 @@ public interface WorkspaceMembershipRepository {
 
 	int countAdminsForUpdate(UUID workspaceId);
 
+	int deleteByWorkspaceIdAndUserId(UUID workspaceId, UUID userId);
+
 }

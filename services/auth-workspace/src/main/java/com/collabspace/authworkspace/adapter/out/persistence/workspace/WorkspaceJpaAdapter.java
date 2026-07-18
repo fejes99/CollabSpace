@@ -6,6 +6,9 @@ import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRep
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
 import org.springframework.stereotype.Component;
 
+import java.util.Optional;
+import java.util.UUID;
+
 @Component
 public class WorkspaceJpaAdapter implements WorkspaceRepository {
 
@@ -13,6 +16,11 @@ public class WorkspaceJpaAdapter implements WorkspaceRepository {
 
 	public WorkspaceJpaAdapter(WorkspaceJpaRepository jpaRepository) {
 		this.jpaRepository = jpaRepository;
+	}
+
+	@Override
+	public Optional<Workspace> findById(UUID workspaceId) {
+		return jpaRepository.findById(workspaceId).map(WorkspaceJpaAdapter::toDomain);
 	}
 
 	@Override

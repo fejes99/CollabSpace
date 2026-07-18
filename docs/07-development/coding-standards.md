@@ -21,6 +21,7 @@ For `auth-workspace`. Build tool: **Maven** (`pom.xml`). Maven applies only to t
 - Constructor injection only — no `@Autowired` on fields.
 - Records for DTOs. Skip Lombok (records cover most cases).
 - `Optional<T>` over null returns.
+- **Repository/port method naming: `find*` for a lookup that may come back empty (paired with `Optional<T>` or an empty collection); `get*` is reserved for a lookup guaranteed to succeed, or that throws instead of returning empty.** Matches Spring Data's own `findBy...` derived-query convention, so hand-written repository methods read consistently with the framework methods they wrap.
 - `@Transactional` on service methods that span multiple repository calls.
 - Bean Validation (`jakarta.validation`) at the controller boundary.
 - No direct database access from controllers — go through the service layer.

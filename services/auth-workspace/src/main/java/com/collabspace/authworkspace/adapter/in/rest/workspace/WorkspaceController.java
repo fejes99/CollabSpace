@@ -10,6 +10,8 @@ import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspa
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -25,6 +27,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -46,11 +49,15 @@ public class WorkspaceController {
 
 	private final ChangeMemberRoleUseCase changeMemberRoleUseCase;
 
+	private final RemoveMemberUseCase removeMemberUseCase;
+
 	public WorkspaceController(ChangeMemberRoleUseCase changeMemberRoleUseCase,
-			CreateWorkspaceUseCase createWorkspaceUseCase, InviteMemberUseCase inviteMemberUseCase) {
+			CreateWorkspaceUseCase createWorkspaceUseCase, InviteMemberUseCase inviteMemberUseCase,
+			RemoveMemberUseCase removeMemberUseCase) {
 		this.changeMemberRoleUseCase = changeMemberRoleUseCase;
 		this.createWorkspaceUseCase = createWorkspaceUseCase;
 		this.inviteMemberUseCase = inviteMemberUseCase;
+		this.removeMemberUseCase = removeMemberUseCase;
 	}
 
 	@Operation(summary = "Create a new workspace",
@@ -143,6 +150,37 @@ public class WorkspaceController {
 		ChangeMemberRoleResult result = changeMemberRoleUseCase.changeMemberRole(command);
 
 		return ResponseEntity.ok(ChangeMemberRoleResponse.from(result));
+	}
+
+	@Operation(summary = "Remove a member from workspace",
+			description = "Admin removes member from workspace. Returns a no content response code")
+	@ApiResponse(responseCode = "204", description = "Member removed successful")
+	@ApiResponse(responseCode = "400", description = "Validation failed",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "401", description = "Invalid credentials",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "403",
+			description = "Caller is not a member of the workspace, or is a member without the admin role",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "404", description = "The user has no membership in this workspace",
+			content = @Content(mediaType = "application/problem+json"))
+	@ApiResponse(responseCode = "422", description = "Cannot leave workspace without admins",
+			content = @Content(mediaType = "application/problem+json"))
+	@PreAuthorize("hasWorkspaceRole(#workspaceId, 'admin')")
+	@DeleteMapping("/{workspaceId}/members/{memberId}")
+	public ResponseEntity<Void> removeMember(@PathVariable UUID workspaceId, @PathVariable UUID memberId,
+			HttpServletRequest httpRequest) {
+		UUID adminId = currentUserId();
+		String ipAddress = ClientIpResolver.resolve(httpRequest);
+		String correlationId = MDC.get("correlationId");
+
+		RemoveMemberCommand command = new RemoveMemberCommand(adminId, workspaceId, memberId,
+				Optional.ofNullable(correlationId), Optional.of(ipAddress));
+
+		removeMemberUseCase.removeMember(command);
+
+		return ResponseEntity.noContent().build();
 	}
 
 	private static UUID currentUserId() {

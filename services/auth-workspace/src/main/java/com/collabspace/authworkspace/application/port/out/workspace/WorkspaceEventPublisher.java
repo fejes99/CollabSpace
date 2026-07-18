@@ -6,4 +6,6 @@ public interface WorkspaceEventPublisher {
 
 	void publishRoleChanged(MemberRoleChangedEvent event);
 
+	void publishMemberRemoved(MemberRemovedEvent event);
+
 }

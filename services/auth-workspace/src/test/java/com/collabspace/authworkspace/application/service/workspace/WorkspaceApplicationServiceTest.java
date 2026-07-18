@@ -5,7 +5,9 @@ import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberR
 import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
 import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
+import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
+import com.collabspace.authworkspace.application.port.out.workspace.MemberRemovedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
@@ -15,6 +17,7 @@ import com.collabspace.authworkspace.application.service.AccessToken;
 import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
+import com.collabspace.authworkspace.domain.exception.CreatorSelfRemovalException;
 import com.collabspace.authworkspace.domain.exception.InvitedUserNotFoundException;
 import com.collabspace.authworkspace.domain.exception.LastAdminInvariantException;
 import com.collabspace.authworkspace.domain.exception.TargetNotMemberException;
@@ -176,6 +179,15 @@ class WorkspaceApplicationServiceTest {
 
 	private ChangeMemberRoleCommand changeRoleCommand(UUID adminId, UUID memberId, String role) {
 		return new ChangeMemberRoleCommand(adminId, WORKSPACE_ID, memberId, role, Optional.empty(), Optional.empty());
+	}
+
+	private RemoveMemberCommand removeMemberCommand(UUID adminId, UUID memberId) {
+		return new RemoveMemberCommand(adminId, WORKSPACE_ID, memberId, Optional.empty(), Optional.empty());
+	}
+
+	private Workspace workspace(UUID createdByUserId) {
+		return new Workspace(WORKSPACE_ID, "Engineering", "Engineering workspace", createdByUserId, FIXED_INSTANT,
+				FIXED_INSTANT);
 	}
 
 	@Test
@@ -433,7 +445,7 @@ class WorkspaceApplicationServiceTest {
 	@DisplayName("changeRole: trusts the post-lock re-read over the pre-lock snapshot and skips a redundant save when a concurrent request already applied the same change")
 	void changeRoleReReadAfterLockSkipsRedundantSaveWhenAlreadyAtTargetRole() {
 		// Simulates a concurrent request that demoted this exact member between the
-		// pre-lock lookup and the post-lock re-read inside ensureAdminInvariant --
+		// pre-lock lookup and the post-lock re-read inside verifyAdminInvariant --
 		// the second read must win, and since it already matches the requested role,
 		// the save is redundant. countAdminsForUpdate=2 keeps the invariant itself out
 		// of the way so this test isolates the re-read/skip-save behavior alone.
@@ -678,6 +690,305 @@ class WorkspaceApplicationServiceTest {
 
 		assertThat(logCapture.list).anyMatch(e -> e.getLevel() == Level.ERROR
 				&& e.getFormattedMessage().contains("event=member_role_changed_publish_failed")
+				&& e.getFormattedMessage().contains("userId=" + MEMBER_ID));
+	}
+
+	@Test
+	@DisplayName("remove: throws TargetNotMemberException when the target has no membership, starting no transaction")
+	void removeThrowsTargetNotMemberExceptionWhenNoMembershipExists() {
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.empty());
+
+		assertThrows(TargetNotMemberException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID)));
+
+		verifyNoInteractions(workspaceRepository);
+		verifyNoInteractions(transactionManager);
+		verifyNoInteractions(membershipStalenessRepository);
+		verifyNoInteractions(workspaceEventPublisher);
+	}
+
+	@Test
+	@DisplayName("remove: creator removing themselves throws CreatorSelfRemovalException before ever consulting the last-admin invariant")
+	void removeCreatorSelfRemovalThrowsBeforeConsultingAdminInvariant() {
+		// No stub for countAdminsForUpdate -- the assertion that it's never invoked is
+		// what
+		// proves this fires unconditionally, even when the creator happens to be the sole
+		// admin, per the plan's §6 ordering note.
+		WorkspaceMembership current = membershipWithRole(ADMIN_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace(ADMIN_ID)));
+
+		assertThrows(CreatorSelfRemovalException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, ADMIN_ID)));
+
+		verify(workspaceMembershipRepository, never()).countAdminsForUpdate(any());
+		verify(workspaceMembershipRepository, never()).deleteByWorkspaceIdAndUserId(any(), any());
+		verifyNoInteractions(transactionManager);
+	}
+
+	@Test
+	@DisplayName("remove: another admin removing the creator succeeds without ever checking creator identity")
+	void removeOtherAdminRemovingCreatorSucceedsWithoutCreatorCheck() {
+		WorkspaceMembership creatorMembership = membershipWithRole(MEMBER_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(creatorMembership));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		verifyNoInteractions(workspaceRepository);
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: removing a non-admin member never consults the last-admin invariant")
+	void removeNonAdminTargetNeverConsultsLastAdminInvariant() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		verify(workspaceMembershipRepository, never()).countAdminsForUpdate(any());
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: removing the workspace's sole admin throws LastAdminInvariantException and rolls back")
+	void removeSoleAdminTargetThrowsLastAdminInvariantExceptionAndRollsBack() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(1);
+
+		assertThrows(LastAdminInvariantException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID)));
+
+		verify(workspaceMembershipRepository, never()).deleteByWorkspaceIdAndUserId(any(), any());
+		verify(transactionManager).rollback(transactionStatus);
+		verify(transactionManager, never()).commit(any(TransactionStatus.class));
+		verifyNoInteractions(membershipStalenessRepository);
+		verifyNoInteractions(workspaceEventPublisher);
+	}
+
+	@Test
+	@DisplayName("remove: removing an admin who isn't the sole admin succeeds and publishes member.removed with the admin and target ids")
+	void removeAdminTargetNotSoleAdminSucceedsAndPublishesEvent() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		ArgumentCaptor<MemberRemovedEvent> captor = ArgumentCaptor.forClass(MemberRemovedEvent.class);
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		verify(workspaceEventPublisher).publishMemberRemoved(captor.capture());
+		MemberRemovedEvent event = captor.getValue();
+		assertThat(event.adminId()).isEqualTo(ADMIN_ID);
+		assertThat(event.workspaceId()).isEqualTo(WORKSPACE_ID);
+		assertThat(event.removedUserId()).isEqualTo(MEMBER_ID);
+		verify(membershipStalenessRepository).markMembershipChanged(eq(MEMBER_ID), any());
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: self-removal by a non-creator admin who isn't the sole admin succeeds")
+	void removeSelfNonCreatorNotSoleAdminSucceeds() {
+		WorkspaceMembership current = membershipWithRole(ADMIN_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace(MEMBER_ID)));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID)).thenReturn(1);
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, ADMIN_ID));
+
+		verify(membershipStalenessRepository).markMembershipChanged(eq(ADMIN_ID), any());
+		verify(workspaceEventPublisher).publishMemberRemoved(any());
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: a delete that affects zero rows (already removed by a concurrent request) throws TargetNotMemberException and rolls back")
+	void removeDeleteReturnsZeroRowsThrowsTargetNotMemberExceptionAndRollsBack() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(0);
+
+		assertThrows(TargetNotMemberException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID)));
+
+		verify(transactionManager).rollback(transactionStatus);
+		verify(transactionManager, never()).commit(any(TransactionStatus.class));
+		verifyNoInteractions(membershipStalenessRepository);
+		verifyNoInteractions(workspaceEventPublisher);
+	}
+
+	@Test
+	@DisplayName("remove: self-removal throws IllegalStateException when the membership's workspace no longer exists")
+	void removeThrowsIllegalStateExceptionWhenWorkspaceMissingForSelfRemoval() {
+		WorkspaceMembership current = membershipWithRole(ADMIN_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.empty());
+
+		assertThrows(IllegalStateException.class, () -> service.removeMember(removeMemberCommand(ADMIN_ID, ADMIN_ID)));
+
+		verifyNoInteractions(transactionManager);
+		verify(workspaceMembershipRepository, never()).deleteByWorkspaceIdAndUserId(any(), any());
+	}
+
+	@Test
+	@DisplayName("remove: still succeeds, and still attempts the SNS publish, when the Redis marker write fails")
+	void removeStillSucceedsWhenMarkerWriteFails() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		doThrow(new DataAccessResourceFailureException("redis down")).when(membershipStalenessRepository)
+			.markMembershipChanged(any(), any());
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		verify(workspaceEventPublisher).publishMemberRemoved(any());
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: still succeeds, and still attempts the Redis marker write, when the SNS publish fails")
+	void removeStillSucceedsWhenEventPublishFails() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		doThrow(SdkException.create("sns down", null)).when(workspaceEventPublisher).publishMemberRemoved(any());
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		verify(membershipStalenessRepository).markMembershipChanged(any(), any());
+		verify(transactionManager).commit(transactionStatus);
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removed at INFO with distinct adminId/targetUserId and no jti field for an other-directed removal")
+	void removeSuccessOtherDirectedLogsDistinctAdminAndTargetIdsWithNoJti() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		RemoveMemberCommand command = new RemoveMemberCommand(ADMIN_ID, WORKSPACE_ID, MEMBER_ID,
+				Optional.of("corr-rm-1"), Optional.of(TEST_IP));
+
+		service.removeMember(command);
+
+		assertThat(logCapture.list)
+			.anyMatch(e -> e.getLevel() == Level.INFO && e.getFormattedMessage().contains("event=member_removed")
+					&& e.getFormattedMessage().contains("adminId=" + ADMIN_ID)
+					&& e.getFormattedMessage().contains("targetUserId=" + MEMBER_ID)
+					&& e.getFormattedMessage().contains("correlationId=corr-rm-1")
+					&& !e.getFormattedMessage().contains("jti"));
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removed with equal adminId and targetUserId for a self-directed removal")
+	void removeSuccessSelfDirectedLogsEqualAdminAndTargetIds() {
+		WorkspaceMembership current = membershipWithRole(ADMIN_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace(MEMBER_ID)));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID)).thenReturn(1);
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, ADMIN_ID));
+
+		assertThat(logCapture.list)
+			.anyMatch(e -> e.getLevel() == Level.INFO && e.getFormattedMessage().contains("event=member_removed")
+					&& e.getFormattedMessage().contains("adminId=" + ADMIN_ID)
+					&& e.getFormattedMessage().contains("targetUserId=" + ADMIN_ID));
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removal_rejected reason=target_not_member at WARN")
+	void removeRejectedLogsWarnReasonTargetNotMember() {
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.empty());
+
+		assertThrows(TargetNotMemberException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID)));
+
+		assertThat(logCapture.list).anyMatch(
+				e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("event=member_removal_rejected")
+						&& e.getFormattedMessage().contains("reason=target_not_member"));
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removal_rejected reason=creator_self_removal at WARN")
+	void removeRejectedLogsWarnReasonCreatorSelfRemoval() {
+		WorkspaceMembership current = membershipWithRole(ADMIN_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, ADMIN_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceRepository.findById(WORKSPACE_ID)).thenReturn(Optional.of(workspace(ADMIN_ID)));
+
+		assertThrows(CreatorSelfRemovalException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, ADMIN_ID)));
+
+		assertThat(logCapture.list).anyMatch(
+				e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("event=member_removal_rejected")
+						&& e.getFormattedMessage().contains("reason=creator_self_removal"));
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removal_rejected reason=last_admin_invariant at WARN")
+	void removeRejectedLogsWarnReasonLastAdminInvariant() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.ADMIN);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(1);
+
+		assertThrows(LastAdminInvariantException.class,
+				() -> service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID)));
+
+		assertThat(logCapture.list).anyMatch(
+				e -> e.getLevel() == Level.WARN && e.getFormattedMessage().contains("event=member_removal_rejected")
+						&& e.getFormattedMessage().contains("reason=last_admin_invariant"));
+	}
+
+	@Test
+	@DisplayName("remove: logs membership_marker_write_failed at ERROR with the target's userId when the Redis marker write fails")
+	void removeMarkerWriteFailureLogsErrorWithTargetUserId() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		doThrow(new DataAccessResourceFailureException("redis down")).when(membershipStalenessRepository)
+			.markMembershipChanged(any(), any());
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		assertThat(logCapture.list).anyMatch(e -> e.getLevel() == Level.ERROR
+				&& e.getFormattedMessage().contains("event=membership_marker_write_failed")
+				&& e.getFormattedMessage().contains("userId=" + MEMBER_ID));
+	}
+
+	@Test
+	@DisplayName("remove: logs member_removed_publish_failed at ERROR with the target's userId when the SNS publish fails")
+	void removeEventPublishFailureLogsErrorWithTargetUserId() {
+		WorkspaceMembership current = membershipWithRole(MEMBER_ID, WorkspaceRole.MEMBER);
+		when(workspaceMembershipRepository.findByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID))
+			.thenReturn(Optional.of(current));
+		when(workspaceMembershipRepository.deleteByWorkspaceIdAndUserId(WORKSPACE_ID, MEMBER_ID)).thenReturn(1);
+		doThrow(SdkException.create("sns down", null)).when(workspaceEventPublisher).publishMemberRemoved(any());
+
+		service.removeMember(removeMemberCommand(ADMIN_ID, MEMBER_ID));
+
+		assertThat(logCapture.list).anyMatch(e -> e.getLevel() == Level.ERROR
+				&& e.getFormattedMessage().contains("event=member_removed_publish_failed")
 				&& e.getFormattedMessage().contains("userId=" + MEMBER_ID));
 	}
 
