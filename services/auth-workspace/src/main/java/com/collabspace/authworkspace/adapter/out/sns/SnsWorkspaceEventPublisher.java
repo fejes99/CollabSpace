@@ -1,6 +1,7 @@
 package com.collabspace.authworkspace.adapter.out.sns;
 
 import com.collabspace.authworkspace.application.port.out.workspace.MemberInvitedEvent;
+import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -22,6 +23,8 @@ import java.util.Map;
 public class SnsWorkspaceEventPublisher implements WorkspaceEventPublisher {
 
 	private static final String EVENT_TYPE_MEMBER_INVITED = "member.invited";
+
+	private static final String EVENT_TYPE_MEMBER_ROLE_CHANGED = "member.role_changed";
 
 	private final SnsClient snsClient;
 
@@ -47,22 +50,29 @@ public class SnsWorkspaceEventPublisher implements WorkspaceEventPublisher {
 
 	@Override
 	public void publishMemberInvited(MemberInvitedEvent event) {
-		String messageBody = writeAsJson(event);
-		PublishRequest request = PublishRequest.builder()
-			.topicArn(topicArn)
-			.message(messageBody)
-			.messageAttributes(Map.of("eventType",
-					MessageAttributeValue.builder().dataType("String").stringValue(EVENT_TYPE_MEMBER_INVITED).build()))
-			.build();
-		snsClient.publish(request);
+		snsClient.publish(buildRequest(event, EVENT_TYPE_MEMBER_INVITED));
 	}
 
-	private String writeAsJson(MemberInvitedEvent event) {
+	@Override
+	public void publishRoleChanged(MemberRoleChangedEvent event) {
+		snsClient.publish(buildRequest(event, EVENT_TYPE_MEMBER_ROLE_CHANGED));
+	}
+
+	private PublishRequest buildRequest(Object event, String eventType) {
+		return PublishRequest.builder()
+			.topicArn(topicArn)
+			.message(writeAsJson(event))
+			.messageAttributes(Map.of("eventType",
+					MessageAttributeValue.builder().dataType("String").stringValue(eventType).build()))
+			.build();
+	}
+
+	private String writeAsJson(Object event) {
 		try {
 			return objectMapper.writeValueAsString(event);
 		}
 		catch (JsonProcessingException ex) {
-			throw new IllegalStateException("Failed to serialize MemberInvitedEvent", ex);
+			throw new IllegalStateException("Failed to serialize " + event.getClass().getSimpleName(), ex);
 		}
 	}
 

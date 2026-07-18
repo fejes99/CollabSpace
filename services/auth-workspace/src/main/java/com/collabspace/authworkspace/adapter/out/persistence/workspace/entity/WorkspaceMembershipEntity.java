@@ -10,6 +10,7 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 
+import java.time.Instant;
 import java.util.UUID;
 
 @Entity
@@ -31,11 +32,22 @@ public class WorkspaceMembershipEntity extends AbstractAuditableEntity {
 	protected WorkspaceMembershipEntity() {
 	}
 
-	public WorkspaceMembershipEntity(UUID id, UUID workspaceId, UUID userId, WorkspaceRole role) {
+	// createdAt must be threaded through explicitly for the update path (JPA's merge()
+	// copies all basic-attribute state from this transient instance onto the managed
+	// entity,
+	// including a null createdAt, even though @Column(updatable = false) keeps that null
+	// out
+	// of the generated UPDATE statement -- it doesn't stop merge() from nulling the
+	// in-memory
+	// field). Harmless on insert: @PrePersist's @CreatedDate unconditionally overwrites
+	// it
+	// with the auditing clock's value regardless of what's passed here.
+	public WorkspaceMembershipEntity(UUID id, UUID workspaceId, UUID userId, WorkspaceRole role, Instant createdAt) {
 		super(id);
 		this.workspaceId = workspaceId;
 		this.userId = userId;
 		this.role = role;
+		this.createdAt = createdAt;
 	}
 
 	public UUID getWorkspaceId() {

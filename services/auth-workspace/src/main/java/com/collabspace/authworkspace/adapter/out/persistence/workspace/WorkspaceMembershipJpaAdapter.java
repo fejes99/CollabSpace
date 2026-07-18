@@ -5,6 +5,7 @@ import com.collabspace.authworkspace.adapter.out.persistence.workspace.repositor
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
+import com.collabspace.authworkspace.domain.model.workspace.WorkspaceRole;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Component;
@@ -28,9 +29,6 @@ public class WorkspaceMembershipJpaAdapter implements WorkspaceMembershipReposit
 			return toDomain(jpaRepository.saveAndFlush(toEntity(workspaceMembership)));
 		}
 		catch (DataIntegrityViolationException ex) {
-			// workspace_memberships_workspace_user_unique is defined in
-			// V4__create_workspaces_and_memberships.sql. If a different constraint
-			// fires, rethrow so it surfaces as an unexpected server error.
 			if (ex.getCause() instanceof ConstraintViolationException cve
 					&& "workspace_memberships_workspace_user_unique".equals(cve.getConstraintName())) {
 				throw new AlreadyMemberException();
@@ -40,8 +38,20 @@ public class WorkspaceMembershipJpaAdapter implements WorkspaceMembershipReposit
 	}
 
 	@Override
+	public int countAdminsForUpdate(UUID workspaceId) {
+		return jpaRepository.findByWorkspaceIdAndRole(workspaceId, WorkspaceRole.ADMIN).size();
+	}
+
+	@Override
 	public Optional<WorkspaceMembership> findById(UUID id) {
 		return jpaRepository.findById(id).map(WorkspaceMembershipJpaAdapter::toDomain);
+	}
+
+	@Override
+	public Optional<WorkspaceMembership> findByWorkspaceIdAndUserId(UUID workspaceId, UUID userId) {
+		return jpaRepository.findByWorkspaceIdAndUserId(workspaceId, userId)
+			.map(WorkspaceMembershipJpaAdapter::toDomain);
+
 	}
 
 	@Override
@@ -59,7 +69,7 @@ public class WorkspaceMembershipJpaAdapter implements WorkspaceMembershipReposit
 
 	private static WorkspaceMembershipEntity toEntity(WorkspaceMembership workspaceMembership) {
 		return new WorkspaceMembershipEntity(workspaceMembership.id(), workspaceMembership.workspaceId(),
-				workspaceMembership.userId(), workspaceMembership.role());
+				workspaceMembership.userId(), workspaceMembership.role(), workspaceMembership.createdAt());
 	}
 
 	private static WorkspaceMembership toDomain(WorkspaceMembershipEntity entity) {

@@ -46,12 +46,14 @@ Defined in [`docs/03-services/auth-workspace/plans/security-filter.md`](../03-se
 
 ## `workspace/`
 
-Defined in [`docs/03-services/auth-workspace/plans/invite-member.md`](../03-services/auth-workspace/plans/invite-member.md) (PR 9).
+Defined in [`docs/03-services/auth-workspace/plans/invite-member.md`](../03-services/auth-workspace/plans/invite-member.md) (PR 9) and [`docs/03-services/auth-workspace/plans/change-member-role.md`](../03-services/auth-workspace/plans/change-member-role.md) (PR 10).
 
 | `type` | Status | Meaning |
 |---|---|---|
 | `workspace/user-not-found` | 404 | No registered user matches the invited email address. |
 | `workspace/already-member` | 409 | The target user already has a membership in the requested workspace. |
+| `workspace/target-not-a-member` | 404 | The target `userId` has no membership in the requested workspace — distinct from `user-not-found`, since the user exists, just isn't a member of this workspace. |
+| `workspace/last-admin-invariant` | 422 | The requested role change would leave the workspace with zero admins. |
 
 ---
 
