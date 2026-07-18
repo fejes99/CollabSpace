@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), and invite-member (`POST /v1/workspaces/{id}/members`, PR #48) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 is not yet verified on AWS. Next: the rest of workspace CRUD and membership endpoints, starting with change-member-role.
+Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), invite-member (`POST /v1/workspaces/{id}/members`, PR #48), and change-member-role (`PATCH /v1/workspaces/{id}/members/{userId}`, PR #49) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 is not yet verified on AWS. Next: the rest of workspace CRUD and membership endpoints, starting with remove-member.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: PR 10 — `PATCH /v1/workspaces/{workspaceId}/members/{userId}` (change member role, admin-only; plan doc at `docs/03-services/auth-workspace/plans/change-member-role.md`) — in progress on `feat/auth/change-member-role`. Reprioritized ahead of list-workspaces and remove-member on 2026-07-16 so PR 9's RBAC machinery (`hasWorkspaceRole`, the two `403` exception types, the `membership-changed-at` staleness write side) stays fresh context; builds the last-admin invariant that PR 11 (remove-member) will reuse. After that: remove-member (PR 11) and `GET /v1/workspaces` list (PR 12) — see `notes/auth-workspace-prs.md`.
+Next milestone: PR 11 — `DELETE /v1/workspaces/{workspaceId}/members/{userId}` (remove member, admin-only; plan doc at `docs/03-services/auth-workspace/plans/remove-member.md`) — in progress on `feat/auth/remove-member`. Reuses PR 10's last-admin invariant (`countAdminsForUpdate`); adds a creator-self-removal rule that fires unconditionally, before the invariant lock. Service-layer and integration tests are written and passing; endpoint not yet committed or opened as a PR. After that: `GET /v1/workspaces` list (PR 12) — see `notes/auth-workspace-prs.md`.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 
