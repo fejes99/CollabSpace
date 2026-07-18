@@ -35,13 +35,14 @@ services:
       - services/auth-workspace/.env
     environment:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/auth_db
+      SPRING_DATA_REDIS_URL: redis://redis:6379
     depends_on:
       postgres:
         condition: service_healthy
     networks:
       - collabspace
     healthcheck:
-      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health"]
+      test: ["CMD-SHELL", "curl -sf http://localhost:8080/actuator/health/readiness"]
       interval: 10s
       timeout: 5s
       retries: 5
