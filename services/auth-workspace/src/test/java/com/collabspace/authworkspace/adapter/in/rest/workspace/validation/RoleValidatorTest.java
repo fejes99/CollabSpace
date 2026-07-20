@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.adapter.in.rest.workspace;
+package com.collabspace.authworkspace.adapter.in.rest.workspace.validation;
 
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;

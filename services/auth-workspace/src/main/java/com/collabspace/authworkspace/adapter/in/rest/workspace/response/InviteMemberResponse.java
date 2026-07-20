@@ -1,6 +1,6 @@
-package com.collabspace.authworkspace.adapter.in.rest.workspace;
+package com.collabspace.authworkspace.adapter.in.rest.workspace.response;
 
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.InviteMemberResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.time.Instant;

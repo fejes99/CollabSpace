@@ -1,6 +1,6 @@
-package com.collabspace.authworkspace.adapter.in.rest.workspace;
+package com.collabspace.authworkspace.adapter.in.rest.workspace.response;
 
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.CreateWorkspaceResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record CreateWorkspaceResponse(@Schema(

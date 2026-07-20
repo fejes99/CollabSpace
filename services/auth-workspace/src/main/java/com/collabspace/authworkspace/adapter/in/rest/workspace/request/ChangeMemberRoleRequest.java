@@ -1,5 +1,6 @@
-package com.collabspace.authworkspace.adapter.in.rest.workspace;
+package com.collabspace.authworkspace.adapter.in.rest.workspace.request;
 
+import com.collabspace.authworkspace.adapter.in.rest.workspace.validation.ValidRole;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.constraints.NotBlank;
 

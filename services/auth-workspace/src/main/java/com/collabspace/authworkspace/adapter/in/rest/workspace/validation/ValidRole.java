@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.adapter.in.rest.workspace;
+package com.collabspace.authworkspace.adapter.in.rest.workspace.validation;
 
 import jakarta.validation.Constraint;
 import jakarta.validation.Payload;
