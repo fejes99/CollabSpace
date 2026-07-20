@@ -1,17 +1,30 @@
 package com.collabspace.authworkspace.adapter.in.rest.workspace;
 
+import com.collabspace.authworkspace.adapter.in.rest.common.PagedResponse;
+import com.collabspace.authworkspace.adapter.in.rest.common.PaginationMetadata;
 import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleResult;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberUseCase;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.request.ChangeMemberRoleRequest;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.request.CreateWorkspaceRequest;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.request.InviteMemberRequest;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.response.ChangeMemberRoleResponse;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.response.CreateWorkspaceResponse;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.response.InviteMemberResponse;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.response.WorkspaceListItem;
+import com.collabspace.authworkspace.adapter.in.rest.workspace.validation.ValidAfter;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ChangeMemberRoleCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.CreateWorkspaceCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.InviteMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ListWorkspacesCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ChangeMemberRoleResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.CreateWorkspaceResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.InviteMemberResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ListWorkspacesResult;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.ChangeMemberRoleUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.CreateWorkspaceUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.InviteMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.ListWorkspacesUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.RemoveMemberUseCase;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.media.Content;
 import io.swagger.v3.oas.annotations.media.Schema;
@@ -19,6 +32,8 @@ import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import org.slf4j.MDC;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -27,17 +42,23 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
+@Validated
 @RestController
 @RequestMapping("/v1/workspaces")
 @Tag(name = "Workspaces", description = "Workspace management")
@@ -51,13 +72,65 @@ public class WorkspaceController {
 
 	private final RemoveMemberUseCase removeMemberUseCase;
 
+	private final ListWorkspacesUseCase listWorkspacesUseCase;
+
 	public WorkspaceController(ChangeMemberRoleUseCase changeMemberRoleUseCase,
 			CreateWorkspaceUseCase createWorkspaceUseCase, InviteMemberUseCase inviteMemberUseCase,
-			RemoveMemberUseCase removeMemberUseCase) {
+			RemoveMemberUseCase removeMemberUseCase, ListWorkspacesUseCase listWorkspacesUseCase) {
 		this.changeMemberRoleUseCase = changeMemberRoleUseCase;
 		this.createWorkspaceUseCase = createWorkspaceUseCase;
 		this.inviteMemberUseCase = inviteMemberUseCase;
 		this.removeMemberUseCase = removeMemberUseCase;
+		this.listWorkspacesUseCase = listWorkspacesUseCase;
+	}
+
+	@Operation(summary = "List workspaces",
+			description = "Returns a cursor-paginated list of every workspace in the system")
+	@ApiResponse(responseCode = "200", description = "List workspaces",
+			content = @Content(mediaType = MediaType.APPLICATION_JSON_VALUE,
+					schema = @Schema(implementation = PagedResponse.class)))
+	@ApiResponse(responseCode = "400", description = "Validation failed",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@ApiResponse(responseCode = "401", description = "Invalid credentials",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@GetMapping()
+	public ResponseEntity<PagedResponse<WorkspaceListItem>> getWorkspaces(
+			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
+			@RequestParam(required = false) @ValidAfter String after) {
+		UUID userId = currentUserId();
+		String correlationId = MDC.get("correlationId");
+
+		Optional<Instant> afterCreatedAt = Optional.empty();
+		Optional<UUID> afterWorkspaceId = Optional.empty();
+		if (after != null) {
+			WorkspaceCursor cursor = WorkspaceCursor.decode(after);
+			afterCreatedAt = Optional.of(cursor.createdAt());
+			afterWorkspaceId = Optional.of(cursor.workspaceId());
+		}
+
+		ListWorkspacesCommand command = new ListWorkspacesCommand(userId, limit, afterCreatedAt, afterWorkspaceId,
+				Optional.ofNullable(correlationId));
+
+		ListWorkspacesResult result = listWorkspacesUseCase.list(command);
+
+		List<WorkspaceListItem> items = result.workspaces()
+			.stream()
+			.map(entry -> new WorkspaceListItem(entry.id(), entry.name(), entry.memberCount()))
+			.toList();
+
+		String nextCursor = null;
+		if (result.hasNextPage()) {
+			WorkspaceCursor next = new WorkspaceCursor(result.nextAfterCreatedAt().orElseThrow(),
+					result.nextAfterWorkspaceId().orElseThrow());
+			nextCursor = next.encode();
+		}
+
+		PaginationMetadata pagination = new PaginationMetadata(result.hasNextPage(), nextCursor, limit, items.size());
+		PagedResponse<WorkspaceListItem> response = new PagedResponse<>(items, pagination);
+
+		return ResponseEntity.ok(response);
 	}
 
 	@Operation(summary = "Create a new workspace",

@@ -1,10 +1,12 @@
 package com.collabspace.authworkspace.adapter.in.rest.error;
 
+import com.collabspace.authworkspace.adapter.in.rest.workspace.validation.ValidAfter;
 import com.collabspace.authworkspace.domain.exception.ConflictException;
 import com.collabspace.authworkspace.domain.exception.DomainException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
 import com.collabspace.authworkspace.domain.exception.UnauthorizedException;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.ConstraintViolationException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.ProblemDetail;
@@ -14,6 +16,7 @@ import org.springframework.security.core.AuthenticationException;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 
@@ -40,6 +43,45 @@ class GlobalExceptionHandler {
 		problem.setInstance(URI.create(request.getRequestURI()));
 		problem.setProperty("errors", errors);
 		log.warn("event=validation_failed uri={} fields={}", request.getRequestURI(), fieldNames(ex));
+		return problem;
+	}
+
+	// Thrown for @RequestParam/@PathVariable constraint annotations (@Min, @Max,
+	// @ValidAfter) on a @Validated-annotated controller -- a different exception type
+	// from MethodArgumentNotValidException, which only covers @Valid @RequestBody.
+	@ExceptionHandler(ConstraintViolationException.class)
+	ProblemDetail handleConstraintViolation(ConstraintViolationException ex, HttpServletRequest request) {
+		// Checked by constraint annotation type, not by property-path string matching --
+		// a string suffix like ".after" would also misfire on any future @RequestParam
+		// that happens to share that name for an unrelated reason.
+		boolean cursorInvalid = ex.getConstraintViolations()
+			.stream()
+			.anyMatch(v -> v.getConstraintDescriptor().getAnnotation() instanceof ValidAfter);
+
+		// Every violation is reported, even when limit and after are both invalid in the
+		// same request -- picking one type/title to headline (cursor takes priority,
+		// since it's the more specific error) must not cause the other violation to go
+		// unmentioned in the response body.
+		List<Map<String, String>> errors = ex.getConstraintViolations().stream().map(v -> {
+			String path = v.getPropertyPath().toString();
+			String field = path.contains(".") ? path.substring(path.lastIndexOf('.') + 1) : path;
+			return Map.of("field", field, "message", v.getMessage());
+		}).toList();
+
+		ProblemDetail problem = ProblemDetail.forStatus(400);
+		if (cursorInvalid) {
+			problem.setType(DomainException.errorType("validation/invalid-cursor"));
+			problem.setTitle("Invalid cursor");
+			problem.setDetail("The 'after' cursor is malformed or invalid.");
+		}
+		else {
+			problem.setType(DomainException.errorType("validation/invalid-request"));
+			problem.setTitle("Validation failed");
+			problem.setDetail("The request contains invalid parameters.");
+		}
+		problem.setInstance(URI.create(request.getRequestURI()));
+		problem.setProperty("errors", errors);
+		log.warn("event=constraint_violation uri={} violations={}", request.getRequestURI(), violationSummary(ex));
 		return problem;
 	}
 
@@ -100,12 +142,23 @@ class GlobalExceptionHandler {
 
 	@ExceptionHandler(MethodArgumentTypeMismatchException.class)
 	ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
+		boolean isQueryParam = ex.getParameter().hasParameterAnnotation(RequestParam.class);
+
 		ProblemDetail problem = ProblemDetail.forStatus(400);
-		problem.setType(DomainException.errorType("validation/invalid-path-parameter"));
-		problem.setTitle("Invalid path parameter");
-		problem.setDetail("Parameter '" + ex.getName() + "' has an invalid value.");
+		if (isQueryParam) {
+			problem.setType(DomainException.errorType("validation/invalid-request"));
+			problem.setTitle("Validation failed");
+			problem.setDetail("Parameter '" + ex.getName() + "' has an invalid value.");
+			problem.setProperty("errors", List.of(Map.of("field", ex.getName(), "message", "has an invalid value")));
+		}
+		else {
+			problem.setType(DomainException.errorType("validation/invalid-path-parameter"));
+			problem.setTitle("Invalid path parameter");
+			problem.setDetail("Parameter '" + ex.getName() + "' has an invalid value.");
+		}
 		problem.setInstance(URI.create(request.getRequestURI()));
-		log.warn("event=invalid_path_parameter uri={} parameter={}", request.getRequestURI(), ex.getName());
+		log.warn("event=invalid_parameter uri={} parameter={} source={}", request.getRequestURI(), ex.getName(),
+				isQueryParam ? "query" : "path");
 		return problem;
 	}
 
@@ -145,6 +198,14 @@ class GlobalExceptionHandler {
 			.stream()
 			.map(FieldError::getField)
 			.distinct()
+			.reduce((a, b) -> a + "," + b)
+			.orElse("unknown");
+	}
+
+	private static String violationSummary(ConstraintViolationException ex) {
+		return ex.getConstraintViolations()
+			.stream()
+			.map(v -> v.getPropertyPath() + "=" + v.getMessage())
 			.reduce((a, b) -> a + "," + b)
 			.orElse("unknown");
 	}

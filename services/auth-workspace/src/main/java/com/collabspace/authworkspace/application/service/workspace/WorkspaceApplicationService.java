@@ -1,22 +1,27 @@
 package com.collabspace.authworkspace.application.service.workspace;
 
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleResult;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceResult;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberUseCase;
-import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ChangeMemberRoleCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.CreateWorkspaceCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.InviteMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ListWorkspacesCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ChangeMemberRoleResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.CreateWorkspaceResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.InviteMemberResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ListWorkspacesResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.WorkspaceListEntry;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.ChangeMemberRoleUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.CreateWorkspaceUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.InviteMemberUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.ListWorkspacesUseCase;
+import com.collabspace.authworkspace.application.port.in.workspace.usecase.RemoveMemberUseCase;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberInvitedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRemovedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
+import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceListRow;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRepository;
 import com.collabspace.authworkspace.application.service.AccessToken;
@@ -45,12 +50,14 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class WorkspaceApplicationService
-		implements CreateWorkspaceUseCase, InviteMemberUseCase, ChangeMemberRoleUseCase, RemoveMemberUseCase {
+public class WorkspaceApplicationService implements CreateWorkspaceUseCase, InviteMemberUseCase,
+		ChangeMemberRoleUseCase, RemoveMemberUseCase, ListWorkspacesUseCase {
 
 	private static final Logger log = LoggerFactory.getLogger(WorkspaceApplicationService.class);
 
 	private static final String EVENT_MARKER_WRITE_FAILED = "membership_marker_write_failed";
+
+	private static final UUID MIN_UUID = new UUID(0L, 0L);
 
 	private final WorkspaceRepository workspaceRepository;
 
@@ -80,6 +87,35 @@ public class WorkspaceApplicationService
 		this.workspaceEventPublisher = workspaceEventPublisher;
 		this.jwtService = jwtService;
 		this.commitThenAction = commitThenAction;
+	}
+
+	@Override
+	public ListWorkspacesResult list(ListWorkspacesCommand command) {
+		Instant afterCreatedAt = command.afterCreatedAt().orElse(Instant.EPOCH);
+		UUID afterWorkspaceId = command.afterWorkspaceId().orElse(MIN_UUID);
+
+		List<WorkspaceListRow> rows = workspaceRepository.findPage(afterCreatedAt, afterWorkspaceId,
+				command.limit() + 1);
+
+		boolean hasNextPage = rows.size() > command.limit();
+		List<WorkspaceListRow> page = hasNextPage ? rows.subList(0, command.limit()) : rows;
+
+		List<WorkspaceListEntry> entries = page.stream()
+			.map(row -> new WorkspaceListEntry(row.id(), row.name(), (int) row.memberCount()))
+			.toList();
+
+		Optional<Instant> nextAfterCreatedAt = Optional.empty();
+		Optional<UUID> nextAfterWorkspaceId = Optional.empty();
+		if (hasNextPage) {
+			WorkspaceListRow lastRow = page.getLast();
+			nextAfterCreatedAt = Optional.of(lastRow.createdAt());
+			nextAfterWorkspaceId = Optional.of(lastRow.id());
+		}
+
+		log.info("event=workspaces_listed userId={} count={} limit={} hasNextPage={} correlationId={}",
+				command.userId(), entries.size(), command.limit(), hasNextPage, command.correlationId().orElse(null));
+
+		return new ListWorkspacesResult(entries, hasNextPage, nextAfterCreatedAt, nextAfterWorkspaceId);
 	}
 
 	@Override

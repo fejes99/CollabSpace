@@ -2,10 +2,14 @@ package com.collabspace.authworkspace.adapter.out.persistence.workspace;
 
 import com.collabspace.authworkspace.adapter.out.persistence.workspace.entity.WorkspaceEntity;
 import com.collabspace.authworkspace.adapter.out.persistence.workspace.repository.WorkspaceJpaRepository;
+import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceListRow;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRepository;
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
+import org.springframework.data.domain.Limit;
 import org.springframework.stereotype.Component;
 
+import java.time.Instant;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -26,6 +30,11 @@ public class WorkspaceJpaAdapter implements WorkspaceRepository {
 	@Override
 	public Workspace save(Workspace workspace) {
 		return toDomain(jpaRepository.saveAndFlush(toEntity(workspace)));
+	}
+
+	@Override
+	public List<WorkspaceListRow> findPage(Instant afterCreatedAt, UUID afterWorkspaceId, int limit) {
+		return jpaRepository.findPage(afterCreatedAt, afterWorkspaceId, Limit.of(limit));
 	}
 
 	private static WorkspaceEntity toEntity(Workspace workspace) {

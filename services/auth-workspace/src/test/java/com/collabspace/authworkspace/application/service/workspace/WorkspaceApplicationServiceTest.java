@@ -1,16 +1,19 @@
 package com.collabspace.authworkspace.application.service.workspace;
 
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.ChangeMemberRoleResult;
-import com.collabspace.authworkspace.application.port.in.workspace.CreateWorkspaceCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberCommand;
-import com.collabspace.authworkspace.application.port.in.workspace.InviteMemberResult;
-import com.collabspace.authworkspace.application.port.in.workspace.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ChangeMemberRoleCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.CreateWorkspaceCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.InviteMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.ListWorkspacesCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.command.RemoveMemberCommand;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ChangeMemberRoleResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.InviteMemberResult;
+import com.collabspace.authworkspace.application.port.in.workspace.result.ListWorkspacesResult;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRemovedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MemberRoleChangedEvent;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceEventPublisher;
+import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceListRow;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRepository;
 import com.collabspace.authworkspace.application.service.AccessToken;
@@ -76,6 +79,8 @@ class WorkspaceApplicationServiceTest {
 
 	private static final String TEST_IP = "192.0.2.1";
 
+	private static final UUID MIN_UUID = new UUID(0L, 0L);
+
 	@Mock
 	private WorkspaceRepository workspaceRepository;
 
@@ -127,6 +132,122 @@ class WorkspaceApplicationServiceTest {
 		service = new WorkspaceApplicationService(Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC), workspaceRepository,
 				workspaceMembershipRepository, userRepository, membershipStalenessRepository, workspaceEventPublisher,
 				jwtService, new CommitThenAction(transactionManager));
+	}
+
+	private WorkspaceListRow row(String name, long memberCount) {
+		return new WorkspaceListRow(UUID.randomUUID(), name, FIXED_INSTANT, memberCount);
+	}
+
+	private ListWorkspacesCommand listCommand(int limit) {
+		return new ListWorkspacesCommand(USER_ID, limit, Optional.empty(), Optional.empty(), Optional.empty());
+	}
+
+	@Test
+	@DisplayName("list: maps repository rows to entries and reports no next page when fewer than limit+1 rows come back")
+	void listReturnsEntriesMappedFromRepositoryRows() {
+		WorkspaceListRow row = row("Engineering", 4);
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of(row));
+
+		ListWorkspacesResult result = service.list(listCommand(20));
+
+		assertThat(result.workspaces()).hasSize(1);
+		assertThat(result.workspaces().get(0).id()).isEqualTo(row.id());
+		assertThat(result.workspaces().get(0).name()).isEqualTo("Engineering");
+		assertThat(result.workspaces().get(0).memberCount()).isEqualTo(4);
+		assertThat(result.hasNextPage()).isFalse();
+		assertThat(result.nextAfterCreatedAt()).isEmpty();
+		assertThat(result.nextAfterWorkspaceId()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("list: requests limit+1 rows from the repository, not limit")
+	void listRequestsLimitPlusOneRowsFromRepository() {
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of());
+
+		service.list(listCommand(20));
+
+		verify(workspaceRepository).findPage(any(), any(), eq(21));
+	}
+
+	@Test
+	@DisplayName("list: first page (no cursor in the command) queries with the EPOCH/min-UUID sentinels")
+	void listFirstPageUsesEpochAndMinUuidSentinelsWhenCursorAbsent() {
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of());
+
+		service.list(listCommand(20));
+
+		verify(workspaceRepository).findPage(Instant.EPOCH, MIN_UUID, 21);
+	}
+
+	@Test
+	@DisplayName("list: subsequent page (cursor present in the command) queries with the provided cursor values, not the sentinels")
+	void listSubsequentPageUsesProvidedCursorValues() {
+		Instant afterCreatedAt = Instant.parse("2026-04-15T10:32:00Z");
+		UUID afterWorkspaceId = UUID.randomUUID();
+		ListWorkspacesCommand command = new ListWorkspacesCommand(USER_ID, 20, Optional.of(afterCreatedAt),
+				Optional.of(afterWorkspaceId), Optional.empty());
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of());
+
+		service.list(command);
+
+		verify(workspaceRepository).findPage(afterCreatedAt, afterWorkspaceId, 21);
+	}
+
+	@Test
+	@DisplayName("list: when the repository returns limit+1 rows, trims the probe row and derives the next cursor from the last KEPT row")
+	void listHasNextPageTrimsExtraRowAndDerivesNextCursorFromLastKeptRow() {
+		WorkspaceListRow first = row("Alpha", 1);
+		WorkspaceListRow second = row("Beta", 2);
+		WorkspaceListRow probeRow = row("Gamma-never-returned", 3);
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of(first, second, probeRow));
+
+		ListWorkspacesResult result = service.list(listCommand(2));
+
+		assertThat(result.workspaces()).hasSize(2);
+		assertThat(result.workspaces()).extracting("name").containsExactly("Alpha", "Beta");
+		assertThat(result.hasNextPage()).isTrue();
+		assertThat(result.nextAfterCreatedAt()).contains(second.createdAt());
+		assertThat(result.nextAfterWorkspaceId()).contains(second.id());
+	}
+
+	@Test
+	@DisplayName("list: exactly limit rows (no probe row) reports no next page")
+	void listExactlyLimitRowsReturnsHasNextPageFalse() {
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of(row("Alpha", 1), row("Beta", 2)));
+
+		ListWorkspacesResult result = service.list(listCommand(2));
+
+		assertThat(result.workspaces()).hasSize(2);
+		assertThat(result.hasNextPage()).isFalse();
+		assertThat(result.nextAfterCreatedAt()).isEmpty();
+		assertThat(result.nextAfterWorkspaceId()).isEmpty();
+	}
+
+	@Test
+	@DisplayName("list: no workspaces system-wide returns an empty page")
+	void listEmptyResultReturnsEmptyEntriesAndNoNextPage() {
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of());
+
+		ListWorkspacesResult result = service.list(listCommand(20));
+
+		assertThat(result.workspaces()).isEmpty();
+		assertThat(result.hasNextPage()).isFalse();
+	}
+
+	@Test
+	@DisplayName("list: logs workspaces_listed at INFO with count, limit, hasNextPage and correlationId")
+	void listLogsWorkspacesListedAtInfo() {
+		when(workspaceRepository.findPage(any(), any(), anyInt())).thenReturn(List.of(row("Alpha", 1)));
+		ListWorkspacesCommand command = new ListWorkspacesCommand(USER_ID, 20, Optional.empty(), Optional.empty(),
+				Optional.of("corr-list-1"));
+
+		service.list(command);
+
+		assertThat(logCapture.list)
+			.anyMatch(e -> e.getLevel() == Level.INFO && e.getFormattedMessage().contains("event=workspaces_listed")
+					&& e.getFormattedMessage().contains("count=1") && e.getFormattedMessage().contains("limit=20")
+					&& e.getFormattedMessage().contains("hasNextPage=false")
+					&& e.getFormattedMessage().contains("correlationId=corr-list-1"));
 	}
 
 	@Test
