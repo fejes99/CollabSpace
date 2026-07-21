@@ -35,7 +35,7 @@ Defined in [`docs/03-services/auth-workspace/plans/security-filter.md`](../03-se
 | `type` | Status | Meaning |
 |---|---|---|
 | `auth/invalid-internal-token` | 401 | `X-Internal-Token` missing or incorrect. |
-| `auth/malformed-identity-headers` | 401 | `X-User-Id`/`X-User-Workspaces` inconsistent, malformed, or oversized — see security-filter.md §4 for the full validation table. Also covers a non-UUID `X-User-Id` or non-numeric `X-JWT-Iat` reaching `MembershipStalenessFilter` (invite-member.md). |
+| `auth/malformed-identity-headers` | 401 | `X-User-Id`/`X-User-Workspaces` inconsistent, malformed, or oversized — see security-filter.md §4 for the full validation table. Also covers a non-UUID `X-User-Id` or non-numeric `X-JWT-Iat` reaching `MembershipStalenessFilter` (invite-member.md), and a missing `X-JWT-Jti`/`X-JWT-Iat` reaching `AuthController.logout` directly (logout.md) — the first endpoint to bind those headers as required controller parameters rather than tolerating their absence the way the filters do. |
 | `auth/unexpected-identity` | 401 | Identity headers present on a route defined as anonymous (`/v1/auth/register`, `/v1/auth/login`) — signals the API Gateway header-stripping guarantee has regressed. |
 | `auth/token-revoked` | 401 | `jti` present in the Redis blocklist. |
 | `auth/insufficient-authentication` | 401 | `anyRequest().authenticated()` rejected a request that reached `ProblemDetailsSecurityHandler.commence()` with a plain Spring Security `AuthenticationException` rather than one of the `auth/*` types above — i.e. no security filter treated the request as anonymous, but nothing populated a real `Authentication` either. |

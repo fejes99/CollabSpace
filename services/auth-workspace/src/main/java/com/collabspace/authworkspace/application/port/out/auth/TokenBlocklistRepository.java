@@ -4,4 +4,6 @@ public interface TokenBlocklistRepository {
 
 	boolean isBlocklisted(String jti);
 
+	void blocklist(String jti, long ttlSeconds);
+
 }

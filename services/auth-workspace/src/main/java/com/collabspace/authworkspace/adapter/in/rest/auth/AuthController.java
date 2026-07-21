@@ -5,13 +5,17 @@ import com.collabspace.authworkspace.adapter.in.rest.auth.request.RegisterReques
 import com.collabspace.authworkspace.adapter.in.rest.auth.response.LoginResponse;
 import com.collabspace.authworkspace.adapter.in.rest.auth.response.RefreshResponse;
 import com.collabspace.authworkspace.adapter.in.rest.auth.response.RegisterResponse;
+import com.collabspace.authworkspace.adapter.in.rest.security.exception.MalformedIdentityHeadersException;
 import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
+import com.collabspace.authworkspace.adapter.in.rest.util.CurrentUserIdResolver;
 import com.collabspace.authworkspace.application.port.in.auth.command.LoginCommand;
+import com.collabspace.authworkspace.application.port.in.auth.command.LogoutCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RefreshCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.result.LoginResult;
 import com.collabspace.authworkspace.application.port.in.auth.result.RefreshResult;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.LoginUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.LogoutUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RefreshUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RegisterUseCase;
 import com.collabspace.authworkspace.application.service.JwtService;
@@ -34,10 +38,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.CookieValue;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @RestController
 @RequestMapping("/v1/auth")
@@ -52,12 +58,16 @@ public class AuthController {
 
 	private final RefreshUseCase refreshUseCase;
 
+	private final LogoutUseCase logoutUseCase;
+
 	public AuthController(LoginUseCase loginUseCase, RegisterUseCase registerUseCase,
-			@Value("${app.cookie.secure:true}") boolean cookieSecure, RefreshUseCase refreshUseCase) {
+			@Value("${app.cookie.secure:true}") boolean cookieSecure, RefreshUseCase refreshUseCase,
+			LogoutUseCase logoutUseCase) {
 		this.loginUseCase = loginUseCase;
 		this.registerUseCase = registerUseCase;
 		this.cookieSecure = cookieSecure;
 		this.refreshUseCase = refreshUseCase;
+		this.logoutUseCase = logoutUseCase;
 	}
 
 	// Scopes down from OpenApiConfig's global requirement -- register fails closed on
@@ -135,13 +145,55 @@ public class AuthController {
 		return ResponseEntity.ok(RefreshResponse.from(result));
 	}
 
+	@SecurityRequirement(name = OpenApiConfig.INTERNAL_TOKEN_SCHEME)
+	@Operation(summary = "Logout user",
+			description = "Revokes the caller's current access token and deletes their refresh token. A repeat call with the same access token is rejected 401 (that jti is already blocklisted); a repeat call presenting an already-consumed or missing refresh cookie is a no-op 200.")
+	@ApiResponse(responseCode = "200", description = "Logout successful")
+	@ApiResponse(responseCode = "401", description = "Missing, malformed, or revoked access token",
+			content = @Content(mediaType = "application/problem+json",
+					schema = @Schema(implementation = ProblemDetail.class)))
+	@PostMapping("/logout")
+	public ResponseEntity<Void> logout(@RequestHeader(value = "X-JWT-Jti", required = false) String jti,
+			@RequestHeader(value = "X-JWT-Iat", required = false) Long iat,
+			@CookieValue(value = "refresh_token", required = false) String refreshToken,
+			HttpServletResponse httpResponse) {
+		// Deliberately not `required = true`: API Gateway forwards X-User-Id and
+		// X-JWT-Jti/X-JWT-Iat from the same JWT claims, so all three should always arrive
+		// together -- but MembershipStalenessFilter/JwtBlocklistFilter both tolerate a
+		// missing jti/iat upstream by design (a claim-mapping regression like ADR-036's
+		// should be diagnosable, not a hard filter-level failure). A required
+		// @RequestHeader would let Spring's own MissingRequestHeaderException reach the
+		// generic 500 handler instead -- this endpoint is the first to bind these headers
+		// directly, so there was no existing 401 path to fall back on.
+		if (jti == null || iat == null) {
+			throw new MalformedIdentityHeadersException("X-JWT-Jti or X-JWT-Iat is missing");
+		}
+
+		UUID userId = CurrentUserIdResolver.resolve();
+
+		LogoutCommand command = new LogoutCommand(userId, jti, iat, Optional.ofNullable(refreshToken));
+
+		logoutUseCase.logout(command);
+		clearRefreshTokenCookie(httpResponse);
+
+		return ResponseEntity.ok().build();
+	}
+
 	private void setRefreshTokenCookie(HttpServletResponse httpResponse, String refreshToken) {
-		Cookie cookie = new Cookie("refresh_token", refreshToken);
+		addRefreshTokenCookie(httpResponse, refreshToken, JwtService.REFRESH_TOKEN_TTL_SECONDS);
+	}
+
+	private void clearRefreshTokenCookie(HttpServletResponse httpResponse) {
+		addRefreshTokenCookie(httpResponse, "", 0);
+	}
+
+	private void addRefreshTokenCookie(HttpServletResponse httpResponse, String value, int maxAgeSeconds) {
+		Cookie cookie = new Cookie("refresh_token", value);
 		cookie.setAttribute("SameSite", "Strict");
 		cookie.setHttpOnly(true);
 		cookie.setSecure(cookieSecure);
 		cookie.setPath("/v1/auth");
-		cookie.setMaxAge(JwtService.REFRESH_TOKEN_TTL_SECONDS);
+		cookie.setMaxAge(maxAgeSeconds);
 		httpResponse.addCookie(cookie);
 	}
 

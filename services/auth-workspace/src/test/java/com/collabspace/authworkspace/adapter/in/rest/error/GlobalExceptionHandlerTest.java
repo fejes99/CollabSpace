@@ -6,6 +6,7 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.LoginUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.LogoutUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RefreshUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.ChangeMemberRoleUseCase;
@@ -53,6 +54,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.not;
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -77,7 +79,7 @@ class GlobalExceptionHandlerTest {
 
 		@Bean
 		TokenBlocklistRepository tokenBlocklistRepository() {
-			return jti -> false;
+			return mock(TokenBlocklistRepository.class);
 		}
 
 		@Bean
@@ -188,6 +190,9 @@ class GlobalExceptionHandlerTest {
 
 	@MockitoBean
 	RefreshUseCase refreshUseCase;
+
+	@MockitoBean
+	LogoutUseCase logoutUseCase;
 
 	@MockitoBean
 	CreateWorkspaceUseCase createWorkspaceUseCase;
