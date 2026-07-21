@@ -28,6 +28,7 @@ import java.time.Instant;
 import java.util.Optional;
 import java.util.UUID;
 
+import static org.mockito.Mockito.mock;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -95,7 +96,7 @@ class WellKnownControllerTest {
 
 		@Bean
 		TokenBlocklistRepository tokenBlocklistRepository() {
-			return jti -> false;
+			return mock(TokenBlocklistRepository.class);
 		}
 
 		@Bean

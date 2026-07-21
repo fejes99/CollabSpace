@@ -12,12 +12,13 @@ public final class RefreshTokenValidator {
 	}
 
 	public static void validate(String token) {
-		if (token == null || token.isBlank()) {
+		if (!isValid(token)) {
 			throw new InvalidTokenException();
 		}
-		if (token.getBytes(StandardCharsets.UTF_8).length > MAX_TOKEN_BYTES) {
-			throw new InvalidTokenException();
-		}
+	}
+
+	public static boolean isValid(String token) {
+		return token != null && !token.isBlank() && token.getBytes(StandardCharsets.UTF_8).length <= MAX_TOKEN_BYTES;
 	}
 
 }

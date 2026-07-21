@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), invite-member (`POST /v1/workspaces/{id}/members`, PR #48), change-member-role (`PATCH /v1/workspaces/{id}/members/{userId}`, PR #49), remove-member (`DELETE /v1/workspaces/{workspaceId}/members/{userId}`, PR #50), and list-workspaces (`GET /v1/workspaces`, PR #52) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 and PR #52 are not yet verified on AWS. Token refresh (`POST /v1/auth/refresh`, PR 13) is implemented, tested locally (329 tests, real Docker/Testcontainers run), and PR is open — not yet merged or verified on AWS. Next: logout — the other required v1 flow per `authentication.md`, not a stretch goal (the `(stretch)` label was stale; corrected 2026-07-20).
+Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), invite-member (`POST /v1/workspaces/{id}/members`, PR #48), change-member-role (`PATCH /v1/workspaces/{id}/members/{userId}`, PR #49), remove-member (`DELETE /v1/workspaces/{workspaceId}/members/{userId}`, PR #50), and list-workspaces (`GET /v1/workspaces`, PR #52) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 and PR #52 are not yet verified on AWS. Token refresh (`POST /v1/auth/refresh`, PR 13) merged as #53 — not yet independently verified on AWS. Logout (`POST /v1/auth/logout`, PR 14, the other required v1 flow per `authentication.md` — not a stretch goal; the `(stretch)` label was stale, corrected 2026-07-20) is implemented and tested locally (345 tests, Docker/Testcontainers + a live manual smoke test), PR open — not yet merged or verified on AWS.
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: PR 14 — `POST /v1/auth/logout` (Redis blocklist write side, required v1 flow, not stretch) — see `notes/auth-workspace-prs.md` §PR 14 for the design sketch. Plan doc not yet written.
+Next milestone: merge PR 14 (logout) and verify it on AWS via smoke test, then tear down the dev environment (ADR-022). After that, the next feature is undecided — see `notes/auth-workspace-prs.md`'s 2026-07-20 scope check for the five candidate v1.5 items (workspace detail, member roster, rename, delete, `POST /v1/auth/ws-ticket`).
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

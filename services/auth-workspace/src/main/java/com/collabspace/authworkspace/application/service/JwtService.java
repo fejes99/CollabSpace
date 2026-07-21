@@ -23,7 +23,7 @@ import java.util.UUID;
 @Service
 public class JwtService {
 
-	private static final int ACCESS_TOKEN_TTL_SECONDS = 900;
+	public static final int ACCESS_TOKEN_TTL_SECONDS = 900;
 
 	public static final int REFRESH_TOKEN_TTL_SECONDS = 604800;
 

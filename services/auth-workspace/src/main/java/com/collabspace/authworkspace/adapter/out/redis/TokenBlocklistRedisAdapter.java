@@ -7,6 +7,8 @@ import org.springframework.dao.DataAccessException;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.stereotype.Component;
 
+import java.time.Duration;
+
 @Component
 public class TokenBlocklistRedisAdapter implements TokenBlocklistRepository {
 
@@ -31,6 +33,11 @@ public class TokenBlocklistRedisAdapter implements TokenBlocklistRepository {
 			log.warn("event=blocklist_check_unavailable jti={} reason={}", jti, ex.getMessage());
 			return false;
 		}
+	}
+
+	@Override
+	public void blocklist(String jti, long ttlSeconds) {
+		redisTemplate.opsForValue().set(BLOCKLIST_KEY_PREFIX + jti, "1", Duration.ofSeconds(ttlSeconds));
 	}
 
 }

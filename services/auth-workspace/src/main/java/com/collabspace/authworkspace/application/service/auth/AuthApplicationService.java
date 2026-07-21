@@ -1,18 +1,22 @@
 package com.collabspace.authworkspace.application.service.auth;
 
 import com.collabspace.authworkspace.application.port.in.auth.command.LoginCommand;
+import com.collabspace.authworkspace.application.port.in.auth.command.LogoutCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RefreshCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.result.LoginResult;
 import com.collabspace.authworkspace.application.port.in.auth.result.RefreshResult;
 import com.collabspace.authworkspace.application.port.in.auth.result.RegisterResult;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.LoginUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.LogoutUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RefreshUseCase;
 import com.collabspace.authworkspace.application.port.in.auth.usecase.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.out.auth.RefreshTokenRepository;
+import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.service.AccessToken;
+import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.service.RefreshTokenPair;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
@@ -26,6 +30,7 @@ import com.collabspace.authworkspace.domain.model.auth.User;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +42,7 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Service
-public class AuthApplicationService implements RegisterUseCase, LoginUseCase, RefreshUseCase {
+public class AuthApplicationService implements RegisterUseCase, LoginUseCase, RefreshUseCase, LogoutUseCase {
 
 	private static final Logger log = LoggerFactory.getLogger(AuthApplicationService.class);
 
@@ -49,19 +54,26 @@ public class AuthApplicationService implements RegisterUseCase, LoginUseCase, Re
 
 	private final JwtService jwtService;
 
+	private final TokenBlocklistRepository tokenBlocklistRepository;
+
 	private final PasswordEncoder passwordEncoder;
 
 	private final Clock clock;
 
+	private final CommitThenAction commitThenAction;
+
 	public AuthApplicationService(UserRepository userRepository, RefreshTokenRepository refreshTokenRepository,
 			WorkspaceMembershipRepository workspaceMembershipRepository, JwtService jwtService,
-			PasswordEncoder passwordEncoder, Clock clock) {
+			TokenBlocklistRepository tokenBlocklistRepository, PasswordEncoder passwordEncoder, Clock clock,
+			CommitThenAction commitThenAction) {
 		this.userRepository = userRepository;
 		this.refreshTokenRepository = refreshTokenRepository;
 		this.workspaceMembershipRepository = workspaceMembershipRepository;
 		this.jwtService = jwtService;
+		this.tokenBlocklistRepository = tokenBlocklistRepository;
 		this.passwordEncoder = passwordEncoder;
 		this.clock = clock;
+		this.commitThenAction = commitThenAction;
 	}
 
 	@Override
@@ -151,6 +163,43 @@ public class AuthApplicationService implements RegisterUseCase, LoginUseCase, Re
 				command.ipAddress().orElse(null), accessToken.jti());
 
 		return new RefreshResult(accessToken.token(), tokenPair.plaintext());
+	}
+
+	@Override
+	public void logout(LogoutCommand command) {
+		Optional<RefreshToken> existingToken = resolveDeletableToken(command.refreshToken());
+
+		// Unlike refresh() above, the deleteByIdReturningCount count is not checked here.
+		// refresh() needs it to detect a losing race against a concurrent refresh and
+		// react differently (401). Logout has nothing to react to either way -- if a
+		// concurrent request already deleted this row, the outcome is identical either
+		// way, so there is no meaningful count==0 branch to take.
+		commitThenAction.run(
+				() -> existingToken.ifPresent(token -> refreshTokenRepository.deleteByIdReturningCount(token.id())),
+				() -> {
+					blocklistIfStillLive(command);
+					log.info("event=user_logged_out userId={} jti={}", command.userId(), command.jti());
+					return null;
+				});
+	}
+
+	private Optional<RefreshToken> resolveDeletableToken(Optional<String> refreshToken) {
+		return refreshToken.filter(RefreshTokenValidator::isValid)
+			.map(CryptoUtils::sha256Hex)
+			.flatMap(refreshTokenRepository::findByTokenHash);
+	}
+
+	private void blocklistIfStillLive(LogoutCommand command) {
+		long remainingTtl = (command.iat() + JwtService.ACCESS_TOKEN_TTL_SECONDS) - clock.instant().getEpochSecond();
+		if (remainingTtl <= 0) {
+			return;
+		}
+		try {
+			tokenBlocklistRepository.blocklist(command.jti(), remainingTtl);
+		}
+		catch (DataAccessException ex) {
+			log.error("event=logout_blocklist_write_failed userId={} jti={}", command.userId(), command.jti(), ex);
+		}
 	}
 
 	private InvalidCredentialsException loginFailed(String reason, String emailHash, Optional<String> ip) {

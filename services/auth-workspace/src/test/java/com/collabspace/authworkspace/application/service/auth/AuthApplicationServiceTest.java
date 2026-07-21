@@ -1,15 +1,18 @@
 package com.collabspace.authworkspace.application.service.auth;
 
 import com.collabspace.authworkspace.application.port.in.auth.command.LoginCommand;
+import com.collabspace.authworkspace.application.port.in.auth.command.LogoutCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RefreshCommand;
 import com.collabspace.authworkspace.application.port.in.auth.command.RegisterCommand;
 import com.collabspace.authworkspace.application.port.in.auth.result.LoginResult;
 import com.collabspace.authworkspace.application.port.in.auth.result.RefreshResult;
 import com.collabspace.authworkspace.application.port.in.auth.result.RegisterResult;
 import com.collabspace.authworkspace.application.port.out.auth.RefreshTokenRepository;
+import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
 import com.collabspace.authworkspace.application.service.AccessToken;
+import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.service.RefreshTokenPair;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
@@ -28,7 +31,10 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionStatus;
 
 import java.time.Clock;
 import java.time.Instant;
@@ -38,8 +44,11 @@ import java.util.Optional;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
@@ -68,12 +77,26 @@ class AuthApplicationServiceTest {
 	@Mock
 	private PasswordEncoder passwordEncoder;
 
+	@Mock
+	private TokenBlocklistRepository tokenBlocklistRepository;
+
+	@Mock
+	private PlatformTransactionManager transactionManager;
+
+	@Mock
+	private TransactionStatus transactionStatus;
+
 	private AuthApplicationService service;
 
 	@BeforeEach
 	void setup() {
+		// lenient: register/login/refresh never touch the transaction manager -- only
+		// logout does, via CommitThenAction. Same reasoning as
+		// WorkspaceApplicationServiceTest's setup().
+		lenient().when(transactionManager.getTransaction(any())).thenReturn(transactionStatus);
 		service = new AuthApplicationService(userRepository, refreshTokenRepository, workspaceMembershipRepository,
-				jwtService, passwordEncoder, Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC));
+				jwtService, tokenBlocklistRepository, passwordEncoder, Clock.fixed(FIXED_INSTANT, ZoneOffset.UTC),
+				new CommitThenAction(transactionManager));
 	}
 
 	@Test
@@ -302,6 +325,113 @@ class AuthApplicationServiceTest {
 
 		verifyNoInteractions(refreshTokenRepository);
 		verifyNoInteractions(jwtService);
+	}
+
+	@Test
+	@DisplayName("logout deletes the matching refresh token row and blocklists the jti")
+	void logoutWithMatchingCookieDeletesRowAndBlocklistsJti() {
+		String rawToken = "raw-refresh-token-value";
+		String hashedToken = CryptoUtils.sha256Hex(rawToken);
+		RefreshToken existingToken = new RefreshToken(UUID.randomUUID(), UUID.randomUUID(), hashedToken,
+				FIXED_INSTANT.minusSeconds(100), FIXED_INSTANT.plusSeconds(604700), Optional.empty(), Optional.empty());
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.of(rawToken));
+		when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(existingToken));
+
+		service.logout(command);
+
+		verify(refreshTokenRepository).deleteByIdReturningCount(existingToken.id());
+		verify(tokenBlocklistRepository).blocklist("test-jti", JwtService.ACCESS_TOKEN_TTL_SECONDS);
+	}
+
+	@Test
+	@DisplayName("logout still blocklists the jti when no refresh_token cookie was presented")
+	void logoutWithNoCookieStillBlocklistsJti() {
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.empty());
+
+		service.logout(command);
+
+		verifyNoInteractions(refreshTokenRepository);
+		verify(tokenBlocklistRepository).blocklist("test-jti", JwtService.ACCESS_TOKEN_TTL_SECONDS);
+	}
+
+	@Test
+	@DisplayName("logout still blocklists the jti when the cookie exceeds 256 bytes")
+	void logoutWithOversizedCookieStillBlocklistsJti() {
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.of("a".repeat(257)));
+
+		service.logout(command);
+
+		verifyNoInteractions(refreshTokenRepository);
+		verify(tokenBlocklistRepository).blocklist("test-jti", JwtService.ACCESS_TOKEN_TTL_SECONDS);
+	}
+
+	@Test
+	@DisplayName("logout does not throw when the cookie matches no row (already logged out, duplicate request)")
+	void logoutWithUnknownCookieDoesNotThrowAndStillBlocklistsJti() {
+		String hashedToken = CryptoUtils.sha256Hex("garbage-token");
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.of("garbage-token"));
+		when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.empty());
+
+		assertDoesNotThrow(() -> service.logout(command));
+
+		verify(refreshTokenRepository, never()).deleteByIdReturningCount(any());
+		verify(tokenBlocklistRepository).blocklist("test-jti", JwtService.ACCESS_TOKEN_TTL_SECONDS);
+	}
+
+	@Test
+	@DisplayName("logout computes the blocklist TTL as (iat + access token lifetime) minus now")
+	void logoutComputesBlocklistTtlFromIatPlusAccessTokenLifetime() {
+		long fiveMinutesAgo = FIXED_INSTANT.minusSeconds(300).getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", fiveMinutesAgo, Optional.empty());
+
+		service.logout(command);
+
+		// 900s lifetime - 300s already elapsed = 600s remaining.
+		verify(tokenBlocklistRepository).blocklist("test-jti", 600L);
+	}
+
+	@Test
+	@DisplayName("logout skips the blocklist write when the access token's own lifetime has already elapsed")
+	void logoutSkipsBlocklistWriteWhenAccessTokenAlreadyExpired() {
+		long wayInThePast = FIXED_INSTANT.minusSeconds(1000).getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", wayInThePast, Optional.empty());
+
+		service.logout(command);
+
+		verifyNoInteractions(tokenBlocklistRepository);
+	}
+
+	@Test
+	@DisplayName("logout does not throw when the blocklist write fails -- fails open")
+	void logoutDoesNotThrowWhenBlocklistWriteFailsOpen() {
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.empty());
+		doThrow(new DataAccessResourceFailureException("simulated Redis outage")).when(tokenBlocklistRepository)
+			.blocklist(anyString(), anyLong());
+
+		assertDoesNotThrow(() -> service.logout(command));
+	}
+
+	@Test
+	@DisplayName("logout propagates a genuine database failure while deleting the refresh token row")
+	void logoutPropagatesDatabaseFailureFromRefreshTokenDelete() {
+		String rawToken = "raw-refresh-token-value";
+		String hashedToken = CryptoUtils.sha256Hex(rawToken);
+		RefreshToken existingToken = new RefreshToken(UUID.randomUUID(), UUID.randomUUID(), hashedToken,
+				FIXED_INSTANT.minusSeconds(100), FIXED_INSTANT.plusSeconds(604700), Optional.empty(), Optional.empty());
+		long iat = FIXED_INSTANT.getEpochSecond();
+		LogoutCommand command = new LogoutCommand(UUID.randomUUID(), "test-jti", iat, Optional.of(rawToken));
+		when(refreshTokenRepository.findByTokenHash(hashedToken)).thenReturn(Optional.of(existingToken));
+		doThrow(new DataAccessResourceFailureException("simulated DB outage")).when(refreshTokenRepository)
+			.deleteByIdReturningCount(existingToken.id());
+
+		assertThrows(DataAccessResourceFailureException.class, () -> service.logout(command));
+
+		verifyNoInteractions(tokenBlocklistRepository);
 	}
 
 }
