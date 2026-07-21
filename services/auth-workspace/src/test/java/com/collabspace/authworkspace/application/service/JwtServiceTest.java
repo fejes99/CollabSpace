@@ -29,7 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @DisplayName("JwtService")
 class JwtServiceTest {
 
-	private static final String TEST_USER_ID = "user-123";
+	private static final UUID TEST_USER_ID = UUID.randomUUID();
 
 	private static RSAKey testKey;
 
@@ -69,7 +69,7 @@ class JwtServiceTest {
 		var claims = jwt.getJWTClaimsSet();
 		assertThat(jwt.getHeader().getAlgorithm().getName()).isEqualTo("RS256");
 		assertThat(claims.getSubject()).isEqualTo("user:" + TEST_USER_ID);
-		assertThat(claims.getStringClaim("userId")).isEqualTo(TEST_USER_ID);
+		assertThat(claims.getStringClaim("userId")).isEqualTo(TEST_USER_ID.toString());
 		assertThat(claims.getIssuer()).isEqualTo("https://test.issuer");
 		assertThat(claims.getAudience()).contains("test-audience");
 		assertThat(claims.getJWTID()).isEqualTo(accessToken.jti());

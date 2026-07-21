@@ -1,4 +1,6 @@
-package com.collabspace.authworkspace.domain.exception;
+package com.collabspace.authworkspace.domain.exception.workspace;
+
+import com.collabspace.authworkspace.domain.exception.DomainException;
 
 import java.net.URI;
 

@@ -4,20 +4,21 @@ import ch.qos.logback.classic.Level;
 import ch.qos.logback.classic.Logger;
 import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
-import com.collabspace.authworkspace.application.port.in.auth.LoginUseCase;
-import com.collabspace.authworkspace.application.port.in.auth.RegisterUseCase;
+import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.LoginUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.RefreshUseCase;
+import com.collabspace.authworkspace.application.port.in.auth.usecase.RegisterUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.ChangeMemberRoleUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.CreateWorkspaceUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.InviteMemberUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.ListWorkspacesUseCase;
 import com.collabspace.authworkspace.application.port.in.workspace.usecase.RemoveMemberUseCase;
-import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.application.port.out.auth.TokenBlocklistRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.MembershipStalenessRepository;
 import com.collabspace.authworkspace.application.service.InternalTokenProperties;
 import com.collabspace.authworkspace.domain.exception.DomainException;
-import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
-import com.collabspace.authworkspace.domain.exception.InvalidCredentialsException;
+import com.collabspace.authworkspace.domain.exception.auth.EmailAlreadyTakenException;
+import com.collabspace.authworkspace.domain.exception.auth.InvalidCredentialsException;
 import com.collabspace.authworkspace.domain.exception.NotFoundException;
 import com.collabspace.authworkspace.support.JwtTestConfiguration;
 import jakarta.validation.Valid;
@@ -184,6 +185,9 @@ class GlobalExceptionHandlerTest {
 
 	@MockitoBean
 	RegisterUseCase registerUseCase;
+
+	@MockitoBean
+	RefreshUseCase refreshUseCase;
 
 	@MockitoBean
 	CreateWorkspaceUseCase createWorkspaceUseCase;

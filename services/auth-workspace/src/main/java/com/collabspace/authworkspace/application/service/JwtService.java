@@ -25,6 +25,8 @@ public class JwtService {
 
 	private static final int ACCESS_TOKEN_TTL_SECONDS = 900;
 
+	public static final int REFRESH_TOKEN_TTL_SECONDS = 604800;
+
 	private static final int REFRESH_TOKEN_BYTES = 32;
 
 	private final RSAKey rsaKey;
@@ -44,7 +46,7 @@ public class JwtService {
 		this.objectMapper = objectMapper;
 	}
 
-	public AccessToken issueAccessToken(String userId, List<WorkspaceMembership> memberships) {
+	public AccessToken issueAccessToken(UUID userId, List<WorkspaceMembership> memberships) {
 		Instant now = clock.instant();
 		String jti = UUID.randomUUID().toString();
 		List<Map<String, String>> membershipClaims = memberships.stream()
@@ -63,7 +65,7 @@ public class JwtService {
 			.claim("iat", now.getEpochSecond())
 			.claim("exp", now.plusSeconds(ACCESS_TOKEN_TTL_SECONDS).getEpochSecond())
 			.jwtID(jti)
-			.claim("userId", userId)
+			.claim("userId", userId.toString())
 			.claim("memberships", membershipsJson)
 			.build();
 

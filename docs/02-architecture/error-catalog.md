@@ -30,7 +30,7 @@ Defined in [authorization.md](authorization.md).
 
 ## `auth/`
 
-Defined in [`docs/03-services/auth-workspace/plans/security-filter.md`](../03-services/auth-workspace/plans/security-filter.md) (PR 7).
+Defined in [`docs/03-services/auth-workspace/plans/security-filter.md`](../03-services/auth-workspace/plans/security-filter.md) (PR 7) and [`docs/03-services/auth-workspace/plans/token-refresh.md`](../03-services/auth-workspace/plans/token-refresh.md) (PR 13).
 
 | `type` | Status | Meaning |
 |---|---|---|
@@ -41,6 +41,8 @@ Defined in [`docs/03-services/auth-workspace/plans/security-filter.md`](../03-se
 | `auth/insufficient-authentication` | 401 | `anyRequest().authenticated()` rejected a request that reached `ProblemDetailsSecurityHandler.commence()` with a plain Spring Security `AuthenticationException` rather than one of the `auth/*` types above — i.e. no security filter treated the request as anonymous, but nothing populated a real `Authentication` either. |
 | `auth/access-denied` | 403 | Generic `AccessDeniedException` reaching `ProblemDetailsSecurityHandler.handle()` — an authenticated caller was denied by a method-security check (`@PreAuthorize`) that isn't one of the more specific `authorization/*` types. See `authorization/insufficient-role` for the workspace-RBAC-specific case once it exists. |
 | `auth/claims-stale` | 401 | Token's `iat` predates the `membership-changed-at:<userId>` marker — membership claims are stale. Activated by PR 9 (invite-member); reserved since `security-filter.md` §9. |
+| `auth/refresh-token-invalid` | 401 | `POST /v1/auth/refresh` called with no `refresh_token` cookie, or with a cookie whose hash matches no row in `refresh_tokens`. Deliberately not distinguished from each other, to avoid signaling to a probing caller whether a given value came close to matching. |
+| `auth/refresh-token-expired` | 401 | `POST /v1/auth/refresh`'s `refresh_token` cookie resolves to a row whose `expires_at` has passed. Kept distinct from `refresh-token-invalid` — this is a routine, non-adversarial event, not a potentially malicious one. |
 
 ---
 

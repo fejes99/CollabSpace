@@ -101,7 +101,7 @@ Refresh tokens are transported as **HTTP-only, Secure, SameSite=Strict cookies**
 - `HttpOnly`: the cookie cannot be read by JavaScript. XSS attacks cannot exfiltrate the refresh token even if they execute in the page context.
 - `Secure`: the cookie is only transmitted over HTTPS. It is never sent over an unencrypted connection.
 - `SameSite=Strict`: the cookie is only sent when the request originates from the same site as the cookie's domain.
-- `Path=/auth`: the cookie is scoped to the `/auth` path prefix. It is not sent to document, realtime, or AI endpoints — only to the auth endpoints that need it.
+- `Path=/v1/auth`: the cookie is scoped to the `/auth` path prefix. It is not sent to document, realtime, or AI endpoints — only to the auth endpoints that need it.
 
 **CORS implications.** The frontend (hosted on Vercel) and the API (on AWS) are on different origins. For the browser to send the refresh token cookie with cross-origin requests, two conditions must both be met:
 
@@ -165,7 +165,7 @@ Full design, alternatives considered, and the write-ordering requirements this d
 4. A JWT access token is generated: claims `{ sub, userId, memberships, iat, exp, jti }`. Signed with the private RSA key (RS256). `jti` is a UUID (`UUID.randomUUID()`).
 5. A 32-byte cryptographically random refresh token is generated.
 6. The refresh token is hashed with SHA-256. The hash is inserted into `refresh_tokens` with `expires_at = now() + 7 days`, along with the request's `User-Agent` and IP address.
-7. The plaintext refresh token is set as the response cookie: `Set-Cookie: refresh_token=<value>; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=604800`.
+7. The plaintext refresh token is set as the response cookie: `Set-Cookie: refresh_token=<value>; HttpOnly; Secure; SameSite=Strict; Path=/v1/auth; Max-Age=604800`.
 8. Response: `200 OK` with `{ accessToken, user }`.
 
 ### Token refresh
@@ -186,7 +186,7 @@ Token rotation is atomic — if the transaction fails, neither the deletion nor 
 1. Client sends `POST /v1/auth/logout`. The current access token is in the `Authorization: Bearer <token>` header (validated and stripped by API Gateway before the request reaches the service — see [api-gateway-trust.md](../02-architecture/api-gateway-trust.md)). The refresh token is in the cookie.
 2. Read the refresh token from the cookie. Hash it (SHA-256) and delete the matching row from `refresh_tokens`. If no row exists (already logged out, duplicate request), this is a no-op.
 3. Read `jti` from the `X-JWT-Jti` header forwarded by API Gateway — the service never parses the access token itself. Write `SET blocklist:<jti> 1 EX <remaining_ttl>` to Redis, where `remaining_ttl = max(0, exp - now())`.
-4. Clear the cookie: `Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/auth; Max-Age=0`.
+4. Clear the cookie: `Set-Cookie: refresh_token=; HttpOnly; Secure; SameSite=Strict; Path=/v1/auth; Max-Age=0`.
 5. Response: `200 OK`.
 
 ### Membership and role changes
@@ -229,14 +229,14 @@ The following events are emitted as structured log lines and should always be pr
 | Registration            | `userId`, `email` (hashed), `ip`, `jti`, `correlationId`                      |
 | Login success           | `userId`, `ip`, `userAgent`, `jti`, `correlationId`                           |
 | Login failure           | `email` (hashed), `reason` (not_found \| bad_password), `ip`, `correlationId` |
-| Token refresh           | `userId`, `ip`, `correlationId`                                               |
+| Token refresh           | `userId`, `jti`, `ip`, `correlationId`                                        |
 | Logout                  | `userId`, `jti`, `correlationId`                                              |
 | Blocklist check failure | `jti`, `userId`, `ip`, `correlationId`                                        |
 | Workspace created       | `userId`, `workspaceId`, `name`, `ip`, `jti`, `correlationId`                 |
 | Member role changed     | `adminId`, `memberId`, `workspaceId`, `previousRole`, `newRole`, `ip`, `correlationId`, `jti` (present only on self-demotion) |
 | Member removed          | `adminId`, `targetUserId`, `workspaceId`, `previousRole`, `ip`, `correlationId`                                              |
 
-Registration and login success both include `jti`: both mint a live, revocable access token immediately (registration does not set a refresh-token cookie, so it is not a full login session, but the token it issues can still be blocklisted the same as any other), so both need to appear in the same `jti` trail as Logout and Blocklist check failure — otherwise a token issued at registration that never had an explicit login has no traceable point of origin. Workspace created carries `jti` for the same reason: per ADR-032, creating a workspace is a self-directed membership change that reissues a fresh access token in the same response, rather than waiting for natural expiry. Member role changed carries `jti` only when the change is self-directed, for the same reason — an other-directed change writes the `membership-changed-at` marker instead of minting a token, so there is no new `jti` to log. Member removed never carries `jti`, on self- or other-directed removal alike — unlike self-demotion, self-removal does not reissue a token synchronously either, since `DELETE` returns a bare `204 No Content` with no body to carry one; the client's own subsequent `POST /v1/auth/refresh` call mints a fresh `jti`, already covered by the Token refresh audit event above. `adminId` and `targetUserId` are equal on a self-removal and distinct on an other-directed one, which is how a reader tells the two apart from this single row.
+Registration and login success both include `jti`: both mint a live, revocable access token immediately (registration does not set a refresh-token cookie, so it is not a full login session, but the token it issues can still be blocklisted the same as any other), so both need to appear in the same `jti` trail as Logout and Blocklist check failure — otherwise a token issued at registration that never had an explicit login has no traceable point of origin. Token refresh carries `jti` for the same reason: every successful refresh mints a brand-new access token, and without logging its `jti` here, a token whose entire lineage consists of refresh calls — no login anywhere in its history — would have no traceable point of origin, the same gap this paragraph describes for registration. Workspace created carries `jti` for the same reason: per ADR-032, creating a workspace is a self-directed membership change that reissues a fresh access token in the same response, rather than waiting for natural expiry. Member role changed carries `jti` only when the change is self-directed, for the same reason — an other-directed change writes the `membership-changed-at` marker instead of minting a token, so there is no new `jti` to log. Member removed never carries `jti`, on self- or other-directed removal alike — unlike self-demotion, self-removal does not reissue a token synchronously either, since `DELETE` returns a bare `204 No Content` with no body to carry one; the client's own subsequent `POST /v1/auth/refresh` call mints a fresh `jti`, already covered by the Token refresh audit event above. `adminId` and `targetUserId` are equal on a self-removal and distinct on an other-directed one, which is how a reader tells the two apart from this single row.
 
 Email addresses are hashed in logs (SHA-256, non-reversible) to prevent plaintext PII in CloudWatch. A workspace `name` is logged as-is, unhashed — unlike an email address, it is not personal data (no more sensitive than a document title). A compliance-grade audit trail — stored durably, tamper-evidently, queryable by user and time range — is deferred to v1.5. → [roadmap.md](../roadmap.md)
 

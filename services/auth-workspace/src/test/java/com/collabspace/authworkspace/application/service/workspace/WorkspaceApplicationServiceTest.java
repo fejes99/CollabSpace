@@ -19,11 +19,11 @@ import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceRep
 import com.collabspace.authworkspace.application.service.AccessToken;
 import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
-import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
-import com.collabspace.authworkspace.domain.exception.CreatorSelfRemovalException;
-import com.collabspace.authworkspace.domain.exception.InvitedUserNotFoundException;
-import com.collabspace.authworkspace.domain.exception.LastAdminInvariantException;
-import com.collabspace.authworkspace.domain.exception.TargetNotMemberException;
+import com.collabspace.authworkspace.domain.exception.workspace.AlreadyMemberException;
+import com.collabspace.authworkspace.domain.exception.workspace.CreatorSelfRemovalException;
+import com.collabspace.authworkspace.domain.exception.workspace.InvitedUserNotFoundException;
+import com.collabspace.authworkspace.domain.exception.workspace.LastAdminInvariantException;
+import com.collabspace.authworkspace.domain.exception.workspace.TargetNotMemberException;
 import com.collabspace.authworkspace.domain.model.auth.User;
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
@@ -275,7 +275,7 @@ class WorkspaceApplicationServiceTest {
 		when(workspaceRepository.save(any(Workspace.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(workspaceMembershipRepository.save(any(WorkspaceMembership.class))).thenAnswer(inv -> inv.getArgument(0));
 		when(workspaceMembershipRepository.findByUserId(USER_ID)).thenReturn(List.of());
-		when(jwtService.issueAccessToken(anyString(), anyList()))
+		when(jwtService.issueAccessToken(any(UUID.class), anyList()))
 			.thenThrow(new IllegalStateException("simulated signing failure"));
 
 		assertThrows(IllegalStateException.class, () -> service.create(command));
@@ -514,13 +514,13 @@ class WorkspaceApplicationServiceTest {
 			.thenReturn(Optional.of(current));
 		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
 		when(workspaceMembershipRepository.save(any(WorkspaceMembership.class))).thenAnswer(inv -> inv.getArgument(0));
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("new-token", "jti-1"));
+		when(jwtService.issueAccessToken(any(UUID.class), anyList())).thenReturn(new AccessToken("new-token", "jti-1"));
 
 		ChangeMemberRoleResult result = service.changeMemberRole(changeRoleCommand(ADMIN_ID, ADMIN_ID, "member"));
 
 		assertThat(result.role()).isEqualTo(WorkspaceRole.MEMBER);
 		assertThat(result.accessToken()).contains("new-token");
-		verify(jwtService).issueAccessToken(eq(ADMIN_ID.toString()), anyList());
+		verify(jwtService).issueAccessToken(eq(ADMIN_ID), anyList());
 		verify(transactionManager).commit(transactionStatus);
 		verifyNoInteractions(membershipStalenessRepository);
 		verifyNoInteractions(workspaceEventPublisher);
@@ -666,7 +666,7 @@ class WorkspaceApplicationServiceTest {
 			.thenReturn(Optional.of(current));
 		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
 		when(workspaceMembershipRepository.save(any(WorkspaceMembership.class))).thenAnswer(inv -> inv.getArgument(0));
-		when(jwtService.issueAccessToken(anyString(), anyList()))
+		when(jwtService.issueAccessToken(any(UUID.class), anyList()))
 			.thenThrow(new IllegalStateException("simulated signing failure"));
 
 		assertThrows(IllegalStateException.class,
@@ -726,7 +726,7 @@ class WorkspaceApplicationServiceTest {
 			.thenReturn(Optional.of(current));
 		when(workspaceMembershipRepository.countAdminsForUpdate(WORKSPACE_ID)).thenReturn(2);
 		when(workspaceMembershipRepository.save(any(WorkspaceMembership.class))).thenAnswer(inv -> inv.getArgument(0));
-		when(jwtService.issueAccessToken(anyString(), anyList())).thenReturn(new AccessToken("token", "jti-log-1"));
+		when(jwtService.issueAccessToken(any(UUID.class), anyList())).thenReturn(new AccessToken("token", "jti-log-1"));
 
 		service.changeMemberRole(changeRoleCommand(ADMIN_ID, ADMIN_ID, "member"));
 
