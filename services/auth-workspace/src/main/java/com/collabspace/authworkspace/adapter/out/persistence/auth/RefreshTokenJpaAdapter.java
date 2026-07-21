@@ -7,6 +7,7 @@ import com.collabspace.authworkspace.domain.model.auth.RefreshToken;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
@@ -18,8 +19,18 @@ public class RefreshTokenJpaAdapter implements RefreshTokenRepository {
 	}
 
 	@Override
+	public Optional<RefreshToken> findByTokenHash(String tokenHash) {
+		return jpaRepository.findByTokenHash(tokenHash).map(RefreshTokenJpaAdapter::toDomain);
+	}
+
+	@Override
 	public RefreshToken save(RefreshToken refreshToken) {
 		return toDomain(jpaRepository.save(toEntity(refreshToken)));
+	}
+
+	@Override
+	public int deleteByIdReturningCount(UUID id) {
+		return jpaRepository.deleteByIdReturningCount(id);
 	}
 
 	private static RefreshTokenEntity toEntity(RefreshToken refreshToken) {

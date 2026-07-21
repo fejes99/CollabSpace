@@ -60,7 +60,7 @@ class LoginIntegrationTest {
 			.andExpect(jsonPath("$.user.createdAt").isNotEmpty())
 			.andExpect(cookie().exists(REFRESH_TOKEN_COOKIE))
 			.andExpect(cookie().httpOnly(REFRESH_TOKEN_COOKIE, true))
-			.andExpect(cookie().path(REFRESH_TOKEN_COOKIE, "/auth"))
+			.andExpect(cookie().path(REFRESH_TOKEN_COOKIE, "/v1/auth"))
 			.andExpect(cookie().maxAge(REFRESH_TOKEN_COOKIE, 604800));
 	}
 

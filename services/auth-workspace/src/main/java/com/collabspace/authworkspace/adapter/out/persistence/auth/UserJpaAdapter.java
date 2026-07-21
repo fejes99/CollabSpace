@@ -3,7 +3,7 @@ package com.collabspace.authworkspace.adapter.out.persistence.auth;
 import com.collabspace.authworkspace.adapter.out.persistence.auth.entity.UserEntity;
 import com.collabspace.authworkspace.adapter.out.persistence.auth.repository.UserJpaRepository;
 import com.collabspace.authworkspace.application.port.out.auth.UserRepository;
-import com.collabspace.authworkspace.domain.exception.EmailAlreadyTakenException;
+import com.collabspace.authworkspace.domain.exception.auth.EmailAlreadyTakenException;
 import com.collabspace.authworkspace.domain.model.auth.User;
 import org.hibernate.exception.ConstraintViolationException;
 import org.springframework.dao.DataIntegrityViolationException;

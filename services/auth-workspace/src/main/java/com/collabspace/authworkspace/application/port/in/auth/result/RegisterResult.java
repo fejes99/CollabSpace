@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.application.port.in.auth;
+package com.collabspace.authworkspace.application.port.in.auth.result;
 
 import com.collabspace.authworkspace.domain.model.auth.User;
 

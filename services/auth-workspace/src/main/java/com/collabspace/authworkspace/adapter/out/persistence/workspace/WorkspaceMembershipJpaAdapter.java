@@ -3,7 +3,7 @@ package com.collabspace.authworkspace.adapter.out.persistence.workspace;
 import com.collabspace.authworkspace.adapter.out.persistence.workspace.entity.WorkspaceMembershipEntity;
 import com.collabspace.authworkspace.adapter.out.persistence.workspace.repository.WorkspaceMembershipJpaRepository;
 import com.collabspace.authworkspace.application.port.out.workspace.WorkspaceMembershipRepository;
-import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
+import com.collabspace.authworkspace.domain.exception.workspace.AlreadyMemberException;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceRole;
 import org.hibernate.exception.ConstraintViolationException;

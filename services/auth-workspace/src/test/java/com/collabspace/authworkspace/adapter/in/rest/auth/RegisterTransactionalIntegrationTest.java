@@ -15,9 +15,11 @@ import org.springframework.http.MediaType;
 import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.util.UUID;
+
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyList;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doThrow;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -57,7 +59,7 @@ class RegisterTransactionalIntegrationTest {
 	@DisplayName("rolls back user insert when JWT signing fails")
 	void registrationRollsBackUserInsertWhenJwtSigningFails() throws Exception {
 		doThrow(new IllegalStateException("simulated signing failure")).when(jwtService)
-			.issueAccessToken(anyString(), anyList());
+			.issueAccessToken(any(UUID.class), anyList());
 
 		mvc.perform(post(REGISTER_URL).header("X-Internal-Token", internalToken)
 			.contentType(MediaType.APPLICATION_JSON)

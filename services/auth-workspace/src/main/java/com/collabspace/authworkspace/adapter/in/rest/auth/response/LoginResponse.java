@@ -1,6 +1,6 @@
-package com.collabspace.authworkspace.adapter.in.rest.auth;
+package com.collabspace.authworkspace.adapter.in.rest.auth.response;
 
-import com.collabspace.authworkspace.application.port.in.auth.LoginResult;
+import com.collabspace.authworkspace.application.port.in.auth.result.LoginResult;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 public record LoginResponse(@Schema(

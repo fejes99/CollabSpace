@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.adapter.in.rest.auth;
+package com.collabspace.authworkspace.adapter.in.rest.auth.response;
 
 import io.swagger.v3.oas.annotations.media.Schema;
 

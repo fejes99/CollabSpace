@@ -1,4 +1,4 @@
-package com.collabspace.authworkspace.application.port.in.auth;
+package com.collabspace.authworkspace.application.port.in.auth.command;
 
 import java.util.Optional;
 

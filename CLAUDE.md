@@ -46,13 +46,13 @@ This is a tutor relationship, not a pair-programming session. The goal is profes
 
 Current stage: Stage 2 — Service Implementation (in progress)
 Current service: auth-workspace
-Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), invite-member (`POST /v1/workspaces/{id}/members`, PR #48), change-member-role (`PATCH /v1/workspaces/{id}/members/{userId}`, PR #49), and remove-member (`DELETE /v1/workspaces/{workspaceId}/members/{userId}`, PR #50) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 is not yet verified on AWS. list-workspaces (`GET /v1/workspaces`, PR 12) is implemented and tested locally (297 tests passing, real Docker/Testcontainers run); PR being opened, not yet reviewed, merged, or verified on AWS. Next: the stretch goals — token refresh, then logout.
+Current goal: Database connection, Flyway migration, JWT infrastructure, user registration, login, the security filter chain (internal-token + header-based auth), workspace creation (`POST /v1/workspaces`, PR #45), invite-member (`POST /v1/workspaces/{id}/members`, PR #48), change-member-role (`PATCH /v1/workspaces/{id}/members/{userId}`, PR #49), remove-member (`DELETE /v1/workspaces/{workspaceId}/members/{userId}`, PR #50), and list-workspaces (`GET /v1/workspaces`, PR #52) are merged — see [docs/CHANGELOG.md](docs/CHANGELOG.md) for what each of those shipped. PR #48 and PR #52 are not yet verified on AWS. Token refresh (`POST /v1/auth/refresh`, PR 13) is implemented, tested locally (329 tests, real Docker/Testcontainers run), and PR is open — not yet merged or verified on AWS. Next: logout — the other required v1 flow per `authentication.md`, not a stretch goal (the `(stretch)` label was stale; corrected 2026-07-20).
 
 Out of scope: frontend, full inter-service event flows, production hardening, monitoring dashboards.
 
 Blocked on: nothing
 
-Next milestone: PR 13 — `POST /v1/auth/refresh` (token refresh, stretch; plan doc not yet written) — see `notes/auth-workspace-prs.md` §PR 13 for the design sketch (atomic refresh-token rotation: delete old row, insert new row, issue new access token, all in one transaction). After that: PR 14 — `POST /v1/auth/logout` (Redis blocklist write side).
+Next milestone: PR 14 — `POST /v1/auth/logout` (Redis blocklist write side, required v1 flow, not stretch) — see `notes/auth-workspace-prs.md` §PR 14 for the design sketch. Plan doc not yet written.
 
 Past completions live in [docs/CHANGELOG.md](docs/CHANGELOG.md).
 

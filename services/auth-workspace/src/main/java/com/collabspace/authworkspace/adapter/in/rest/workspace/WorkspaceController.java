@@ -3,6 +3,7 @@ package com.collabspace.authworkspace.adapter.in.rest.workspace;
 import com.collabspace.authworkspace.adapter.in.rest.common.PagedResponse;
 import com.collabspace.authworkspace.adapter.in.rest.common.PaginationMetadata;
 import com.collabspace.authworkspace.adapter.in.rest.util.ClientIpResolver;
+import com.collabspace.authworkspace.adapter.in.rest.util.CurrentUserIdResolver;
 import com.collabspace.authworkspace.adapter.in.rest.workspace.request.ChangeMemberRoleRequest;
 import com.collabspace.authworkspace.adapter.in.rest.workspace.request.CreateWorkspaceRequest;
 import com.collabspace.authworkspace.adapter.in.rest.workspace.request.InviteMemberRequest;
@@ -40,8 +41,6 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -99,7 +98,7 @@ public class WorkspaceController {
 	public ResponseEntity<PagedResponse<WorkspaceListItem>> getWorkspaces(
 			@RequestParam(defaultValue = "20") @Min(1) @Max(100) int limit,
 			@RequestParam(required = false) @ValidAfter String after) {
-		UUID userId = currentUserId();
+		UUID userId = CurrentUserIdResolver.resolve();
 		String correlationId = MDC.get("correlationId");
 
 		Optional<Instant> afterCreatedAt = Optional.empty();
@@ -147,7 +146,7 @@ public class WorkspaceController {
 	@PostMapping()
 	public ResponseEntity<CreateWorkspaceResponse> createWorkspace(@RequestBody @Valid CreateWorkspaceRequest request,
 			HttpServletRequest httpRequest) {
-		UUID userId = currentUserId();
+		UUID userId = CurrentUserIdResolver.resolve();
 		String ipAddress = ClientIpResolver.resolve(httpRequest);
 
 		CreateWorkspaceCommand command = new CreateWorkspaceCommand(request.name(), request.description(), userId,
@@ -179,7 +178,7 @@ public class WorkspaceController {
 	@PostMapping("/{workspaceId}/members")
 	public ResponseEntity<InviteMemberResponse> inviteMember(@PathVariable UUID workspaceId,
 			@RequestBody @Valid InviteMemberRequest request, HttpServletRequest httpRequest) {
-		UUID adminId = currentUserId();
+		UUID adminId = CurrentUserIdResolver.resolve();
 		String ipAddress = ClientIpResolver.resolve(httpRequest);
 		String correlationId = MDC.get("correlationId");
 
@@ -213,7 +212,7 @@ public class WorkspaceController {
 	public ResponseEntity<ChangeMemberRoleResponse> changeMemberRole(@PathVariable UUID workspaceId,
 			@PathVariable UUID memberId, @RequestBody @Valid ChangeMemberRoleRequest request,
 			HttpServletRequest httpRequest) {
-		UUID adminId = currentUserId();
+		UUID adminId = CurrentUserIdResolver.resolve();
 		String ipAddress = ClientIpResolver.resolve(httpRequest);
 		String correlationId = MDC.get("correlationId");
 
@@ -244,7 +243,7 @@ public class WorkspaceController {
 	@DeleteMapping("/{workspaceId}/members/{memberId}")
 	public ResponseEntity<Void> removeMember(@PathVariable UUID workspaceId, @PathVariable UUID memberId,
 			HttpServletRequest httpRequest) {
-		UUID adminId = currentUserId();
+		UUID adminId = CurrentUserIdResolver.resolve();
 		String ipAddress = ClientIpResolver.resolve(httpRequest);
 		String correlationId = MDC.get("correlationId");
 
@@ -254,18 +253,6 @@ public class WorkspaceController {
 		removeMemberUseCase.removeMember(command);
 
 		return ResponseEntity.noContent().build();
-	}
-
-	private static UUID currentUserId() {
-		Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-		if (authentication == null) {
-			// SecurityConfig's anyRequest().authenticated() guarantees this never fires
-			// --
-			// if it does, the security config itself is broken, not this request.
-			throw new IllegalStateException(
-					"Authenticated request reached the controller with no Authentication in the SecurityContext");
-		}
-		return UUID.fromString(authentication.getName());
 	}
 
 }

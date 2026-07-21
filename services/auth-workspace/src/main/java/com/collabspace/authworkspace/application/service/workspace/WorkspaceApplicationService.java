@@ -28,11 +28,11 @@ import com.collabspace.authworkspace.application.service.AccessToken;
 import com.collabspace.authworkspace.application.service.CommitThenAction;
 import com.collabspace.authworkspace.application.service.JwtService;
 import com.collabspace.authworkspace.application.util.CryptoUtils;
-import com.collabspace.authworkspace.domain.exception.AlreadyMemberException;
-import com.collabspace.authworkspace.domain.exception.CreatorSelfRemovalException;
-import com.collabspace.authworkspace.domain.exception.InvitedUserNotFoundException;
-import com.collabspace.authworkspace.domain.exception.LastAdminInvariantException;
-import com.collabspace.authworkspace.domain.exception.TargetNotMemberException;
+import com.collabspace.authworkspace.domain.exception.workspace.AlreadyMemberException;
+import com.collabspace.authworkspace.domain.exception.workspace.CreatorSelfRemovalException;
+import com.collabspace.authworkspace.domain.exception.workspace.InvitedUserNotFoundException;
+import com.collabspace.authworkspace.domain.exception.workspace.LastAdminInvariantException;
+import com.collabspace.authworkspace.domain.exception.workspace.TargetNotMemberException;
 import com.collabspace.authworkspace.domain.model.auth.User;
 import com.collabspace.authworkspace.domain.model.workspace.Workspace;
 import com.collabspace.authworkspace.domain.model.workspace.WorkspaceMembership;
@@ -329,7 +329,7 @@ public class WorkspaceApplicationService implements CreateWorkspaceUseCase, Invi
 
 	private AccessToken mintAccessToken(UUID userId) {
 		List<WorkspaceMembership> memberships = workspaceMembershipRepository.findByUserId(userId);
-		return jwtService.issueAccessToken(userId.toString(), memberships);
+		return jwtService.issueAccessToken(userId, memberships);
 	}
 
 	// SdkException: SNS transport failure. IllegalStateException:

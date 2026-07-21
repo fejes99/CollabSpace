@@ -1,8 +1,8 @@
 package com.collabspace.authworkspace.adapter.in.rest.security.filter;
 
+import com.collabspace.authworkspace.adapter.in.rest.security.MembershipClaim;
 import com.collabspace.authworkspace.adapter.in.rest.security.ProblemDetailsSecurityHandler;
 import com.collabspace.authworkspace.adapter.in.rest.security.SecurityExemptPaths;
-import com.collabspace.authworkspace.adapter.in.rest.security.MembershipClaim;
 import com.collabspace.authworkspace.adapter.in.rest.security.WorkspaceAuthority;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.MalformedIdentityHeadersException;
 import com.collabspace.authworkspace.adapter.in.rest.security.exception.SecurityAuthenticationException;
@@ -36,8 +36,8 @@ public class HeaderAuthenticationFilter extends OncePerRequestFilter {
 	// Routes that never carry identity headers, by design -- either they don't go
 	// through the JWT authorizer at all (.well-known, actuator/health/**) or they're
 	// the pre-authentication auth endpoints themselves (register, login).
-	private static final Set<String> ANONYMOUS_PATHS = Set.of("/v1/auth/register", "/v1/auth/login", "/actuator/health",
-			"/actuator/health/readiness", "/actuator/health/liveness");
+	private static final Set<String> ANONYMOUS_PATHS = Set.of("/v1/auth/register", "/v1/auth/login", "/v1/auth/refresh",
+			"/actuator/health", "/actuator/health/readiness", "/actuator/health/liveness");
 
 	private static final int MAX_WORKSPACES_HEADER_BYTES = 4096;
 
