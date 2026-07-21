@@ -464,6 +464,8 @@ resource "aws_apigatewayv2_integration" "auth_workspace" {
 
 # Public routes — no JWT Authorizer. These must be reachable without a token:
 #   /v1/auth/register, /v1/auth/login: the client does not have a JWT yet.
+#   /v1/auth/refresh: identity comes from the refresh_token cookie, not a JWT —
+#     the whole point of this route is to get a new one.
 #   /.well-known/jwks.json: the JWT Authorizer itself fetches from this URL.
 #   /actuator/health: ALB and monitoring probes; must not require auth.
 
@@ -476,6 +478,12 @@ resource "aws_apigatewayv2_route" "auth_register" {
 resource "aws_apigatewayv2_route" "auth_login" {
   api_id    = module.api_gateway.api_id
   route_key = "POST /v1/auth/login"
+  target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
+}
+
+resource "aws_apigatewayv2_route" "auth_refresh" {
+  api_id    = module.api_gateway.api_id
+  route_key = "POST /v1/auth/refresh"
   target    = "integrations/${aws_apigatewayv2_integration.auth_workspace.id}"
 }
 
