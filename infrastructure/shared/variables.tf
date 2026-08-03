@@ -20,6 +20,12 @@ variable "github_repo" {
   type        = string
 }
 
+variable "github_pat" {
+  description = "GitHub personal access token (fine-grained, Contents:Read only, scoped to this one repo). Used by CodeBuild to clone the source for the nightly environments/dev destroy job. Source from secrets.auto.tfvars (gitignored)."
+  type        = string
+  sensitive   = true
+}
+
 variable "ecr_max_image_count" {
   description = "Number of images to retain per ECR repository. Images beyond this count are expired by the lifecycle policy."
   type        = number
